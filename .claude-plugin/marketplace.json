@@ -1,0 +1,12 @@
+{
+  "name": "revayat-subtitle-marketplace",
+  "owner": {"name": "Kiaro Sama"},
+  "plugins": [
+    {
+      "name": "revayat-subtitle",
+      "description": "Translate and repair Persian anime subtitles.",
+      "source": "./",
+      "version": "1.0.0"
+    }
+  ]
+}
