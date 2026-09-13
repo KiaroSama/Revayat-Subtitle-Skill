@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.10'
+          - os: ubuntu-latest
+            python: '3.14'
+          - os: windows-latest
+            python: '3.14'
+          - os: macos-latest
+            python: '3.14'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install libass renderer and fonts
+        if: runner.os == 'Linux' && matrix.python == '3.14'
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - name: Check CLI, formats, installation and rendering
+        if: runner.os == 'Linux' && matrix.python == '3.14'
+        run: python -X utf8 tests/check.py --render
+      - name: Check CLI, formats and native installation
+        if: runner.os != 'Linux' || matrix.python != '3.14'
+        run: python -X utf8 tests/check.py

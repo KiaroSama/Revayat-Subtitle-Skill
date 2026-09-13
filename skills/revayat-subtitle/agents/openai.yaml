@@ -1,0 +1,4 @@
+interface:
+  display_name: "Revayat Subtitle"
+  short_description: "Translate and repair Persian anime subtitles"
+  default_prompt: "Use $revayat-subtitle to review these subtitles and deliver a Persian Sub.zip with one file per episode."

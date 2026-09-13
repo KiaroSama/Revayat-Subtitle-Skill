@@ -1,0 +1,21 @@
+{
+  "name": "revayat-subtitle",
+  "version": "1.0.0",
+  "description": "Translate and repair Persian anime subtitles with complete cue review and FFmpeg visual QA.",
+  "author": {"name": "Kiaro Sama", "url": "https://github.com/KiaroSama"},
+  "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+  "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+  "keywords": ["subtitles", "anime", "persian", "farsi", "rtl", "ass", "srt"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Revayat Subtitle",
+    "shortDescription": "Translate and repair Persian anime subtitles",
+    "longDescription": "Review every cue, reconcile competing releases, preserve Japanese honorifics and names, inspect FFmpeg renders and deliver Sub.zip.",
+    "developerName": "Kiaro Sama",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write", "Interactive"],
+    "websiteURL": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+    "defaultPrompt": ["Translate these subtitles into spoken Persian.", "Repair this Persian season and give me Sub.zip."],
+    "brandColor": "#236A70"
+  }
+}
