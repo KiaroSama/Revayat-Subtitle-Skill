@@ -105,9 +105,8 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 
 `ready: true` confirms the FFmpeg filters are available. It does not prove that a
 font can draw Persian or that a particular episode displays correctly. When
-FFmpeg is outside PATH, use `--ffmpeg PATH` or `REVAYAT_FFMPEG`. The
-[FFmpeg documentation](https://ffmpeg.org/ffmpeg-filters.html#ass) describes the
-libass build requirement; actual image inspection is part of the workflow.
+FFmpeg is outside PATH, use `--ffmpeg PATH` or `REVAYAT_FFMPEG`.
+Actual image inspection is part of the workflow.
 
 ## Use
 
@@ -250,17 +249,6 @@ the subtitles, and place that log beside the translated files as required by
 Execution logs record progress/errors without subtitle bodies;
 read-only installations fall back to stderr. See
 [execution logs](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs).
-
-## Credits
-
-The package layout and agent-led translation workflow follow
-[Revayat Comic](https://github.com/KiaroSama/Revayat-Comic-Skill) and
-[Revayat Novel](https://github.com/KiaroSama/Revayat-Novel-Skill).
-Subtitle rendering uses [FFmpeg](https://ffmpeg.org/) and
-[libass](https://github.com/libass/libass), with shaping and bidi handling from
-[HarfBuzz](https://harfbuzz.github.io/) and [FriBidi](https://github.com/fribidi/fribidi).
-Format and direction guidance comes from [Aegisub](https://aegisub.org/docs/latest/ass_tags/)
-and [Unicode](https://www.unicode.org/reports/tr9/).
 
 ## Donate
 
