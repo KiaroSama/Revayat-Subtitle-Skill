@@ -29,7 +29,7 @@ def destination(agent: str, scope: str, base: Path) -> Path:
 
 
 def skill_files() -> list[Path]:
-    files = [SKILL / "SKILL.md", SKILL / "LICENSE"]
+    files = [SKILL / "SKILL.md", SKILL / "LICENSE", SKILL / "requirements.txt"]
     for folder, suffixes in {"scripts": {".py"}, "references": {".md"}, "agents": {".yaml"}}.items():
         files.extend(sorted(path for path in (SKILL / folder).iterdir() if path.suffix in suffixes))
     if any(not path.is_file() or path.is_symlink() for path in files):
@@ -55,7 +55,8 @@ def install(target: Path, *, plugin: bool, force: bool) -> Path | None:
         pairs = [(path, Path("skills") / NAME / path.relative_to(SKILL)) for path in files]
         for relative in ("plugin.json", "LICENSE", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
                          ".claude-plugin/marketplace.json", ".cursor-plugin/plugin.json",
-                         "commands/translate-subtitles.md"):
+                         "commands/translate-subtitles.md", "commands/revayat-subtitle-resume.md",
+                         "commands/revayat-subtitle-qa.md"):
             source = REPO / relative
             if not source.is_file() or source.is_symlink():
                 raise ValueError("Plugin distribution is incomplete or contains a symlink")

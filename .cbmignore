@@ -1,0 +1,6 @@
+# These scripts are implementation source, not generated tooling.
+!skills/
+!skills/revayat-subtitle/
+!skills/revayat-subtitle/scripts/
+!evaluation/
+!docs/

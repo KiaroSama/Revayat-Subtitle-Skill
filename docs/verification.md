@@ -49,8 +49,8 @@ The skill documents these as decisions to make after actual image inspection.
 - Embedded font payload preservation/removal has mechanical fixtures; the real
   selected ASS files had no embedded font sections. No claim of exhaustive
   embedded-font renderer compatibility is made.
-- The local code graph refused enrollment for this new root; direct source review
-  was used after consulting the reference projects' existing graphs.
+- Codebase Memory enrollment was repaired for the exact project root. Its index
+  is local development tooling, separate from the distributed subtitle runtime.
 
 The private input media, extracted subtitles, review worksheets and image evidence
 stay local and are excluded from skill/plugin distributions and CI uploads.

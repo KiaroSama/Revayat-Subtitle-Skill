@@ -56,9 +56,11 @@ def completed(work: Path):
     write_json(work / "worksheets" / "s0002.json", donor)
 
 
-class SubtitleChecks(unittest.TestCase):
+class WorkspaceCase(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="subtitle check فارسی ")
+        scratch = ROOT / ".scratch" / "checks"
+        scratch.mkdir(parents=True, exist_ok=True)
+        self.temporary = tempfile.TemporaryDirectory(prefix="subtitle check فارسی ", dir=scratch)
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.work = self.root / "work with spaces"
@@ -75,6 +77,23 @@ class SubtitleChecks(unittest.TestCase):
     def import_work(self):
         prepare([FIXTURES / "episode.ass", FIXTURES / "alternative.srt"], self.work,
                 "Fixture Series", 1, "utf-8-sig", None, "fa")
+
+
+class SubtitleChecks(WorkspaceCase):
+    def test_multilingual_sources_survive_import(self):
+        cases = read_json(ROOT / "evaluation" / "cases.json")
+        for language in ("ja", "zh", "fr", "es"):
+            with self.subTest(language=language):
+                source_text = next(case["source"] for case in cases if case["source_language"] == language)
+                source = self.root / f"{language}.srt"
+                raw = f"1\n00:00:01,000 --> 00:00:03,000\n{source_text}\n".encode("utf-8")
+                source.write_bytes(raw)
+                work = self.root / language
+                prepare([source], work, "Fixture Series", 1, "utf-8-sig", None, "fa")
+                row = read_json(work / "worksheets" / "s0001.json")[0]
+                self.assertEqual(row["source_text"], source_text)
+                self.assertFalse(row["reviewed"])
+                self.assertEqual(source.read_bytes(), raw)
 
     def test_cli_roundtrip_and_refusal(self):
         original = (FIXTURES / "episode.ass").read_bytes()
@@ -243,6 +262,9 @@ class SubtitleChecks(unittest.TestCase):
         run([sys.executable, str(ROOT / "install" / "install.py"), "--plugin", "--destination", str(plugin)], timeout=15)
         self.assertEqual(read_json(plugin / "plugin.json")["name"], "revayat-subtitle")
         self.assertTrue((plugin / ".codex-plugin" / "plugin.json").exists())
+        self.assertTrue((plugin / "commands" / "revayat-subtitle-resume.md").is_file())
+        self.assertTrue((plugin / "commands" / "revayat-subtitle-qa.md").is_file())
+        self.assertTrue((plugin / "skills" / "revayat-subtitle" / "requirements.txt").is_file())
         self.assertFalse((plugin / "tests").exists())
         self.assertFalse((plugin / ".git").exists())
         self.assertFalse(list(plugin.rglob("*.log")))
@@ -268,6 +290,20 @@ class SubtitleChecks(unittest.TestCase):
         run([sys.executable, str(ROOT / "install" / "install.py"), "--destination", str(target), "--force"], timeout=15)
         self.assertEqual(len(list(self.root.glob("launcher copy.backup-*"))), 1)
 
+    def test_language_evaluation_requires_review_for_unknown_wording(self):
+        cases = read_json(ROOT / "evaluation" / "cases.json")
+        answers = {case["id"]: case["accepted"][0] for case in cases}
+        path = self.root / "answers.json"
+        write_json(path, answers)
+        command = [sys.executable, str(ROOT / "evaluation" / "score.py"), "--answers", str(path)]
+        result = json.loads(run(command, cwd=self.root, timeout=15))
+        self.assertEqual(result["counts"]["known_wording"], len(cases))
+        self.assertFalse(result["linguistic_quality_certified"])
+        answers[cases[0]["id"]] = "A new wording needing editorial review"
+        write_json(path, answers)
+        with self.assertRaisesRegex(ValueError, "needs_review"):
+            run(command, cwd=self.root, timeout=15)
+
     def test_distribution_syntax_and_links(self):
         for path in ROOT.rglob("*.py"):
             if any(part.startswith(".") or part in {"work", "out"} for part in path.relative_to(ROOT).parts):
@@ -278,7 +314,7 @@ class SubtitleChecks(unittest.TestCase):
         for relative in ("plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json", ".claude-plugin/plugin.json"):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
-            self.assertEqual(manifest["version"], "1.0.0")
+            self.assertEqual(manifest["version"], "1.1.0")
         documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
                      *ROOT.glob("skills/**/*.md")]
         for document in documents:
@@ -287,8 +323,7 @@ class SubtitleChecks(unittest.TestCase):
                     self.assertTrue((document.parent / target).is_file(), f"Broken link in {document.name}: {target}")
 
 
-class RenderCheck(SubtitleChecks):
-    # Select just this method in the render tier; ordinary checks run once.
+class RenderCheck(WorkspaceCase):
     def test_ffmpeg_review_gate_and_zip_bytes(self):
         from render import package, render
         self.import_work()
@@ -322,6 +357,14 @@ class RenderCheck(SubtitleChecks):
             frame["reviewed"] = True
             frame["note"] = "Automated gate-contract fixture; not a claim of human visual approval."
         write_json(Path(evidence["review"]), review)
+        before = {p.relative_to(self.work).as_posix(): digest(p.read_bytes())
+                  for p in self.work.rglob("*") if p.is_file()}
+        checked = json.loads(run([sys.executable, str(CLI), "qa", "--build", str(output)], timeout=15))
+        self.assertTrue(checked["ok"])
+        self.assertEqual(checked["reviewed_frames"], 7)
+        after = {p.relative_to(self.work).as_posix(): digest(p.read_bytes())
+                 for p in self.work.rglob("*") if p.is_file()}
+        self.assertEqual(before, after, "QA must not change translation or approval files")
         delivered = package(output, self.root / "Sub.zip")
         with zipfile.ZipFile(delivered["zip"]) as archive:
             self.assertEqual(archive.namelist(), ["Sub/S01E01.ass"])
@@ -339,8 +382,9 @@ def main():
     args = parser.parse_args()
     if args.worker:
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(SubtitleChecks)
+        suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py"))
         if args.render:
-            suite.addTest(RenderCheck("test_ffmpeg_review_gate_and_zip_bytes"))
+            suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(RenderCheck))
         return 0 if unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite).wasSuccessful() else 1
     with operational_log("check"):
         command = [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "--worker"]

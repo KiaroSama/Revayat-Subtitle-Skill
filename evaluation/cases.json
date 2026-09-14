@@ -1,0 +1,16 @@
+[
+  {"id":"spoken_persian","source_language":"en","source":"I want to go home.","accepted":["می‌خوام برم خونه.","دلم می‌خواد برم خونه."],"focus":"Natural spoken Persian without a literary register."},
+  {"id":"mixed_word_order","source_language":"fa","source":"رو دیدم. OVA من دیروز","accepted":["من دیروز OVA رو دیدم."],"focus":"Repair logical word order before bidi rendering."},
+  {"id":"honorific","source_language":"en","source":"Thank you, Rin-san.","accepted":["ممنون، رین-سان.","مرسی، رین-سان."],"focus":"Retain the Japanese honorific and consistent name."},
+  {"id":"quote_scope","source_language":"fa","source":"اون اسمش رو گذاشت \"امید\".","accepted":["اون اسمش رو گذاشت «امید».","اون اسمش رو گذاشت \"امید\"."],"focus":"Keep quotes around the name rather than the whole sentence."},
+  {"id":"uncensored_intensity","source_language":"en","source":"Damn it!","accepted":["لعنتی!","لعنت بهش!"],"focus":"Retain the source intensity without censoring or escalating it."},
+  {"id":"story_translator","source_language":"fa","source":"اون مترجم بود.","accepted":["اون مترجم بود."],"focus":"A story reference to a translator is not a removable fansub credit."},
+  {"id":"ja_causative_passive","source_language":"ja","source":"先生に掃除させられた。","accepted":["معلم مجبورم کرد تمیزکاری کنم."],"focus":"The speaker was made to clean; do not reverse agent and patient."},
+  {"id":"ja_honorific_source","source_language":"ja","source":"リンさん、ありがとう。","accepted":["رین-سان، ممنون.","رین-سان، مرسی."],"focus":"Direct Japanese input; retain the researched name and honorific."},
+  {"id":"zh_experience","source_language":"zh","source":"我没去过北京。","accepted":["تا حالا پکن نرفتم.","من تا حالا پکن نرفتم."],"focus":"Negated experience, not merely a cancelled trip."},
+  {"id":"zh_passive","source_language":"zh","source":"小王被老师批评了。","accepted":["معلم از شیائو وانگ انتقاد کرد."],"focus":"The teacher criticized Xiao Wang; do not reverse participant roles."},
+  {"id":"fr_restriction","source_language":"fr","source":"Il n'a que deux clés.","accepted":["فقط دو تا کلید داره."],"focus":"Ne...que restricts; it does not negate possession."},
+  {"id":"fr_expletive_ne","source_language":"fr","source":"Je crains qu'il ne parte.","accepted":["می‌ترسم بره."],"focus":"Expletive ne does not mean fear that he will not leave."},
+  {"id":"es_negative_concord","source_language":"es","source":"No vino nadie.","accepted":["هیچ‌کس نیومد."],"focus":"Negative concord remains a negative statement."},
+  {"id":"es_voseo","source_language":"es","source":"¿Vos querés venir?","accepted":["تو می‌خوای بیای؟","می‌خوای بیای؟"],"focus":"Voseo can address one familiar person, not a plural group."}
+]

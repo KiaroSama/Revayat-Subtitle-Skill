@@ -1,0 +1,3 @@
+# The runtime uses the Python standard library; no pip packages are required.
+# FFmpeg with libass and a Persian-capable font are external prerequisites.
+# This manifest supports the common Revayat installation command.

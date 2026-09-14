@@ -1,8 +1,8 @@
 {
   "name": "revayat-subtitle",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "GPL-3.0-or-later",
-  "description": "Translate and repair Persian anime subtitles with complete cue review and FFmpeg visual QA.",
+  "description": "Translate anime subtitles from any source language into Persian, or repair Persian, with complete cue review and FFmpeg visual QA.",
   "author": {"name": "Kiaro Sama", "url": "https://github.com/KiaroSama"},
   "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
   "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
