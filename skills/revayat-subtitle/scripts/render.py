@@ -141,12 +141,13 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
         raise
 
 
-def package(build: Path, output: Path) -> dict:
+def check_delivery(build: Path) -> tuple[dict, list[str], set[str], int]:
     manifest, docs = load_build(build)
     names = [item["file"] for item in manifest["episodes"]]
     if len(set(names)) != len(names):
         raise ValueError("Duplicate episode filenames")
     backgrounds = set()
+    frame_count = 0
     for episode in manifest["episodes"]:
         evidence = read_json(build / "renders" / f"{episode['id']}.json")
         if (evidence.get("identity") != manifest["identity"] or evidence.get("episode") != episode["id"]
@@ -163,6 +164,20 @@ def package(build: Path, output: Path) -> dict:
             if digest(path.read_bytes()) != frame["sha256"]:
                 raise ValueError("Rendered image changed after review")
         backgrounds.add(evidence.get("background"))
+        frame_count += len(frames)
+    return manifest, names, backgrounds, frame_count
+
+
+def qa(build: Path) -> dict:
+    manifest, names, backgrounds, frame_count = check_delivery(build)
+    return {"ok": True, "identity": manifest["identity"], "episodes": len(names),
+            "reviewed_cues": manifest["reviewed_cues"], "reviewed_frames": frame_count,
+            "font_policy": manifest["font_policy"], "backgrounds": sorted(backgrounds),
+            "sync_verified": False}
+
+
+def package(build: Path, output: Path) -> dict:
+    manifest, names, backgrounds, _ = check_delivery(build)
     if output.exists():
         raise ValueError("Output already exists; use a new ZIP filename")
     if output.suffix.lower() != ".zip":

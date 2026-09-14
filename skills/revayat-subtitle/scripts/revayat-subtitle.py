@@ -1,4 +1,4 @@
-"""Revayat Subtitle: prepare -> build -> render -> package; translation belongs to the agent."""
+"""Revayat Subtitle: prepare -> build -> render -> qa -> package; translation belongs to the agent."""
 
 from __future__ import annotations
 
@@ -36,6 +36,8 @@ def main(argv=None) -> int:
         render.add_argument("--video", type=Path)
         render.add_argument("--fonts-dir", type=Path)
         render.add_argument("--all-cues", action="store_true")
+        qa = commands.add_parser("qa", help="Read-only delivery checks for a reviewed subtitle build")
+        qa.add_argument("--build", required=True, type=Path)
         package = commands.add_parser("package", help="Deliver only reviewed episode subtitles inside Sub/ in a ZIP")
         package.add_argument("--build", required=True, type=Path)
         package.add_argument("--out", required=True, type=Path)
@@ -54,6 +56,8 @@ def main(argv=None) -> int:
             elif args.command == "render":
                 result = render_module.render(args.build.resolve(), args.episode, args.ffmpeg,
                                               args.video, args.fonts_dir, args.all_cues)
+            elif args.command == "qa":
+                result = render_module.qa(args.build.resolve())
             else:
                 result = render_module.package(args.build.resolve(), args.out.resolve())
             code = 1 if result.get("ready") is False else 0

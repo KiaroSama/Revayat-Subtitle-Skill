@@ -16,6 +16,8 @@
 **/.ignoreme
 /.scratch/
 /.revayat-venv/
+/.graphify-venv/
+/.venv/
 /work/
 /out/
 /dist/

@@ -51,7 +51,8 @@ paths, hashes and encodings. `episodes` starts empty to prevent guessed numberin
 
 This is an example of fields to edit, **not a replacement project file**. Every
 source is assigned exactly once. Use `remove` instead of `keep` only for requested
-embedded-font removal. Base ASS plus donor SRT remains ASS; SRT-only episodes remain
+embedded-font removal. If embedded fonts exist and no choice was supplied for the
+batch, ask the user and record the answer before delivery. Base ASS plus donor SRT remains ASS; SRT-only episodes remain
 SRT. Ordinary SRT italic/bold/underline/strike markup is adapted for ASS donors.
 More complex donor markup is refused for deliberate adaptation.
 
@@ -63,7 +64,8 @@ name. Terms contain `source`, `target`, `locked: true`, and optionally `aliases`
 `kind`, `source_url`, and `note`. Preserve these in following seasons.
 Set `terms_reviewed` only after research and review. The builder checks that the
 record is present; verifying the sources and applying names throughout the text
-are the agent's responsibility. No fabricated URLs or meaningless signoffs.
+are the agent's responsibility. See [glossary-and-voice.md](glossary-and-voice.md)
+for research, honorifics and sequel continuity. No fabricated URLs or signoffs.
 
 ## Every worksheet row
 
@@ -116,6 +118,10 @@ The ZIP must not already exist. It contains only `Sub/SxxEyy.ass` or `.srt`, and
 OVA equivalents. Logs, source candidates, review JSON and glossary stay outside it.
 Attach `BUILD/glossary.json` separately for continuity. `sync_verified: false` is
 intentional: generated frames alone do not establish audiovisual synchronization.
+
+Run `qa --build BUILD` for the same delivery checks without creating a ZIP.
+Every agent must also keep its own activity log beside the translated files,
+as required by `SKILL.md`; the helper execution logs below do not replace it.
 
 ## Logging and limits
 

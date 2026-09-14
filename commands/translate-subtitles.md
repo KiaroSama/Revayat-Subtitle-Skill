@@ -1,10 +1,13 @@
 ---
-description: Translate or repair anime subtitles and deliver one reviewed file per episode in Sub.zip.
+description: Translate anime subtitles from any source language into Persian, or repair Persian subtitles and deliver one reviewed file per episode in Sub.zip.
 argument-hint: <ASS, SRT, ZIP or folder> [series and season]
 ---
 
 Use `revayat-subtitle` for **$ARGUMENTS**. Resolve the installed skill's `SKILL.md`
-and follow all five stages and its editorial reference. Read every cue of every
+and follow all nine steps, the translation policy and source-language research.
+Persian is the default target; use the original language directly when understood. Read every cue of every
 candidate, research the anime, reuse the series glossary, keep Japanese honorifics,
-retain embedded fonts unless removal was requested, and inspect the FFmpeg images.
+ask about retaining/removing embedded fonts when present unless already decided,
+and inspect the FFmpeg images. Keep the required agent activity log beside the
+translated files throughout the task.
 Return the verified `Sub.zip` and the separate continuity glossary.
