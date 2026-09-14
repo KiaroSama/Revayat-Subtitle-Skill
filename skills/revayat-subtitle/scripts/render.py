@@ -11,7 +11,7 @@ import shutil
 import tempfile
 import zipfile
 
-from runtime import digest, local_path, read_json, run, write_json
+from runtime import digest, local_path, output_directory, read_json, run, write_json
 from subtitle_formats import ARABIC, has_drawing, parse, visible
 
 
@@ -37,13 +37,20 @@ def load_build(build: Path):
     manifest = read_json(build / "manifest.json")
     if manifest.get("version") != 1 or not manifest.get("episodes"):
         raise ValueError("Invalid build manifest")
-    from workflow import load
+    from workflow import build as check_build, load
     work = build.parent.parent
     project, _, sheets = load(work)
     glossary = read_json(work / "glossary.json")
     current = digest(json.dumps([project, sheets, glossary], ensure_ascii=False, sort_keys=True).encode("utf-8"))
     if current != manifest.get("identity"):
         raise ValueError("Workspace changed after this build; rebuild and review the new edition")
+    if build.name != current or build.parent.name != "builds":
+        raise ValueError("Build must remain at its original workspace path")
+    # Recompute the edition from the reviewed sources; an editable manifest may
+    # not silently reduce the episode set or substitute metadata.
+    check_build(work)
+    if read_json(build / "glossary.json") != glossary:
+        raise ValueError("Build glossary differs from the reviewed continuity glossary")
     docs = {}
     for episode in manifest["episodes"]:
         path = local_path(build, episode["file"])
@@ -86,7 +93,7 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
     root = build / "renders"
     root.mkdir(exist_ok=True)
     # Every render is a new directory: old reviewed images are never overwritten.
-    destination = Path(tempfile.mkdtemp(prefix=episode_id + "-", dir=root))
+    destination = output_directory(root, episode_id + "-")
     frames = []
     try:
         with tempfile.TemporaryDirectory(prefix=".render-", dir=build) as temporary:
@@ -110,8 +117,8 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
                     command += ["-ss", str(seconds), "-i", str(video.resolve())]
                 else:
                     command += ["-f", "lavfi", "-i", "color=c=0x202020:s=1280x720:r=1:d=1"]
-                command += ["-filter_threads", "1", "-vf", f"setpts=PTS+{seconds}/TB,{filter_}",
-                            "-frames:v", "1", "-update", "1", "-threads", "1", filename]
+                command += ["-filter_threads", "1", "-vf", f"settb=AVTB,setpts=PTS-STARTPTS+{seconds}/TB,{filter_}",
+                            "-frames:v", "1", "-update", "1", "-pix_fmt", "rgb24", "-threads", "1", filename]
                 run(command, cwd=stage, timeout=45)
                 frame = stage / filename
                 if not frame.is_file() or frame.stat().st_size < 100:

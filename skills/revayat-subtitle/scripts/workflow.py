@@ -7,11 +7,10 @@ import json
 import logging
 from pathlib import Path, PurePosixPath
 import re
-import tempfile
 from urllib.parse import urlparse
 import zipfile
 
-from runtime import digest, local_path, read_json, write_json
+from runtime import digest, local_path, read_json, staging_directory, write_json
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible)
 
@@ -78,7 +77,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
     if not imported:
         raise ValueError("No ASS/SRT subtitles found")
     work.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".subtitle-import-", dir=work.parent) as temporary:
+    with staging_directory(work.parent, ".subtitle-import-") as temporary:
         stage = Path(temporary) / "work"
         (stage / "sources").mkdir(parents=True)
         (stage / "worksheets").mkdir()
@@ -106,11 +105,19 @@ def load(work: Path):
     project = read_json(work / "project.json")
     if project.get("version") != 1 or not isinstance(project.get("sources"), list):
         raise ValueError("Unsupported project schema")
+    source_files = {path.name for path in (work / "sources").iterdir() if path.is_file()}
+    worksheet_files = {path.name for path in (work / "worksheets").glob("*.json")}
+    expected_sources = {f"{item['id']}.{item['kind']}" for item in project["sources"]}
+    expected_sheets = {f"{item['id']}.json" for item in project["sources"]}
+    if source_files != expected_sources or worksheet_files != expected_sheets:
+        raise ValueError("Source inventory differs from imported files or worksheets")
     docs, sheets = {}, {}
     for source in project["sources"]:
         key = source["id"]
         if not SOURCE.fullmatch(key) or key in docs:
             raise ValueError("Invalid or duplicate source ID")
+        if source["file"] != f"sources/{key}.{source['kind']}":
+            raise ValueError("Source path differs from its imported identity")
         raw = local_path(work, source["file"]).read_bytes()
         if digest(raw) != source["sha256"]:
             raise ValueError("Source changed since import; create a fresh workspace")
@@ -274,7 +281,7 @@ def build(work: Path) -> dict:
             raise ValueError("Existing build has been modified; restore it or create a fresh workspace")
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix=".build-", dir=destination.parent) as temporary:
+        with staging_directory(destination.parent, ".build-") as temporary:
             stage = Path(temporary) / "edition"
             (stage / "Sub").mkdir(parents=True)
             for name, data in files.items():

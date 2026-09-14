@@ -9,10 +9,12 @@ import logging
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 
 def digest(data: bytes) -> str:
@@ -40,6 +42,26 @@ def local_path(root: Path, relative: str) -> Path:
     if not path.is_relative_to(root.resolve()):
         raise ValueError("Working file escapes its workspace")
     return path
+
+
+def output_directory(parent: Path, prefix: str) -> Path:
+    # Windows tempfile directories use an owner-only DACL. Published output must
+    # inherit its chosen destination's permissions, including a desktop viewer.
+    path = parent.resolve() / (prefix + uuid.uuid4().hex)
+    path.mkdir()
+    return path
+
+
+@contextlib.contextmanager
+def staging_directory(parent: Path, prefix: str):
+    path = output_directory(parent, prefix)
+    try:
+        yield path
+    finally:
+        if path.exists():
+            if path.resolve().parent != parent.resolve():
+                raise ValueError("Staging cleanup escapes its parent directory")
+            shutil.rmtree(path)
 
 
 def run(command: list[str], *, cwd: Path | None = None, timeout: int = 45) -> bytes:

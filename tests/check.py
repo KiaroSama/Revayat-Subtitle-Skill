@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -18,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "skills" / "revayat-subtitle" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 from runtime import digest, operational_log, read_json, run, write_json
-from subtitle_formats import RLM, parse, rtl, serialize, visible
+from subtitle_formats import PDF, RLE, RLM, parse, rtl, serialize, visible
 from workflow import build, prepare, reviewed_cues
 
 CLI = SCRIPTS / "revayat-subtitle.py"
@@ -119,10 +121,12 @@ class SubtitleChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reviewed"):
             build(self.work)
         sheet[0]["reviewed"] = True
-        sheet.pop()
+        removed = sheet.pop()
         write_json(sheet_path, sheet)
         with self.assertRaisesRegex(ValueError, "every original cue"):
             build(self.work)
+        sheet.append(removed)
+        write_json(sheet_path, sheet)
         completed(self.work)
         project = read_json(self.work / "project.json")
         project["episodes"][0]["alternates"] = []
@@ -132,18 +136,42 @@ class SubtitleChecks(unittest.TestCase):
 
     def test_font_policy_and_style_resets(self):
         raw = (FIXTURES / "episode.ass").read_text(encoding="utf-8")
-        font_data = "[Fonts]\nfontname: synthetic_0.ttf\n!!!!\n"
+        font_data = "[Fonts]\nfontname: synthetic_0.ttf\n!!!!\n[AAAA]\n;OPAQUE\n"
         doc = parse(raw + font_data, "ass")
         self.assertIn(font_data.strip(), serialize(doc, doc.cues))
         self.assertNotIn("[Fonts]", serialize(doc, doc.cues, remove_fonts=True))
+        self.assertNotIn("OPAQUE", serialize(doc, doc.cues, remove_fonts=True))
         self.assertIn("ResetOnly", serialize(doc, doc.cues))
         self.assertNotIn("Unused", serialize(doc, doc.cues))
+
+    def test_inventory_and_manifest_cannot_drop_content(self):
+        from render import load_build
+        self.import_work()
+        completed(self.work)
+        result = build(self.work)
+        output = Path(result["build"])
+        manifest_path = output / "manifest.json"
+        manifest = read_json(manifest_path)
+        manifest["episodes"][0]["cues"] = 1
+        write_json(manifest_path, manifest)
+        with self.assertRaisesRegex(ValueError, "modified"):
+            load_build(output)
+        write_json(manifest_path, {key: value for key, value in result.items() if key != "build"})
+        write_json(output / "glossary.json", {"series": "Wrong series"})
+        with self.assertRaisesRegex(ValueError, "glossary differs"):
+            load_build(output)
+        project = read_json(self.work / "project.json")
+        project["sources"].pop()
+        project["episodes"][0]["alternates"] = []
+        write_json(self.work / "project.json", project)
+        with self.assertRaisesRegex(ValueError, "inventory differs"):
+            build(self.work)
 
     def test_rtl_markup_drawings_and_idempotency(self):
         value = r"{\p1}m 0 0 l 20 20{\p0}{\i1}من دیروز OVA رو دیدم.{\i0}\N«رین-سان» برگشت."
         marked = rtl(value, "ass")
         self.assertEqual(rtl(marked, "ass"), marked)
-        self.assertTrue(marked.startswith(r"{\p1}m 0 0 l 20 20{\p0}{\i1}" + RLM))
+        self.assertTrue(marked.startswith(r"{\p1}m 0 0 l 20 20{\p0}{\i1}" + RLE + RLM))
         self.assertEqual(marked.count(RLM), 4)
         self.assertEqual(visible(marked, "ass"), "من دیروز OVA رو دیدم.\n«رین-سان» برگشت.")
 
@@ -197,7 +225,7 @@ class SubtitleChecks(unittest.TestCase):
         result = build(self.work)
         raw = (Path(result["build"]) / "Sub" / "S02OVA02.srt").read_text(encoding="utf-8")
         self.assertTrue(raw.startswith("1\n00:00:00,000"))
-        self.assertIn("<i>" + RLM + "OVA برگشت." + RLM + "</i>", raw)
+        self.assertIn("<i>" + RLE + RLM + "OVA برگشت." + RLM + PDF + "</i>", raw)
 
     def test_installers_and_manifest_bundle(self):
         project = self.root / "consumer"
@@ -218,6 +246,14 @@ class SubtitleChecks(unittest.TestCase):
         self.assertFalse((plugin / "tests").exists())
         self.assertFalse((plugin / ".git").exists())
         self.assertFalse(list(plugin.rglob("*.log")))
+        self.assertEqual((plugin / "LICENSE").read_bytes(), (ROOT / "LICENSE").read_bytes())
+        spec = importlib.util.spec_from_file_location("subtitle_installer", ROOT / "install" / "install.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.REPO, module.SKILL = plugin, plugin / "skills" / "revayat-subtitle"
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            module.install(plugin / "skills", plugin=False, force=True)
+        self.assertTrue((plugin / "skills" / "revayat-subtitle" / "SKILL.md").exists())
         # Exercise the OS launcher itself from an unrelated directory with spaces.
         target = self.root / "launcher copy"
         if os.name == "nt":
@@ -240,6 +276,12 @@ class SubtitleChecks(unittest.TestCase):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
             self.assertEqual(manifest["version"], "1.0.0")
+        documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
+                     *ROOT.glob("skills/**/*.md")]
+        for document in documents:
+            for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", document.read_text(encoding="utf-8")):
+                if "://" not in target:
+                    self.assertTrue((document.parent / target).is_file(), f"Broken link in {document.name}: {target}")
 
 
 class RenderCheck(SubtitleChecks):
@@ -248,11 +290,29 @@ class RenderCheck(SubtitleChecks):
         from render import package, render
         self.import_work()
         completed(self.work)
+        sheet_path = self.work / "worksheets" / "s0001.json"
+        sheet = read_json(sheet_path)
+        sheet[1].update(start_ms=200, end_ms=800, timing_note="Fractional-time render regression fixture")
+        write_json(sheet_path, sheet)
         result = build(self.work)
         output = Path(result["build"])
         evidence = render(output, "S01E01", None, None, None, True)
         review = read_json(Path(evidence["review"]))
         self.assertEqual(len(review["frames"]), 7)
+        from render import ffmpeg_path
+        first_png = output / review["frames"][0]["file"]
+        pixels = run([ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-nostdin", "-i", str(first_png),
+                      "-vf", "crop=1280:120:0:600", "-frames:v", "1", "-pix_fmt", "gray",
+                      "-f", "rawvideo", "pipe:1"], timeout=15)
+        self.assertGreater(len(set(pixels)), 10, "Fractional sample must show caption pixels, not a blank frame")
+        video = self.root / "ten-bit.mkv"
+        run([ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi",
+             "-i", "color=c=navy:s=320x180:r=10:d=20", "-filter_threads", "1", "-c:v", "ffv1",
+             "-pix_fmt", "yuv420p10le", "-threads", "1", str(video)], timeout=20)
+        evidence = render(output, "S01E01", None, video, None, True)
+        review = read_json(Path(evidence["review"]))
+        for frame in review["frames"]:
+            self.assertEqual((output / frame["file"]).read_bytes()[24], 8, "Previews must be viewable 8-bit PNGs")
         with self.assertRaisesRegex(ValueError, "Inspect every"):
             package(output, self.root / "Sub.zip")
         for frame in review["frames"]:

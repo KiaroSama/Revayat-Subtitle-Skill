@@ -43,6 +43,19 @@ dates, measurements and numbers. Retain Latin acronyms/names where appropriate.
 The builder inserts **actual U+200F RIGHT-TO-LEFT MARK** at the boundaries of
 Persian display lines, outside ASS commands and vector payloads. The literal six
 characters `\u200f` are not an RTL mark. Keep meaningful U+200C ZWNJ in Persian.
+For mixed Persian/Latin or Persian/number lines the builder also uses balanced
+U+202B RLE / U+202C PDF around the line: RLM alone left complete word groups in the
+wrong order in actual libass renders. This is directional embedding, not string
+reversal or the U+202E override. Stored words retain their original logical order.
+In translated ASS signs, inherited nonzero `\fsp` tracking can break Arabic
+joining and visual order even with a suitable font and complex shaping. If the
+render demonstrates this, test `\fsp0` on the affected readable text, record the
+structural edit, and retain positioning, animation, shadows and drawing payloads.
+If a mixed line still reorders whole groups across inline style changes, test
+libass's `\fe-1` whole-text layout for that cue and inspect its effects. This is
+a [libass extension](https://github.com/libass/libass/wiki/Libass%27-ASS-Extensions#encoding-1)
+that VSFilter does not support: disclose the player limitation, or adapt the
+inline typesetting for the requested player. Do not silently apply it to all signs.
 Remove or repair accidental bidi overrides only in editable prose; preserve valid
 isolates when needed. For a difficult embedded Latin phrase, test U+2066 LRI with
 U+2069 PDI in the real renderer before accepting it. Never use U+202E RLO to reverse

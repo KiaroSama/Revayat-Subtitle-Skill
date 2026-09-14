@@ -8,12 +8,11 @@ import logging
 from pathlib import Path
 import shutil
 import sys
-import tempfile
 
 REPO = Path(__file__).resolve().parent.parent
 SKILL = REPO / "skills" / "revayat-subtitle"
 sys.path.insert(0, str(SKILL / "scripts"))
-from runtime import operational_log
+from runtime import operational_log, staging_directory
 
 NAME = "revayat-subtitle"
 AGENTS = ("claude", "codex", "cursor", "kiro", "cline", "hermes", "opencode", "antigravity", "antigravity-cli")
@@ -30,7 +29,7 @@ def destination(agent: str, scope: str, base: Path) -> Path:
 
 
 def skill_files() -> list[Path]:
-    files = [SKILL / "SKILL.md"]
+    files = [SKILL / "SKILL.md", SKILL / "LICENSE"]
     for folder, suffixes in {"scripts": {".py"}, "references": {".md"}, "agents": {".yaml"}}.items():
         files.extend(sorted(path for path in (SKILL / folder).iterdir() if path.suffix in suffixes))
     if any(not path.is_file() or path.is_symlink() for path in files):
@@ -46,11 +45,15 @@ def install(target: Path, *, plugin: bool, force: bool) -> Path | None:
         raise ValueError("Destination exists; use --force to keep a backup and replace this skill")
     if target.resolve() == REPO or target.resolve() == SKILL or REPO.is_relative_to(target.resolve()):
         raise ValueError("Installation destination overlaps the source repository")
+    protected = [SKILL, REPO / "install", REPO / "commands", REPO / ".codex-plugin",
+                 REPO / ".claude-plugin", REPO / ".cursor-plugin"]
+    if any(target.resolve().is_relative_to(path) or path.is_relative_to(target.resolve()) for path in protected):
+        raise ValueError("Installation destination overlaps distribution source files")
     files = skill_files()
     pairs = [(path, path.relative_to(SKILL)) for path in files]
     if plugin:
         pairs = [(path, Path("skills") / NAME / path.relative_to(SKILL)) for path in files]
-        for relative in ("plugin.json", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
+        for relative in ("plugin.json", "LICENSE", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
                          ".claude-plugin/marketplace.json", ".cursor-plugin/plugin.json",
                          "commands/translate-subtitles.md"):
             source = REPO / relative
@@ -62,7 +65,7 @@ def install(target: Path, *, plugin: bool, force: bool) -> Path | None:
     if target.resolve().parent != parent:
         raise ValueError("Destination escapes its installation directory")
     backup = None
-    with tempfile.TemporaryDirectory(prefix=".revayat-install-", dir=parent) as temporary:
+    with staging_directory(parent, ".revayat-install-") as temporary:
         stage = Path(temporary) / NAME
         stage.mkdir()
         for source, relative in pairs:
