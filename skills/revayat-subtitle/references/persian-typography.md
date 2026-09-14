@@ -58,9 +58,8 @@ with a suitable font and complex shaping. When the image demonstrates this, test
 `\fsp0` on the affected readable text and record the structural edit.
 
 If mixed text still reorders whole groups across inline style changes, test
-libass's `\fe-1` whole-text layout for that cue. This is a
-[libass extension](https://github.com/libass/libass/wiki/Libass%27-ASS-Extensions#encoding-1)
-that VSFilter does not support: disclose that limitation or adapt the typesetting
+libass's `\fe-1` whole-text layout for that cue. VSFilter does not support
+this extension: disclose that limitation or adapt the typesetting
 for the requested player. Do not apply it to every sign without inspection.
 
 ## Physical inspection
@@ -74,7 +73,3 @@ Neutral-background images establish presentation only. Matching-video images
 also show scene contrast, but neither alone certifies audiovisual synchronization.
 Generating images is not the same as looking at them. A missing viewer or renderer
 leaves visual QA incomplete. [workflow.md](workflow.md) defines the review records.
-
-Technical references: [Unicode UAX #9](https://www.unicode.org/reports/tr9/),
-[Aegisub tags](https://aegisub.org/docs/latest/ass_tags/), and
-[FFmpeg filters](https://ffmpeg.org/ffmpeg-filters.html#ass).

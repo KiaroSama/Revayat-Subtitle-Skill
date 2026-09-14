@@ -33,7 +33,7 @@ def completed(work: Path):
                             "comparison": "ASS presentation; SRT supplies a missing sign and comparison wording."}]
     write_json(work / "project.json", project)
     write_json(work / "glossary.json", {"series": "Fixture Series", "terms_reviewed": True,
-               "research": [{"url": "https://aegisub.org/docs/latest/ass_tags/",
+               "research": [{"url": "https://example.org/fixture",
                              "note": "Structural test reference only; this authored fixture is not a real anime."}],
                "terms": [{"source": "Rin", "target": "رین", "locked": True}]})
     sheet = read_json(work / "worksheets" / "s0001.json")
@@ -229,7 +229,7 @@ class SubtitleChecks(WorkspaceCase):
         source.write_text("8\n00:00:02,000 --> 00:00:04,000\n<i>OVA برگشت.</i>\n\n"
                           "2\n00:00:00,000 --> 00:00:01,000\nسلام.\n", encoding="utf-8")
         glossary = self.root / "previous.json"
-        terms = {"series": "Fixture Series", "research": [{"url": "https://aegisub.org/", "note": "Fixture only"}],
+        terms = {"series": "Fixture Series", "research": [{"url": "https://example.org/fixture", "note": "Fixture only"}],
                  "terms": [{"source": "Rin", "target": "رین", "locked": True}], "terms_reviewed": True}
         write_json(glossary, terms)
         prepare([source], self.work, "Fixture Series", 2, "utf-8", glossary, "fa")

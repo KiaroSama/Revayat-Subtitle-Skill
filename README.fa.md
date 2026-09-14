@@ -132,7 +132,6 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 `ready: true` وجود فیلترهای FFmpeg را تأیید می‌کند؛ مناسب‌بودن فونت یا نمایش
 درست یک قسمت هنوز به رندر و مشاهده نیاز دارد. اگر FFmpeg در PATH نیست، مسیرش
 را با `--ffmpeg` یا `REVAYAT_FFMPEG` مشخص کنید.
-[راهنمای FFmpeg](https://ffmpeg.org/ffmpeg-filters.html#ass) پیش‌نیاز libass را توضیح می‌دهد.
 
 ## استفاده
 
@@ -278,17 +277,6 @@ Linux رندر libass و پیش‌نمایش ویدئوی ۱۰بیتی را هم
 لاگ اجرایی اسکریپت‌ها نیز برای هر اجرا فایل UTF-8 جدا با زمان UTC می‌سازد و
 متن زیرنویس را ثبت نمی‌کند. جزئیات در
 [لاگ اجرا](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs) آمده است.
-
-## سپاس
-
-چیدمان بسته و روش ترجمه با ایجنت از
-[روایت کمیک](https://github.com/KiaroSama/Revayat-Comic-Skill) و
-[روایت رمان](https://github.com/KiaroSama/Revayat-Novel-Skill) پیروی می‌کند.
-رندر زیرنویس بر [FFmpeg](https://ffmpeg.org/) و
-[libass](https://github.com/libass/libass)، با شکل‌دهی و جهت متن از
-[HarfBuzz](https://harfbuzz.github.io/) و [FriBidi](https://github.com/fribidi/fribidi) استوار است.
-راهنمای قالب و جهت از [Aegisub](https://aegisub.org/docs/latest/ass_tags/) و
-[Unicode](https://www.unicode.org/reports/tr9/) گرفته شده است.
 
 ## حمایت مالی
 
