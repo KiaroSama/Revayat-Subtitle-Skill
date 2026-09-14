@@ -91,9 +91,11 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 
 بدون ویدئوی اصلی، رندر روی زمینهٔ خنثی است و هماهنگی صدا و تصویر را اثبات
 نمی‌کند. فرمت‌های دیگر، نسخه‌های ویدئویی ناسازگار، ASSهای دارای بوم متفاوت،
-فونت‌های متعارض و مارک‌آپ پیچیده به تطبیق صریح نیاز دارند. در زمان ساخت اسکیل،
-فایل واقعی انیمه ضمیمه نشده بود؛ نمونه‌های مخزن مکانیک پردازش و نمایش را
-می‌سنجند، نه کیفیت ترجمهٔ یک فصل واقعی.
+فونت‌های متعارض و مارک‌آپ پیچیده به تطبیق صریح نیاز دارند. در آزمون فایل‌های
+واقعی، ۵۱۸۸ رویداد بررسی ساختاری شدند؛ نمونه‌ای شامل ۴۰ خط از چهار نسخه نیز
+مقایسه و در ۱۰ تصویر از ویدئوی واقعی بازبینی شد. این آزمون، بازبینی معنایی یک
+قسمت یا فصل کامل و بررسی هماهنگی صوتی نیست. [محدودهٔ آزمون](docs/verification.md)
+ثبت شده و فایل‌های خصوصی در مخزن منتشر نمی‌شوند.
 
 دستور بررسی محدودشده `python tests/check.py` است؛ برای FFmpeg گزینهٔ `--render`
 را اضافه کنید. CI برای Windows، Linux و macOS تعریف شده و رندر libass را روی
@@ -102,3 +104,26 @@ Linux اجرا می‌کند. سازگاری قالب بسته با آزمون �
 هر اجرا یک لاگ جدید UTF-8 با زمان UTC در `logs/` داخل اسکیل می‌سازد؛ مسیر با
 `REVAYAT_LOG_DIR` قابل تغییر است. متن زیرنویس در لاگ ثبت نمی‌شود. در نصب فقط‌خواندنی،
 گزارش خطا به stderr می‌رود. لاگ‌ها تا زمان حذف توسط کاربر حفظ می‌شوند.
+
+## لایسنس
+
+Copyright (C) 2026 Kiaro Sama. این پروژه مانند روایت کمیک و روایت رمان با
+**GPL-3.0-or-later** منتشر می‌شود؛ [متن لایسنس](LICENSE) همراه اسکیل و پلاگین
+نیز نصب می‌شود. FFmpeg و فونت‌های سیستم در این مخزن توزیع نمی‌شوند.
+
+## حمایت مالی
+
+اگر این پروژه برایتان مفید است، می‌توانید از توسعهٔ آن حمایت کنید.
+
+| ارز | شبکه | آدرس |
+| --- | --- | --- |
+| Bitcoin (BTC) | Bitcoin | `bc1qmth5m03pu5hujw5xw5jmywam3jj3sqwqupesdt` |
+| USDT, BNB, USDC, etc. | BEP20 | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+| USDT, TRX, USDC, etc. | TRC20 | `TWBA3xFTqgZAeAYMxqo85xWnzvty3DcAhw` |
+| Ethereum (ETH) | ERC20 | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+| TON | TON | `UQCN8Umo_OfOWqImZetQsrNStPcmLkMAKajFyiCOhso23NDb` |
+| Litecoin (LTC) | LTC | `ltc1qntqnnrunadurnw4cshv3qgspywrueyyeyngwuy` |
+| Solana (SOL) | Solana | `7B2wkczUjmkDhETwQuknBL8sUsbuV7nErxc317TmQuwR` |
+| Polygon (POL) | Polygon | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+
+حمایت از طریق گیت‌هاب: [KiaroSama](https://github.com/sponsors/KiaroSama).

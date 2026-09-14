@@ -2,5 +2,6 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "revayat-subtitle",
   "version": "1.0.0",
+  "license": "GPL-3.0-or-later",
   "description": "Translate and repair Persian anime subtitles with complete cue review and FFmpeg visual QA."
 }

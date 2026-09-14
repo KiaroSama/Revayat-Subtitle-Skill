@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, field
 
 RLM = "\u200f"
+RLE, PDF = "\u202b", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u066e-\u06d3\u06fa-\u06fc]")
 BLOCK = re.compile(r"(\{[^{}]*\}|<[^>]*>)")
@@ -76,9 +77,14 @@ def parse(data: str, kind: str) -> Document:
             doc.cues.append(Cue(f"c{len(doc.cues) + 1:06}", start, end, "\n".join(lines[2:])))
     elif kind == "ass":
         section, lines = "", []
+        known_sections = {"[script info]", "[v4+ styles]", "[v4 styles]", "[events]", "[fonts]",
+                          "[graphics]", "[aegisub project garbage]", "[aegisub extradata]"}
         for line in data.split("\n"):
             stripped = line.strip()
-            if stripped.startswith("[") and stripped.endswith("]"):
+            header = stripped.startswith("[") and stripped.endswith("]")
+            if section.casefold() in {"[fonts]", "[graphics]"}:
+                header = header and stripped.casefold() in known_sections
+            if header:
                 section = stripped
                 if any(name.casefold() == section.casefold() for name, _ in doc.sections):
                     raise ValueError("Repeated ASS sections are not supported")
@@ -197,8 +203,14 @@ def rtl(text: str, kind: str) -> str:
         prose = [i for i, (type_, value) in enumerate(line) if type_ == "text" and value.strip()]
         if prose and any(ARABIC.search(line[i][1]) for i in prose):
             first, last = prose[0], prose[-1]
-            line[first] = ("text", RLM + line[first][1])
-            line[last] = ("text", line[last][1] + RLM)
+            mixed = any(re.search(r"[A-Za-z0-9]", line[i][1]) for i in prose)
+            if mixed and line[first][1].startswith(RLE) and line[last][1].endswith(PDF):
+                line[first] = ("text", line[first][1][1:])
+                line[last] = ("text", line[last][1][:-1])
+            # Legacy ASS layout otherwise splits mixed prose into wrongly ordered
+            # runs even with RLM. RLE preserves Latin order without reversing text.
+            line[first] = ("text", (RLE if mixed else "") + RLM + line[first][1])
+            line[last] = ("text", line[last][1] + RLM + (PDF if mixed else ""))
         output.append("".join(value for _, value in line))
         line.clear()
 

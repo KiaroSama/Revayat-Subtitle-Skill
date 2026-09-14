@@ -1,6 +1,7 @@
 ---
 name: revayat-subtitle
 description: Translate English anime subtitles into fluent spoken Persian, or thoroughly edit Persian subtitles. Review every cue, reconcile competing ASS/SRT releases, retain Japanese honorifics and series-wide names, repair RTL punctuation, render with FFmpeg, and deliver one file per episode inside a Sub ZIP. Use for subtitle attachments, seasons, sequels and OVAs.
+license: GPL-3.0-or-later
 metadata:
   version: "1.0.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"

@@ -123,8 +123,11 @@ prove audiovisual synchronization or scene contrast. ASS/SRT are supported;
 SSA/VTT/PGS, encrypted archives and malformed files need deliberate conversion.
 Different ASS canvases, complex donor markup and conflicting embedded font sets
 are refused until reconciled. Font availability and bidi behavior vary by player.
-No real anime attachment was supplied when the skill was created; the repository
-fixtures cover structural and visual mechanics, not production translation quality.
+Real local ASS releases and matching 10-bit video were exercised during development:
+5,188 events passed full-file structural round trips, and a 40-cue excerpt across
+four candidates received editorial comparison and ten image inspections. This
+does not establish full-episode translation quality or audiovisual synchronization.
+See [verification scope](docs/verification.md); private media is not distributed.
 
 Run the bounded check with `python tests/check.py`; add `--render` when FFmpeg is
 available. The included CI matrix checks Windows, Linux and macOS and runs libass
@@ -136,3 +139,27 @@ Every executable run writes a new UTC log under the skill's `logs/`, or
 `revayat-subtitle_YYYY-MM-DD_HH-mm-ss_UTC.log` (installer: `install_...`), with
 collision suffixes. Entries contain levels, progress, errors and exit status,
 never subtitle bodies. Logs are retained until the operator removes them.
+
+## License
+
+Copyright (C) 2026 Kiaro Sama. Licensed under **GPL-3.0-or-later**, matching the
+Revayat Comic and Novel projects. See [LICENSE](LICENSE). The same license travels
+with standalone skill and plugin installations. FFmpeg and system fonts are
+external prerequisites and are not redistributed by this repository.
+
+## Donate
+
+If this project helps you, donations are appreciated.
+
+| Currency | Network | Address |
+| --- | --- | --- |
+| Bitcoin (BTC) | Bitcoin | `bc1qmth5m03pu5hujw5xw5jmywam3jj3sqwqupesdt` |
+| USDT, BNB, USDC, etc. | BEP20 | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+| USDT, TRX, USDC, etc. | TRC20 | `TWBA3xFTqgZAeAYMxqo85xWnzvty3DcAhw` |
+| Ethereum (ETH) | ERC20 | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+| TON | TON | `UQCN8Umo_OfOWqImZetQsrNStPcmLkMAKajFyiCOhso23NDb` |
+| Litecoin (LTC) | LTC | `ltc1qntqnnrunadurnw4cshv3qgspywrueyyeyngwuy` |
+| Solana (SOL) | Solana | `7B2wkczUjmkDhETwQuknBL8sUsbuV7nErxc317TmQuwR` |
+| Polygon (POL) | Polygon | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
+
+GitHub Sponsors: [KiaroSama](https://github.com/sponsors/KiaroSama).
