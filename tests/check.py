@@ -250,7 +250,10 @@ class SubtitleChecks(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("subtitle_installer", ROOT / "install" / "install.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        module.REPO, module.SKILL = plugin, plugin / "skills" / "revayat-subtitle"
+        # Match the installer's constructor: macOS /var symlinks and Windows
+        # short temp paths must be canonical before assigning source roots.
+        module.REPO = plugin.resolve()
+        module.SKILL = module.REPO / "skills" / "revayat-subtitle"
         with self.assertRaisesRegex(ValueError, "overlaps"):
             module.install(plugin / "skills", plugin=False, force=True)
         self.assertTrue((plugin / "skills" / "revayat-subtitle" / "SKILL.md").exists())
