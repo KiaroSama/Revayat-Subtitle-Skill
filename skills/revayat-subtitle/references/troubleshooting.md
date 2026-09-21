@@ -16,6 +16,11 @@ Use this when a command refuses a workspace/build or the rendered result is wron
 | Missing or unreviewed frame | Render that episode and inspect every required PNG before signing its review. |
 | Broken Persian, English order, quotes or sign tracking | Follow [persian-typography.md](persian-typography.md) using the raw string and image together. |
 | Output ZIP already exists | Select a new filename; the original delivery is preserved. |
+| Legacy build | Rebuild its existing workspace with the current recipe and rerender; preserve old editions and decisions. |
+| JSON field/schema error | Repair the named field, duplicate key or type; do not replace missing evidence with invented defaults. |
+| Installation rollback incomplete | Preserve the exact target/backup paths reported; resolve locks or external changes before restoring. |
+| Publication cleanup warning with committed=true | The complete output exists; verify it and retain the named staging file until safe cleanup, rather than overwriting or retrying the same filename. |
+| Resource or output limit | Split a large job or inspect the failing tool; do not treat partial output as success. |
 
 ## Resume without losing decisions
 
@@ -37,7 +42,11 @@ Collisions receive a suffix. Entries use UTC `[timestamp] [LEVEL] [COMPONENT] Me
 `REVAYAT_LOG_DIR` overrides the directory; read-only installations fall back to stderr.
 
 Logs contain stage progress, error types and exit status, never subtitle bodies.
-No verbose mode or automatic log deletion is enabled. Inspect local path information
+`REVAYAT_LOG_LEVEL` accepts DEBUG, INFO (default), WARNING, ERROR and CRITICAL.
+DEBUG adds bounded lifecycle diagnostics. Invalid levels fail without echoing their
+contents. Native installer bootstrap logs cover missing Python; Windows supervisors
+also record their target's actual failure status. Automatic log deletion is disabled.
+Inspect local path information
 before sharing logs and remove old files when no longer needed.
 
 Missing shell, web search, image viewing, video or fonts must be reported accurately.

@@ -1,5 +1,9 @@
 # Revayat Subtitle — روایت زیرنویس
 
+[![CI](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](docs/platforms.md)
+[![GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
+
 **Translate anime subtitles from any source language into spoken Persian, or repair Persian subtitles, and get one reviewed file per episode inside `Sub.zip`.**
 
 An agent skill for Claude Code, Codex, Cursor, Kiro, Cline, Hermes, OpenCode,
@@ -25,6 +29,7 @@ Persian/English text that must display correctly in a real subtitle renderer.
 | **RTL is inspected, not assumed** | Logical Unicode, real direction marks and FFmpeg images expose mixed-script order, punctuation, quote scope, missing glyphs and clipping. |
 | **Effects remain effects** | Vector paths, positioning, animation, karaoke controls and intentional layers stay distinct from the signs and dialogue that need translation. |
 | **Fonts are a choice** | When embedded fonts are found, the agent asks whether to retain or remove them unless the user already decided for this batch; the replacement font is checked after removal. |
+| **Optional parallel editing** | The agent asks before assigning disjoint episodes or cue ranges to subagents. Shared names, separate worker logs and coordinator review keep the results consistent. |
 | **Narrow cleanup** | Verified promotion, empty cues, hidden comments and unused styles are removed; story dialogue, profanity and sexual language retain their meaning and intensity. |
 | **The delivery checks its own evidence** | `qa` and packaging use the same source, subtitle, glossary and image checks, and the finished ZIP is read back before success. |
 
@@ -184,9 +189,12 @@ creates a different build identity and requires matching evidence.
 | Module | Role |
 | --- | --- |
 | `subtitle_formats.py` | ASS/SRT document model, strict parsing, stable serialization, drawing/text separation and bidi marks |
+| `markup.py` / `validation.py` | Shared override/direction parsing and strict editable-record contracts |
 | `workflow.py` | source inventory, worksheets, glossary records, release merging and build identity |
 | `render.py` | FFmpeg samples, shared QA gate and verified ZIP delivery |
 | `runtime.py` | UTF-8 I/O, hashes, bounded subprocesses, staging directories and per-run logging |
+| `process_control.py` / `process_supervisor.py` | Owned process groups/Windows Jobs with wall, idle and output limits |
+| `publication.py` / `png_validation.py` | Complete-file publication and bounded PNG decoding |
 | `revayat-subtitle.py` | one CLI entry point for every stage |
 | `install/install.py` | shared agent routing and allowlisted skill/plugin installation |
 
@@ -221,20 +229,25 @@ The skill routes to these references at the step that needs them:
 - [release-selection.md](skills/revayat-subtitle/references/release-selection.md) — candidate comparison and episode identity.
 - [subtitle-formats.md](skills/revayat-subtitle/references/subtitle-formats.md) — ASS/SRT, comments, styles, drawings and optional font removal.
 - [workflow.md](skills/revayat-subtitle/references/workflow.md) — workspace, worksheet and review contracts.
+- [parallel-editorial.md](skills/revayat-subtitle/references/parallel-editorial.md) — consent, assignments, worker logs and final integration.
 - [troubleshooting.md](skills/revayat-subtitle/references/troubleshooting.md) — refusals, recovery and execution logs.
 
 ## Development
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python tests/check.py
 python tests/check.py --render
 python evaluation/score.py --answers my-answers.json
 ```
 
 The stdlib test runner bounds its worker process and exercises the real CLI and
-native installers. CI checks Linux, macOS and Windows; Linux also exercises libass
-and 10-bit video previews. CodeQL analyzes Python and workflows, Dependency Review
-runs on pull requests, and Dependabot maintains Actions and security updates.
+native installers. Development dependencies add bounded generated cases and native
+process-identity checks; the installed skill still has no pip runtime dependencies.
+CI covers Linux, macOS and Windows, with libass and 10-bit preview lanes on Linux
+and Windows. CodeQL analyzes Python and workflows; actionlint and zizmor block
+workflow defects. Dependency Review runs on PRs; Dependabot covers Actions and
+the development manifest. Read exact-commit Actions results before claiming a pass.
 
 [evaluation/](evaluation/README.md) contains short authored language cases. Known
 acceptable answers are recognized; unseen wording is reported for human review,
@@ -247,7 +260,9 @@ the subtitles, and place that log beside the translated files as required by
 `SKILL.md`. Chat updates and helper execution logs do not replace this agent log.
 
 Execution logs record progress/errors without subtitle bodies;
-read-only installations fall back to stderr. See
+`REVAYAT_LOG_LEVEL=DEBUG` enables bounded diagnostic detail (default `INFO`).
+Read-only installations fall back to formatted stderr. Native installer bootstrap
+logs also cover missing Python. See
 [execution logs](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs).
 
 ## Donate

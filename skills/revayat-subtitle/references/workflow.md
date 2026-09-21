@@ -3,6 +3,8 @@
 The runtime requires Python 3.10+ and FFmpeg with libass. Python uses only the
 standard library. All text output is UTF-8; ASS uses logical Unicode, SRT numbering
 is regenerated, and source timestamps stay unchanged unless explicitly reviewed.
+ASS output has 10 ms precision: SRT donor times are floored, original/reviewed/emitted
+values are recorded, and a conversion that collapses duration is refused.
 
 ## Import and resume
 
@@ -17,6 +19,9 @@ Use `--target-language LANG` only for an explicitly requested non-Persian target
 over them. Input limits: 1,000 subtitles, 16 MiB per subtitle, 256 MiB combined,
 10,000 ZIP members. ZIP paths and symlinks are checked and no archive is extracted
 into arbitrary paths. Encrypted/legacy archives need a separately authorized import.
+Traversal stops at 100,000 entries, a source at 100,000 cues, and a workspace at
+250,000 cues or 512 MiB of expanded source/worksheet data. Editable JSON is limited
+to 64 MiB per file and rejects duplicate keys, non-finite numbers and wrong types.
 
 `sources/` contains byte-identical copies, named by stable IDs. Worksheets contain
 every Dialogue/SRT cue, including empty cues; hidden ASS Comment events are counted
@@ -104,7 +109,19 @@ build under its original workspace: render/package recheck that workspace. A cha
 edit creates a new build; use that new path, not the old one. Repeated identical
 builds are read back and checked, so accidental output edits are refused.
 
+Generation recipe 2 is part of the edition identity, separate from reviewed-input
+identity. Schema-1 workspaces remain readable; rebuild and rerender legacy editions
+with the current recipe. Old editions/decisions stay intact; image approvals are
+not copied to changed output. Provenance retains input-root/member origins without
+private absolute paths, emitted cue indices and effective timing.
+
 Each episode render writes a new PNG directory and `renders/EPISODE.json`.
+Its `receipt.json` binds sampler/renderer fingerprints, provided font files,
+background, sample cue IDs and actual decoded images. Keep it immutable; review
+only the editable notes/flags. Default samples cover reset styles, inline fonts,
+mixed direction, changed structure and animation phases. Use `--all-cues` for
+complete cue coverage. Equal pixels at different samples are allowed; reused paths
+or hardlinked image files are not. System fallback fonts still need visual review.
 Open each image; then set its `reviewed` to `true` and write a real observation in
 `note`. Keep timestamps and hashes unchanged. Each FFmpeg child has a 45-second
 bound; a timeout kills its owned process tree and blocks the command. A failed
@@ -129,8 +146,20 @@ Every CLI run writes `logs/revayat-subtitle_YYYY-MM-DD_HH-mm-ss_UTC.log` inside 
 skill, with a suffix for collisions. Entries are UTC `[timestamp] [LEVEL]
  [COMPONENT] Message`. `REVAYAT_LOG_DIR` overrides the directory; a read-only
 installation falls back to stderr. Logs include progress, error types and exit
-status, not subtitle bodies. No verbose mode or automatic log deletion is enabled;
+status, not subtitle bodies. `REVAYAT_LOG_LEVEL` accepts DEBUG, INFO (default),
+WARNING, ERROR or CRITICAL; invalid values fail clearly. No automatic deletion is enabled;
 review logs for local path information before sharing and remove old logs as needed.
+
+Tool output is bounded to 16 MiB by default, with separate wall/idle deadlines and
+whole-tree ownership. Rendering has a 900-second episode budget, 5,000-frame limit
+and 2 GiB image budget. PNG validation accepts the generated noninterlaced 8-bit
+RGB/RGBA profile, at most 64 MiB, 16 million pixels and 8,192 pixels per dimension.
+Provided fonts are limited to 128 files/64 MiB total/32 MiB each; videos to 16 GiB.
+Split oversized jobs deliberately; a limit refusal does not approve partial output.
+
+Parallel editorial work requires the user's batch consent. Follow
+[parallel-editorial.md](parallel-editorial.md) for disjoint assignments, separate
+worker logs, glossary revision checks and coordinator-owned integration.
 
 Semantic editing and image inspection need a capable agent with filesystem, shell,
 web search and image-viewing access. Missing capabilities leave the relevant stage

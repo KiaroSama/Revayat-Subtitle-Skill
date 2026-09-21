@@ -10,4 +10,6 @@ candidate, research the anime, reuse the series glossary, keep Japanese honorifi
 ask about retaining/removing embedded fonts when present unless already decided,
 and inspect the FFmpeg images. Keep the required agent activity log beside the
 translated files throughout the task.
+Offer optional parallel subagent translation/editing once per batch; follow the
+parallel-editorial reference only after user consent and with actual host support.
 Return the verified `Sub.zip` and the separate continuity glossary.

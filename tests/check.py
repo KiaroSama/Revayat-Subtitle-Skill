@@ -63,6 +63,7 @@ class WorkspaceCase(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="subtitle check فارسی ", dir=scratch)
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
+        self.addCleanup(self.retain_failure_evidence)
         self.work = self.root / "work with spaces"
         self.old_log = os.environ.get("REVAYAT_LOG_DIR")
         os.environ["REVAYAT_LOG_DIR"] = str(self.root / "logs")
@@ -77,6 +78,24 @@ class WorkspaceCase(unittest.TestCase):
     def import_work(self):
         prepare([FIXTURES / "episode.ass", FIXTURES / "alternative.srt"], self.work,
                 "Fixture Series", 1, "utf-8-sig", None, "fa")
+
+    def retain_failure_evidence(self):
+        result = getattr(self._outcome, "result", None)
+        if result is None or not any(test is self for test, _ in result.failures + result.errors):
+            return
+        destination = ROOT / ".scratch/ci-artifacts" / self.id()
+        remaining, count = 10 * 1024 * 1024, 0
+        for source in self.root.rglob("*"):
+            if source.is_symlink() or not source.is_file() or source.suffix not in {".png", ".log"}:
+                continue
+            size = source.stat().st_size
+            if size > remaining or count >= 20:
+                continue
+            target = destination / source.relative_to(self.root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            remaining -= size
+            count += 1
 
 
 class SubtitleChecks(WorkspaceCase):
@@ -305,7 +324,8 @@ class SubtitleChecks(WorkspaceCase):
             run(command, cwd=self.root, timeout=15)
 
     def test_distribution_syntax_and_links(self):
-        for path in ROOT.rglob("*.py"):
+        paths = [path for folder in ("skills", "install", "evaluation", "tests") for path in (ROOT / folder).rglob("*.py")]
+        for path in paths:
             if any(part.startswith(".") or part in {"work", "out"} for part in path.relative_to(ROOT).parts):
                 continue
             source = path.read_text(encoding="utf-8")
@@ -314,7 +334,7 @@ class SubtitleChecks(WorkspaceCase):
         for relative in ("plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json", ".claude-plugin/plugin.json"):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
-            self.assertEqual(manifest["version"], "1.1.0")
+            self.assertEqual(manifest["version"], "1.2.0")
         documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
                      *ROOT.glob("skills/**/*.md")]
         for document in documents:
@@ -381,19 +401,34 @@ def main():
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     if args.worker:
+        from importlib.metadata import version
+        print(f"Runtime: Python {sys.version.split()[0]} on {sys.platform}; "
+              f"psutil {version('psutil')}; Hypothesis {version('hypothesis')}", flush=True)
+        if args.render:
+            from render import ffmpeg_path
+            print(run([ffmpeg_path(), "-version"], timeout=15).decode("utf-8").splitlines()[0], flush=True)
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(SubtitleChecks)
         suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py"))
         if args.render:
             suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(RenderCheck))
+            suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="render_checks.py"))
         return 0 if unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite).wasSuccessful() else 1
     with operational_log("check"):
         command = [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "--worker"]
         if args.render:
             command.append("--render")
         try:
-            print(run(command, timeout=120 if args.render else 60).decode("utf-8"), end="")
+            print(run(command, timeout=180 if args.render else 90, idle_timeout=30).decode("utf-8"), end="")
             return 0
         except (ValueError, subprocess.SubprocessError) as error:
+            # Only this owned authored-test worker's diagnostics are safe to display.
+            for field in ("stdout", "stderr"):
+                captured = getattr(error, field, None)
+                if isinstance(captured, bytes):
+                    print(captured.decode("utf-8", errors="replace"), file=sys.stderr)
+                    destination = ROOT / ".scratch/ci-artifacts"
+                    destination.mkdir(parents=True, exist_ok=True)
+                    (destination / ("worker-" + field + ".txt")).write_text(captured.decode("utf-8", errors="replace"), encoding="utf-8")
             print(str(error), file=sys.stderr)
             return 1
 

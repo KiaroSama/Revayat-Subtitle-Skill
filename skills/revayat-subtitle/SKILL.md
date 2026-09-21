@@ -3,7 +3,7 @@ name: revayat-subtitle
 description: Translate anime subtitles from any source language into fluent spoken Persian, or thoroughly edit Persian subtitles. Review every cue, reconcile competing ASS/SRT releases, preserve Japanese honorifics and series-wide names, repair RTL punctuation, inspect FFmpeg renders, and deliver one file per episode inside Sub.zip. Use for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 
@@ -154,6 +154,12 @@ reasoned comparison, and incompatible video cuts or canvases have been resolved.
 
 ## Step 5 — Read every line and translate or edit
 
+Before starting, offer optional parallel translation/editing as described in
+[parallel-editorial.md](references/parallel-editorial.md). Ask once per batch unless
+already answered. Dispatch real subagents only after consent and only when the host
+supports them; otherwise continue sequentially. Shared worksheets and glossary have
+one writer: the coordinator. All existing cue and final-review requirements remain.
+
 Read [translation-policy.md](references/translation-policy.md) and
 [persian-typography.md](references/persian-typography.md). These are mandatory on
 every invocation. Work sequentially in bounded batches with adjacent dialogue
@@ -271,6 +277,7 @@ Read each reference when its step or condition applies:
 - [source-languages.md](references/source-languages.md) — source identification, direct translation and language-specific meaning checks.
 - [research.md](references/research.md) — inspected upstream evidence and adaptation boundaries.
 - [translation-policy.md](references/translation-policy.md) — every-line fidelity, spoken Persian and narrow removals.
+- [parallel-editorial.md](references/parallel-editorial.md) — optional user-consented subagents, disjoint assignments and coordinator-owned integration.
 - [persian-typography.md](references/persian-typography.md) — RTL, mixed text, quotes, fonts and image inspection.
 - [glossary-and-voice.md](references/glossary-and-voice.md) — research, names, honorifics and sequel continuity.
 - [release-selection.md](references/release-selection.md) — candidate comparison, alignment and episode identity.

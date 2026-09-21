@@ -8,6 +8,10 @@ negation/restriction and forms of address. They are calibration examples, not a
 representative translation-quality benchmark. Do not show the accepted answers
 to an agent whose unaided translation you are evaluating.
 
+Some cases supply a `context` field to establish an omitted referent or singular
+polite address. Read it with the source. Adversarial cases include interruption,
+literal math delimiters, negative requests, not-yet/no-longer, and false friends.
+
 Ask the agent to translate or correct each `source` using the skill, then save a
 UTF-8 JSON object mapping case IDs to its answers:
 
