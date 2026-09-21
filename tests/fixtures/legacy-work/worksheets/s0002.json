@@ -1,0 +1,45 @@
+[
+  {
+    "id": "c000001",
+    "source_text": "Rin-san, come back home!",
+    "start_ms": 0,
+    "end_ms": 2000,
+    "action": "alternate",
+    "text": null,
+    "reviewed": true,
+    "links": [
+      "s0001:c000002"
+    ],
+    "note": "Content retained in the linked ASS cue.",
+    "timing_note": "",
+    "structure_note": ""
+  },
+  {
+    "id": "c000002",
+    "source_text": "I watched the OVA yesterday.",
+    "start_ms": 8000,
+    "end_ms": 10000,
+    "action": "alternate",
+    "text": null,
+    "reviewed": true,
+    "links": [
+      "s0001:c000001"
+    ],
+    "note": "Content retained in the linked ASS cue.",
+    "timing_note": "",
+    "structure_note": ""
+  },
+  {
+    "id": "c000003",
+    "source_text": "<i>North gate</i>",
+    "start_ms": 16000,
+    "end_ms": 18000,
+    "action": "edit",
+    "text": "<i>دروازهٔ شمالی</i>",
+    "reviewed": true,
+    "links": [],
+    "note": "",
+    "timing_note": "",
+    "structure_note": ""
+  }
+]
