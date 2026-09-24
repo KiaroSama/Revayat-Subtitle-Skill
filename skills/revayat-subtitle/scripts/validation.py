@@ -39,6 +39,21 @@ def string(value, where: str, *, empty: bool = False) -> str:
     return value
 
 
+def text_encoding(value, where: str) -> str:
+    string(value, where)
+    try:
+        codecs.lookup(value)
+        # An empty byte string bypasses codec-type checking in str.decode.
+        # A text codec may reject this sentinel as incomplete, which is valid.
+        try:
+            b"\0".decode(value)
+        except UnicodeError:
+            pass
+    except (LookupError, TypeError):
+        fail(where, "expected a supported text encoding, not a binary transform")
+    return value
+
+
 def integer(value, where: str, minimum: int = 0, maximum: int = 10**12) -> int:
     if type(value) is not int or not minimum <= value <= maximum:
         fail(where, f"expected an integer in {minimum}..{maximum}")
@@ -116,10 +131,7 @@ def project(value) -> dict:
             fail(loc + ".kind", "expected ass or srt")
         for field in ("name", "file", "encoding"):
             string(source.get(field), loc + "." + field)
-        try:
-            codecs.lookup(source["encoding"])
-        except LookupError:
-            fail(loc + ".encoding", "unknown codec")
+        text_encoding(source["encoding"], loc + ".encoding")
         integer(source.get("cues"), loc + ".cues", 1, 100000)
         if "origin" in source or value["version"] == 2:
             origin = obj(source.get("origin"), loc + ".origin")
