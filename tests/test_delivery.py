@@ -15,7 +15,7 @@ from subtitle_formats import Cue, parse
 from workflow import build
 import workflow
 from publication import publish_bytes
-from render import qa
+from render import qa, SAMPLER_VERSION
 from png_validation import decode_png
 
 
@@ -214,7 +214,7 @@ class DeliveryTests(WorkspaceCase):
             image.write_bytes(png)
             frames.append({"file": image.relative_to(edition).as_posix(), **sample,
                            "sha256": digest(png), "width": 1, "height": 1})
-        recipe = {"sampler": 2, "profile": "rgb24-v1", "fonts": [], "requested_fonts": requested_fonts(doc), "video": None,
+        recipe = {"sampler": SAMPLER_VERSION, "profile": "rgb24-v1", "fonts": [], "requested_fonts": requested_fonts(doc), "video": None,
                   "renderer": {"name": "authored-fixture", "version": "synthetic; not executed",
                                "bytes": 0, "sha256": digest(b"")}}
         record = write_render_evidence(edition, result, episode, doc, frames, True, recipe)

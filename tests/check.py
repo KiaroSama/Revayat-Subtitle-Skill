@@ -421,7 +421,8 @@ def main():
         if args.render:
             command.append("--render")
         try:
-            print(run(command, timeout=180 if args.render else 90, idle_timeout=30).decode("utf-8"), end="")
+            print(run(command, timeout=300 if args.render else 90,
+                      idle_timeout=90 if args.render else 30).decode("utf-8"), end="")
             return 0
         except (ValueError, subprocess.SubprocessError) as error:
             # Only this owned authored-test worker's diagnostics are safe to display.

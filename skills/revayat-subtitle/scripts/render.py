@@ -39,7 +39,7 @@ def doctor(override: str | None = None) -> dict:
 
 
 def load_build(build: Path):
-    manifest = validation.obj(read_json(build / "manifest.json"), "manifest.json")
+    manifest = validation.obj(read_json(local_path(build, "manifest.json")), "manifest.json")
     if type(manifest.get("version")) is not int:
         raise ValueError("manifest.json.version: expected an integer schema version")
     if manifest.get("version") == 1:
@@ -54,7 +54,7 @@ def load_build(build: Path):
         raise ValueError("Build manifest or workspace modified; rebuild and review the new edition")
     if build.name != current or build.parent.name != "builds":
         raise ValueError("Build must remain at its original workspace path")
-    if read_json(build / "glossary.json") != glossary:
+    if read_json(local_path(build, "glossary.json")) != glossary:
         raise ValueError("Build glossary differs from the reviewed continuity glossary")
     docs = {}
     for episode in manifest["episodes"]:
@@ -66,7 +66,8 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 2
+SAMPLER_VERSION = 3
+ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
 
 
@@ -87,7 +88,8 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
         signature = (cue.fields.get("style", "Default"), tuple(commands))
         prose = visible(cue.text, doc.kind)
         risky = has_rtl(prose) and (has_ltr(prose) or re.search(r"[\"'«»“”()<>\[\]]", prose))
-        if (all_cues or risky or has_drawing(cue.text, doc.kind) or refs - styles
+        animated = any(name in ANIMATED_TAGS for name, _ in commands)
+        if (all_cues or animated or risky or has_drawing(cue.text, doc.kind) or refs - styles
                 or signature not in signatures or "\n" in prose):
             chosen.add(index)
         styles.update(refs)
@@ -97,8 +99,7 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
         if not 0 <= index < len(doc.cues):
             raise ValueError("Changed-structure cue index is outside the episode")
         cue = doc.cues[index]
-        animated = any(name in {"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"}
-                       for name, _ in tokens[index])
+        animated = any(name in ANIMATED_TAGS for name, _ in tokens[index])
         for fraction in ((0.1, 0.5, 0.9) if animated else (0.5,)):
             seconds = round((cue.start + (cue.end - cue.start) * fraction) / 1000, 4)
             times.setdefault(seconds, set()).add(index + 1)
@@ -135,6 +136,7 @@ def requested_fonts(doc) -> list[str]:
 
 def write_render_evidence(build: Path, manifest: dict, episode: dict, doc,
                           frames: list[dict], all_cues: bool, recipe: dict) -> dict:
+    path = local_path(build, f"renders/{episode['id']}.json")
     if not frames:
         raise ValueError("A render must produce at least one frame")
     immutable = [{key: frame[key] for key in FRAME_FIELDS} for frame in frames]
@@ -145,13 +147,13 @@ def write_render_evidence(build: Path, manifest: dict, episode: dict, doc,
     receipt = {"version": 2, "identity": manifest["identity"], "episode": episode["id"],
                "subtitle_sha256": episode["sha256"], "all_cues": all_cues, "background": background,
                "recipe": recipe, "samples": samples, "frames": immutable}
-    receipt_path = local_path(build, frames[0]["file"]).parent / "receipt.json"
+    receipt_relative = (Path(frames[0]["file"]).parent / "receipt.json").as_posix()
+    receipt_path = local_path(build, receipt_relative)
     write_json(receipt_path, receipt)
     evidence = {key: receipt[key] for key in ("version", "identity", "episode", "subtitle_sha256", "all_cues", "background")}
     evidence.update(receipt_file=receipt_path.relative_to(build).as_posix(),
                     receipt_sha256=digest(receipt_path.read_bytes()),
                     frames=[{**frame, "reviewed": False, "note": ""} for frame in immutable])
-    path = build / "renders" / f"{episode['id']}.json"
     write_json(path, evidence)
     return {"review": str(path), "frames": evidence["frames"],
             "next": "Inspect every image; set reviewed=true and write an observation for each frame"}
@@ -159,10 +161,13 @@ def write_render_evidence(build: Path, manifest: dict, episode: dict, doc,
 
 def render(build: Path, episode_id: str, override: str | None, video: Path | None,
            fonts: Path | None, all_cues: bool) -> dict:
+    # Reject linked output roots before invoking tools or publishing any artifact.
+    root = local_path(build, "renders")
     executable = ffmpeg_path(override)
     manifest, docs = load_build(build)
     if episode_id not in docs:
         raise ValueError("Episode ID is not in this build")
+    local_path(build, f"renders/{episode_id}.json")
     episode = next(item for item in manifest["episodes"] if item["id"] == episode_id)
     doc = docs[episode_id]
     samples = sample_plan(doc, all_cues, changed_indices(episode))
@@ -172,7 +177,6 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
     recipe = {"sampler": SAMPLER_VERSION, "profile": "rgb24-v1", "renderer": renderer,
               "fonts": [], "requested_fonts": requested_fonts(doc), "font_resolution": "system fallback requires visual inspection; selected system font files are not attested",
               "video": file_fingerprint(video) if video else None}
-    root = build / "renders"
     root.mkdir(exist_ok=True)
     # Every render is a new directory: old reviewed images are never overwritten.
     destination = output_directory(root, episode_id + "-")
@@ -259,7 +263,7 @@ def check_delivery(build: Path) -> tuple[dict, list[str], set[str], int]:
     deadline = time.monotonic() + 900
     for episode in manifest["episodes"]:
         where = f"renders/{episode['id']}.json"
-        evidence = validation.render_record(read_json(build / where), where)
+        evidence = validation.render_record(read_json(local_path(build, where)), where)
         if (evidence["identity"] != manifest["identity"] or evidence["episode"] != episode["id"]
                 or evidence["subtitle_sha256"] != episode["sha256"]):
             raise ValueError("Render evidence is stale")
