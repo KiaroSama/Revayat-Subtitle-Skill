@@ -8,6 +8,8 @@ import re
 import ipaddress
 from urllib.parse import urlsplit
 
+MAX_TIME_MS = 10**12
+
 HASH = re.compile(r"[0-9a-f]{64}")
 SOURCE_ID = re.compile(r"s[0-9]{4}")
 CUE_ID = re.compile(r"c[0-9]{6}")
@@ -144,7 +146,7 @@ def worksheet(value, where: str = "worksheet") -> list:
         string(row.get("source_text"), loc + ".source_text", empty=True)
         boolean(row.get("reviewed"), loc + ".reviewed")
         for field in ("start_ms", "end_ms"):
-            integer(row.get(field), loc + "." + field)
+            integer(row.get(field), loc + "." + field, maximum=MAX_TIME_MS)
         if row.get("action") not in ("edit", "preserve", "credit", "empty", "alternate"):
             fail(loc + ".action", "expected a valid review action")
         if row.get("text") is not None:

@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, field
 
 from markup import ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment
+from validation import MAX_TIME_MS
 
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
 STYLE_FIELDS = ("Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
@@ -36,18 +37,24 @@ class Document:
 
 
 def timestamp(value: str, kind: str) -> int:
-    pattern = r"(\d+):(\d{2}):(\d{2})\.(\d{2})" if kind == "ass" else r"(\d+):(\d{2}):(\d{2}),(\d{3})"
+    if not isinstance(value, str) or kind not in {"ass", "srt"}:
+        raise ValueError("Invalid subtitle timestamp or format")
+    pattern = (r"([0-9]{1,12}):([0-9]{2}):([0-9]{2})\.([0-9]{2})" if kind == "ass"
+               else r"([0-9]{1,12}):([0-9]{2}):([0-9]{2}),([0-9]{3})")
     match = re.fullmatch(pattern, value.strip())
     if not match:
         raise ValueError("Invalid subtitle timestamp")
     hours, minutes, seconds, fraction = map(int, match.groups())
     if minutes > 59 or seconds > 59:
         raise ValueError("Subtitle minutes and seconds must be below 60")
-    return ((hours * 60 + minutes) * 60 + seconds) * 1000 + fraction * (10 if kind == "ass" else 1)
+    result = ((hours * 60 + minutes) * 60 + seconds) * 1000 + fraction * (10 if kind == "ass" else 1)
+    if result > MAX_TIME_MS:
+        raise ValueError("Subtitle timestamp exceeds the supported millisecond limit")
+    return result
 
 
 def timecode(ms: int, kind: str) -> str:
-    if type(ms) is not int or ms < 0 or kind not in {"ass", "srt"}:
+    if type(ms) is not int or not 0 <= ms <= MAX_TIME_MS or kind not in {"ass", "srt"}:
         raise ValueError("Timestamp serialization requires nonnegative integer milliseconds and ASS/SRT")
     hours, ms = divmod(ms, 3600000)
     minutes, ms = divmod(ms, 60000)
@@ -58,7 +65,7 @@ def timecode(ms: int, kind: str) -> str:
 
 
 def effective_times(start: int, end: int, kind: str) -> tuple[int, int]:
-    if type(start) is not int or type(end) is not int or not 0 <= start < end:
+    if type(start) is not int or type(end) is not int or not 0 <= start < end <= MAX_TIME_MS:
         raise ValueError("Cue timing requires nonnegative integers and end after start")
     result = (start // 10 * 10, end // 10 * 10) if kind == "ass" else (start, end)
     if result[1] <= result[0]:
@@ -238,7 +245,7 @@ def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str
 
 
 def srt_to_ass(cue: Cue) -> Cue:
-    text = cue.text
+    text = cue.text.replace("\r\n", "\n").replace("\r", "\n")
     for tag in ("i", "b", "u", "s"):
         ass_tag = "s" if tag == "s" else tag
         text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I)

@@ -20,6 +20,7 @@ def decode_png(data: bytes) -> tuple[int, int]:
     compressed = []
     ended = False
     image_ended = False
+    palette_seen = False
     while cursor < len(data):
         if cursor + 12 > len(data):
             invalid("truncated chunk")
@@ -62,8 +63,9 @@ def decode_png(data: bytes) -> tuple[int, int]:
             if kind in (b"acTL", b"fcTL", b"fdAT"):
                 invalid("animated images are not single-frame evidence")
             if kind == b"PLTE":
-                if compressed or not size or size % 3 or size > 768:
-                    invalid("invalid palette")
+                if palette_seen or compressed or not size or size % 3 or size > 768:
+                    invalid("invalid or repeated palette")
+                palette_seen = True
             elif not kind or not (kind[0] & 32):
                 invalid("unsupported critical chunk")
         cursor = end

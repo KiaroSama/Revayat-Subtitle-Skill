@@ -10,7 +10,15 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import zipfile
+import zlib
 import validation
+
+try:
+    import lzma
+except ImportError:
+    lzma = None  # ZIP_LZMA remains optional on minimal Python installations.
+
+ZIP_DECODE_ERRORS = (EOFError, zlib.error) + ((lzma.LZMAError,) if lzma is not None else ())
 
 from runtime import digest, local_path, read_json, read_limited, staging_directory, write_json
 from markup import clean_empty_lines, paragraph_direction, remap_resets
@@ -26,7 +34,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 2, "normalization": 2, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 3, "normalization": 3, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -91,6 +99,8 @@ def inputs(paths: list[Path]):
                                 raw = stream.read(MAX_FILE + 1)
                         except (NotImplementedError, RuntimeError) as error:
                             raise ValueError("Unsupported or encrypted ZIP member") from error
+                        except ZIP_DECODE_ERRORS:
+                            raise ValueError("Corrupt ZIP member compressed stream") from None
                         total += len(raw)
                         if len(raw) > MAX_FILE or total > MAX_TOTAL:
                             raise ValueError("Expanded subtitle data exceeds import limits")
@@ -168,7 +178,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
 
 
 def load(work: Path):
-    project = validation.project(read_json(work / "project.json"))
+    project = validation.project(read_json(local_path(work, "project.json")))
     def inventory(folder):
         result = set()
         with os.scandir(local_path(work, folder)) as entries:
@@ -247,6 +257,11 @@ def reviewed_cues(doc, sheet: list, target_language: str = "fa") -> tuple[list[C
         if action in {"credit", "empty", "alternate"}:
             continue
         text = cue.text if action == "preserve" else row.get("text")
+        if doc.kind == "srt" and isinstance(text, str):
+            # Worksheet edits must use the same line model as the SRT parser.
+            if "\r" in text:
+                logging.debug("Normalized SRT line endings cue=%s", cue.id)
+            text = text.replace("\r\n", "\n").replace("\r", "\n")
         if not isinstance(text, str) or (not visible(text, doc.kind) and not has_drawing(text, doc.kind)):
             raise ValueError(f"Cue {cue.id} requires nonempty reviewed text")
         if doc.kind == "ass" and ("\n" in text or "\r" in text):
@@ -319,7 +334,7 @@ def merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool) 
 def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
     """Reconstruct the expected edition without publishing files or changing reviews."""
     project, docs, sheets = load(work)
-    glossary = read_json(work / "glossary.json")
+    glossary = read_json(local_path(work, "glossary.json"))
     verify_glossary(glossary, project["series"])
     if project.get("font_policy") not in {"keep", "remove"}:
         raise ValueError("font_policy must be keep or remove")
@@ -395,8 +410,10 @@ def build(work: Path) -> dict:
     manifest, files, glossary = assemble(work)
     destination = local_path(work, "builds/" + manifest["identity"])
     if destination.exists():
-        old = read_json(destination / "manifest.json")
-        if old != manifest or any((destination / "Sub" / name).read_bytes() != data for name, data in files.items()):
+        old = read_json(local_path(destination, "manifest.json"))
+        if read_json(local_path(destination, "glossary.json")) != glossary:
+            raise ValueError("Existing build glossary differs from the reviewed glossary")
+        if old != manifest or any(local_path(destination, "Sub/" + name).read_bytes() != data for name, data in files.items()):
             raise ValueError("Existing build has been modified; restore it or create a fresh workspace")
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)
