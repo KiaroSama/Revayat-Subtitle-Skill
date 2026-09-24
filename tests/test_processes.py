@@ -45,6 +45,10 @@ class ProcessTests(WorkspaceCase):
                 process = psutil.Process(info["pid"])
             except psutil.NoSuchProcess:
                 return
+            self.assertAlmostEqual(process.create_time(), info["created"], places=2)
+            deadline = time.monotonic() + 3
+            while active(process) and time.monotonic() < deadline:
+                threading.Event().wait(0.02)
             self.assertFalse(active(process))
         finally:
             if marker.exists():
@@ -123,14 +127,19 @@ class ProcessTests(WorkspaceCase):
             "threading.Event().wait(20)\n", encoding="utf-8")
         parent = self.root / "exiting_parent.py"
         parent.write_text(
-            "import subprocess,sys\nsubprocess.Popen([sys.executable,'-B',sys.argv[1],sys.argv[2]],"
-            "creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))\n",
+            "import subprocess,sys,time,threading\nfrom pathlib import Path\n"
+            "subprocess.Popen([sys.executable,'-B',sys.argv[1],sys.argv[2]],"
+            "creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))\n"
+            "deadline=time.monotonic()+3\n"
+            "while not Path(sys.argv[2]).exists() and time.monotonic()<deadline: threading.Event().wait(.01)\n",
             encoding="utf-8")
         began = time.time()
         process = None
         try:
-            with self.assertRaises(subprocess.TimeoutExpired):
+            try:
                 run([sys.executable, "-B", str(parent), str(child), str(marker)], timeout=2)
+            except subprocess.TimeoutExpired:
+                pass  # POSIX may keep the capture pipe open; Windows may close it early.
             self.assertTrue(marker.exists(), "Child must actually start before cleanup is tested")
             info = json.loads(marker.read_text(encoding="utf-8"))
             try:
@@ -139,6 +148,9 @@ class ProcessTests(WorkspaceCase):
                 return
             self.assertGreaterEqual(info["created"], began - 1)
             self.assertAlmostEqual(process.create_time(), info["created"], places=2)
+            deadline = time.monotonic() + 3
+            while active(process) and time.monotonic() < deadline:
+                threading.Event().wait(0.02)
             self.assertFalse(active(process), "Owned child survived after its parent exited")
         finally:
             if marker.exists():

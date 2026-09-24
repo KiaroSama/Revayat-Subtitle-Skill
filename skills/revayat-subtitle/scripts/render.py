@@ -51,7 +51,7 @@ def load_build(build: Path):
     expected, files, glossary = assemble(work)
     current = expected["identity"]
     if manifest != expected:
-        raise ValueError("Build manifest or workspace changed; rebuild and review the new edition")
+        raise ValueError("Build manifest or workspace modified; rebuild and review the new edition")
     if build.name != current or build.parent.name != "builds":
         raise ValueError("Build must remain at its original workspace path")
     if read_json(build / "glossary.json") != glossary:
