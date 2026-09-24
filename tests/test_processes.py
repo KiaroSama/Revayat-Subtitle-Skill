@@ -43,9 +43,10 @@ class ProcessTests(WorkspaceCase):
             info = json.loads(marker.read_text(encoding="utf-8"))
             try:
                 process = psutil.Process(info["pid"])
+                created = process.create_time()
             except psutil.NoSuchProcess:
                 return
-            self.assertAlmostEqual(process.create_time(), info["created"], places=2)
+            self.assertAlmostEqual(created, info["created"], places=2)
             deadline = time.monotonic() + 3
             while active(process) and time.monotonic() < deadline:
                 threading.Event().wait(0.02)
@@ -144,10 +145,11 @@ class ProcessTests(WorkspaceCase):
             info = json.loads(marker.read_text(encoding="utf-8"))
             try:
                 process = psutil.Process(info["pid"])
+                created = process.create_time()
             except psutil.NoSuchProcess:
                 return
             self.assertGreaterEqual(info["created"], began - 1)
-            self.assertAlmostEqual(process.create_time(), info["created"], places=2)
+            self.assertAlmostEqual(created, info["created"], places=2)
             deadline = time.monotonic() + 3
             while active(process) and time.monotonic() < deadline:
                 threading.Event().wait(0.02)
