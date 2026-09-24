@@ -1,8 +1,35 @@
 # Revayat Subtitle — روایت زیرنویس
 
-[![CI](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](docs/platforms.md)
-[![GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
+[![Plugin version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-0d6efd?style=flat-square)](plugin.json)
+[![Python: 3.10 or newer](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](docs/platforms.md)
+[![Skills: one](https://img.shields.io/badge/Skills-1-0f766e?style=flat-square)](skills/revayat-subtitle/SKILL.md)
+[![Plugins: one](https://img.shields.io/badge/Plugins-1-0f766e?style=flat-square)](plugin.json)
+[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1?style=flat-square)](README.fa.md)
+
+[![Cross-platform CI status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
+[![CodeQL analysis status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml)
+[![Workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
+[![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
+[![Dependabot: monthly checks](https://img.shields.io/badge/Dependabot-monthly-6f42c1?style=flat-square)](.github/dependabot.yml)
+
+[![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
+[![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Source languages: multilingual](https://img.shields.io/badge/Sources-multilingual-2563eb?style=flat-square)](skills/revayat-subtitle/references/source-languages.md)
+[![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
+[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-2563eb?style=flat-square)](skills/revayat-subtitle/references/persian-typography.md)
+[![Standard: Agent Skills](https://img.shields.io/badge/Standard-Agent%20Skills-008080?style=flat-square)](https://agentskills.io/specification)
+[![Standard: Agent Plugins](https://img.shields.io/badge/Standard-Agent%20Plugins-008080?style=flat-square)](https://agent-plugins.org/plugin-authors/manifest)
+[![Works with Codex, Claude Code, Cursor and Kiro](https://img.shields.io/badge/Works%20with-Codex%20%7C%20Claude%20Code%20%7C%20Cursor%20%7C%20Kiro-2563eb?style=flat-square)](docs/platforms.md)
+[![Also works with Cline, Hermes, OpenCode and Antigravity](https://img.shields.io/badge/Also-Cline%20%7C%20Hermes%20%7C%20OpenCode%20%7C%20Antigravity-2563eb?style=flat-square)](docs/platforms.md)
+
+[![GitHub stars](https://img.shields.io/github/stars/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/forks)
+[![Open issues](https://img.shields.io/github/issues/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues)
+[![Open pull requests](https://img.shields.io/github/issues-pr/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/pulls)
+[![GitHub contributors](https://img.shields.io/github/contributors/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/graphs/contributors)
+[![Last commit on main](https://img.shields.io/github/last-commit/KiaroSama/Revayat-Subtitle-Skill/main?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/commits/main)
+[![Support through GitHub Sponsors](https://img.shields.io/badge/Support-GitHub%20Sponsors-ea4aaa?style=flat-square)](https://github.com/sponsors/KiaroSama)
 
 **Translate anime subtitles from any source language into spoken Persian, or repair Persian subtitles, and get one reviewed file per episode inside `Sub.zip`.**
 
