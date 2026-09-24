@@ -167,6 +167,7 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
     manifest, docs = load_build(build)
     if episode_id not in docs:
         raise ValueError("Episode ID is not in this build")
+    local_path(build, f"renders/{episode_id}.json")
     episode = next(item for item in manifest["episodes"] if item["id"] == episode_id)
     doc = docs[episode_id]
     samples = sample_plan(doc, all_cues, changed_indices(episode))

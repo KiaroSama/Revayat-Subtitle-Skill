@@ -53,7 +53,9 @@ def one_pixel_png(palettes=0, after_image=False):
 
 class AuditCase(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="revayat-reaudit-")
+        scratch = ROOT / ".scratch" / "checks"
+        scratch.mkdir(parents=True, exist_ok=True)
+        self.temporary = tempfile.TemporaryDirectory(prefix="revayat-reaudit-", dir=scratch)
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
         logging.info("Audit case started case=%s", self.id())
@@ -103,6 +105,19 @@ class AuditCase(unittest.TestCase):
                 render.render(build, "S01E01", sys.executable, None, None, False)
         child.assert_not_called()
         self.assertEqual(list(external.iterdir()), [])
+
+    def test_linked_render_record_rejected_before_external_tools(self):
+        work = self.workspace()
+        build = Path(workflow.build(work)["build"])
+        (build / "renders").mkdir()
+        external = self.root / "external-review.json"
+        external.write_text("{}", encoding="utf-8")
+        self.link(build / "renders/S01E01.json", external)
+        with patch.object(render, "run") as child:
+            with self.assertRaisesRegex(ValueError, "[Ll]ink"):
+                render.render(build, "S01E01", sys.executable, None, None, False)
+        child.assert_not_called()
+        self.assertEqual(external.read_text(encoding="utf-8"), "{}")
 
     def test_linked_project_record_is_not_accepted(self):
         work = self.workspace()
@@ -260,6 +275,26 @@ class AuditCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "compressed stream"):
             workflow.prepare([source], self.root / "work", "Authored fixture", 1, "utf-8", None, "fa")
         self.assertFalse((self.root / "work").exists())
+
+    def test_corrupt_bzip2_gets_controlled_cli_failure(self):
+        source = self.root / "corrupt-bzip2.zip"
+        with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_BZIP2) as archive:
+            archive.writestr("episode.srt", "1\n00:00:01,000 --> 00:00:02,000\nHello.\n")
+        data = bytearray(source.read_bytes())
+        offset = 30 + int.from_bytes(data[26:28], "little") + int.from_bytes(data[28:30], "little")
+        data[offset] = 0  # Invalid BZIP2 stream header; the archive directory remains readable.
+        source.write_bytes(data)
+        work = self.root / "work"
+        with self.assertRaisesRegex(ValueError, "compressed stream"):
+            workflow.prepare([source], work, "Authored fixture", 1, "utf-8", None, "fa")
+        result = subprocess.run([sys.executable, "-S", str(CLI), "prepare", str(source), "--work", str(work),
+                                "--series", "Authored fixture", "--season", "1"],
+                                capture_output=True, timeout=15,
+                                env={**os.environ, "REVAYAT_LOG_DIR": str(self.root / "logs")})
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn(b"Traceback", result.stderr)
+        self.assertIn(b"compressed stream", result.stderr)
+        self.assertFalse(work.exists())
 
     def test_supported_zip_compressions_still_import(self):
         for compression in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA):

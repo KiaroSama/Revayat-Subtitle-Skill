@@ -101,6 +101,11 @@ def inputs(paths: list[Path]):
                             raise ValueError("Unsupported or encrypted ZIP member") from error
                         except ZIP_DECODE_ERRORS:
                             raise ValueError("Corrupt ZIP member compressed stream") from None
+                        except OSError as error:
+                            # BZ2Decompressor reports invalid data as errno-less OSError.
+                            if entry.compress_type == zipfile.ZIP_BZIP2 and error.errno is None:
+                                raise ValueError("Corrupt ZIP member compressed stream") from None
+                            raise
                         total += len(raw)
                         if len(raw) > MAX_FILE or total > MAX_TOTAL:
                             raise ValueError("Expanded subtitle data exceeds import limits")
