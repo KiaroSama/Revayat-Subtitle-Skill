@@ -6,6 +6,44 @@ below is independently written; no upstream prompts, corpora, fonts or code are
 vendored. Software licenses do not automatically license associated datasets or
 model weights. Links pin the inspected revision where available.
 
+## Additional GitHub review — 2026-09-24
+
+This pass extends the earlier language-specific research. Current source pages
+were inspected, and the linked commit IDs were confirmed with Git refs. The
+repositories were not run; their language lists and speed or quality claims are
+not evidence of Japanese, Chinese, French or Spanish → Persian accuracy.
+
+| Newly inspected source | Adopted original guidance | Limit or rejected behavior |
+| --- | --- | --- |
+| [Subtitle Scout](https://github.com/fancydirty/subtitle-scout/blob/caae8e2719c5c114c528f5c0b9a251d0c4f9f613/README.md), AGPL-3.0-only | Compare the actual episode/cut and structural timeline before treating a candidate as a donor; release labels and resolution alone are weak evidence. Added to [release selection](release-selection.md). | No service, provider adapter, download code or AGPL text was copied. A missing video is disclosed as a limit, not silently treated as a verified match. |
+| [Subly](https://github.com/zakariaf/Subly/blob/dce9348aa4a1cd5de4e5972d4372d665245df651/README.md), no license established from the inspected root | Interpret a sentence spanning several timed cues as a whole, then allocate Persian to the same cue IDs. Added to [source-language review](source-languages.md). | Its fallback that fills missing translations with unchanged source text conflicts with required Persian output. No code or prompt was copied; ASR, Telegram and dubbing are outside scope. |
+| [Subtitle Translator](https://github.com/rockbenben/subtitle-translator/blob/44d503ed4c98e8da4b12c6615f84d0e5677b9f22/README.md), MIT | Structural separation of cue timing and dialogue confirms the existing immutable-source/worksheet contract; no duplicate implementation was added. | Its speed, 120-language list and provider support do not establish Persian editorial quality. Browser caching or API uploads were not adopted. |
+| [subtitle-translation-agent](https://github.com/abdulrabbt/subtitle-translation-agent/blob/2acdbd25fb2a878bf96beb32ac906830167da4a7/README.md), no license established from the inspected root | Its checkpoint idea overlaps Revayat's existing resumable worksheets; no new framework is needed. | Taking the first N model lines and discarding extras, or padding missed entries, violates one-decision-per-cue accounting. Do not adopt these repairs. |
+
+Agent skill packages were checked separately from applications:
+
+| Inspected SKILL.md | Adopted original guidance | Boundary |
+| --- | --- | --- |
+| [dual-subtitles-srt-skill](https://github.com/CalebDane7/dual-subtitles-srt-skill/blob/6084b24f1ee0b88aa90c90381a9b685b6d40523b/dual-subtitles-srt/SKILL.md), no license established | With matching media, inspect actual audio before/after cue coverage and real playback for embedded/forced/burned-in track collisions. Routed in [Step 8](../SKILL.md). | Four-line bilingual SRT, rejection of all overlaps and its provider path conflict with ASS layers and one Persian file per episode; nothing copied or installed. |
+| [gemini-srt-translator agent skill](https://github.com/MaKTaiL/gemini-srt-translator/blob/f61bbfb79e3bd4ae4981c78c452df0cc8c0c458f/skills/subtitle-translator/SKILL.md), MIT | Use approved neighboring Persian cues as optional read-only voice context alongside source cues, with source evidence decisive. Routed in [source-language review](source-languages.md) and [parallel handoff](parallel-editorial.md). | A chat-history-only context window can be stale or incomplete; no provider, package or prompt text copied. |
+| [subtitle-maker skill](https://github.com/DianeHoo/subtitle-maker/blob/0619bb87aac08642170bab32beb117f233b42487/SKILL.md), MIT | Manual uncertainty checks align with existing review; no separate rule needed. | ASR segmentation/interpolation and SRT reconstruction would change the approved source/cue contract. |
+| [VideoCaptioner skill](https://github.com/WEIFENG2333/VideoCaptioner/blob/95842ecb5618c0b6a548a336bdfb0eb859bdb501/skills/SKILL.md), GPL-3.0-or-later | Its staged creation process overlaps the existing worksheet/build/render gates. | No evidence from its skill that existing ASS effects survive translation; no generated-video or dependency integration. |
+| [cinemacc-subtitle-skill](https://github.com/HaiyiMei/cinemacc-subtitle-skill/blob/080fd0baa946a44c9b8cd6ecaa7eb4d939b678dc/skills/cinemacc-subtitle/SKILL.md), MIT | Neighboring source context and uncertainty handling were already adopted in the previous review. | Counted as prior work, not a new adoption; its SRT-only format is not a replacement for ASS. |
+
+Discovery also checked the [skills.sh catalogue](https://skills.sh/). These
+exact subtitle packages did not have verified install counts there; popularity
+is not a quality certificate. Neither unlicensed skill text nor prompts, media,
+models or executable code were imported. Original adapted rules live in the
+Revayat references linked above.
+
+Japanese and Chinese subtitle sources received renewed attention through Subly,
+Subtitle Scout and Subtitle Translator; their declared language support is a
+research lead only. For French and Spanish, Subtitle Scout describes basic source
+coverage, Subtitle Translator lists both, and Subly permits a selected language;
+none supplies a verified direct-to-Persian quality benchmark. The earlier
+Japanese/Chinese/French/Spanish grammar authorities and authored cases remain the
+meaning check. No external subtitle corpus was imported or redistributed.
+
 ## What changed in this skill
 
 The [source-language guide](source-languages.md) applies direct original→Persian

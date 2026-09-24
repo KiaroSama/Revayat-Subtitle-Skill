@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "series": "Fixture Series",
+  "season": 1,
+  "target_language": "fa",
+  "font_policy": "keep",
+  "sources": [
+    {
+      "id": "s0001",
+      "name": "episode.ass",
+      "file": "sources/s0001.ass",
+      "kind": "ass",
+      "sha256": "0d007bf172fc79e3630080ce331205cd87cc1fc2fea02680e3433ee00fdd45c4",
+      "encoding": "utf-8-sig",
+      "cues": 8,
+      "comments_removed": 1
+    },
+    {
+      "id": "s0002",
+      "name": "alternative.srt",
+      "file": "sources/s0002.srt",
+      "kind": "srt",
+      "sha256": "722627c82dc3751860a162964be0d7c7d5d39bef5cea385926cf75263af41b30",
+      "encoding": "utf-8-sig",
+      "cues": 3,
+      "comments_removed": 0
+    }
+  ],
+  "episodes": [
+    {
+      "id": "S01E01",
+      "base": "s0001",
+      "alternates": [
+        "s0002"
+      ],
+      "comparison": "ASS presentation; SRT supplies a missing sign and comparison wording."
+    }
+  ]
+}

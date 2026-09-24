@@ -11,7 +11,7 @@ import unicodedata
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "skills" / "revayat-subtitle" / "scripts"))
-from runtime import operational_log, read_json
+from runtime import operational_log, read_json, LogConfigurationError
 
 
 def score(answers: dict) -> dict:
@@ -31,21 +31,29 @@ def score(answers: dict) -> dict:
             "linguistic_quality_certified": False}
 
 
+def execute(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--answers", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        result = score(read_json(args.answers))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        code = int(bool(result["counts"]["needs_review"] or result["counts"]["missing"]))
+        logging.log(logging.ERROR if code else logging.INFO, "Evaluation completed exit=%d counts=%s", code, result["counts"])
+        return code
+    except (OSError, ValueError) as error:
+        logging.error("Evaluation failed error_type=%s exit=2", type(error).__name__)
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+
+
 def main(argv=None) -> int:
-    with operational_log("evaluation"):
-        parser = argparse.ArgumentParser(description=__doc__)
-        parser.add_argument("--answers", required=True, type=Path)
-        args = parser.parse_args(argv)
-        try:
-            result = score(read_json(args.answers))
-            print(json.dumps(result, ensure_ascii=False, indent=2))
-            code = int(bool(result["counts"]["needs_review"] or result["counts"]["missing"]))
-            logging.info("Evaluation completed exit=%d counts=%s", code, result["counts"])
-            return code
-        except (OSError, ValueError) as error:
-            logging.error("Evaluation failed error_type=%s exit=2", type(error).__name__)
-            print(f"ERROR: {error}", file=sys.stderr)
-            return 2
+    try:
+        with operational_log("evaluation"):
+            return execute(argv)
+    except LogConfigurationError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

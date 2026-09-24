@@ -5,11 +5,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-RLM = "\u200f"
-RLE, PDF = "\u202b", "\u202c"
-BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u066e-\u06d3\u06fa-\u06fc]")
-BLOCK = re.compile(r"(\{[^{}]*\}|<[^>]*>)")
+from markup import ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment
+
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
 STYLE_FIELDS = ("Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
                 "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, "
@@ -50,6 +47,8 @@ def timestamp(value: str, kind: str) -> int:
 
 
 def timecode(ms: int, kind: str) -> str:
+    if type(ms) is not int or ms < 0 or kind not in {"ass", "srt"}:
+        raise ValueError("Timestamp serialization requires nonnegative integer milliseconds and ASS/SRT")
     hours, ms = divmod(ms, 3600000)
     minutes, ms = divmod(ms, 60000)
     seconds, fraction = divmod(ms, 1000)
@@ -58,13 +57,30 @@ def timecode(ms: int, kind: str) -> str:
     return f"{hours:02}:{minutes:02}:{seconds:02},{fraction:03}"
 
 
+def effective_times(start: int, end: int, kind: str) -> tuple[int, int]:
+    if type(start) is not int or type(end) is not int or not 0 <= start < end:
+        raise ValueError("Cue timing requires nonnegative integers and end after start")
+    result = (start // 10 * 10, end // 10 * 10) if kind == "ass" else (start, end)
+    if result[1] <= result[0]:
+        raise ValueError("Centisecond quantization collapses this cue; review its timing explicitly")
+    return result
+
+
 def parse(data: str, kind: str) -> Document:
+    if not isinstance(data, str) or len(data) > 16 * 1024 * 1024:
+        raise ValueError("Subtitle text exceeds the supported parse budget")
     data = data.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     if "\x00" in data or "\ufffd" in data:
         raise ValueError("NUL or replacement characters in subtitles; check the input encoding")
     doc = Document(kind, [])
     if kind == "srt":
-        for block in re.split(r"\n[ \t]*\n", data.strip()):
+        def blocks():
+            source, cursor = data.strip(), 0
+            for match in re.finditer(r"\n[ \t]*\n", source):
+                yield source[cursor:match.start()]
+                cursor = match.end()
+            yield source[cursor:]
+        for block in blocks():
             if not block.strip():
                 continue
             lines = block.split("\n")
@@ -74,6 +90,8 @@ def parse(data: str, kind: str) -> Document:
             if len(times) != 2:
                 raise ValueError("Malformed SRT timestamp line")
             start, end = (timestamp(t, kind) for t in times)
+            if len(doc.cues) >= 100000:
+                raise ValueError("Subtitle exceeds 100000 cues")
             doc.cues.append(Cue(f"c{len(doc.cues) + 1:06}", start, end, "\n".join(lines[2:])))
     elif kind == "ass":
         section, lines = "", []
@@ -141,6 +159,8 @@ def parse(data: str, kind: str) -> Document:
                             raise ValueError("Duplicate ASS style name")
                         doc.styles[name] = parts
                     else:
+                        if len(doc.cues) >= 100000:
+                            raise ValueError("Subtitle exceeds 100000 cues")
                         doc.cues.append(Cue(f"c{len(doc.cues) + 1:06}", timestamp(row["start"], kind),
                                             timestamp(row["end"], kind), row["text"], row))
                 else:
@@ -155,29 +175,6 @@ def parse(data: str, kind: str) -> Document:
         if cue.end <= cue.start:
             raise ValueError(f"Cue {cue.id} ends before or at its start")
     return doc
-
-
-def uncomment(text: str, kind: str) -> str:
-    if kind == "srt":
-        return re.sub(r"<!--.*?-->", "", text, flags=re.S)
-    return re.sub(r"\{[^{}]*\}", lambda m: m[0] if "\\" in m[0] else "", text)
-
-
-def pieces(text: str, kind: str):
-    """Classify prose separately from tags and vector drawing payloads."""
-    drawing = False
-    pattern = BLOCK if kind == "srt" else re.compile(r"(\{[^{}]*\})")
-    for piece in pattern.split(uncomment(text, kind)):
-        if not piece:
-            continue
-        tag = piece.startswith("{") if kind == "ass" else bool(BLOCK.fullmatch(piece))
-        if tag:
-            if kind == "ass":
-                for match in re.finditer(r"\\p(\d+)(?!\d)|\\r(?:[^\\}]*)", piece):
-                    drawing = bool(int(match[1])) if match[1] is not None else False
-            yield "tag", piece
-        else:
-            yield "drawing" if drawing else "text", piece
 
 
 def visible(text: str, kind: str) -> str:
@@ -195,46 +192,12 @@ def has_drawing(text: str, kind: str) -> bool:
     return any(type_ == "drawing" and value.strip() for type_, value in pieces(text, kind))
 
 
-def rtl(text: str, kind: str) -> str:
-    """Add real RLM characters to logical Persian lines, never to drawing payloads."""
-    output, line = [], []
-
-    def flush():
-        prose = [i for i, (type_, value) in enumerate(line) if type_ == "text" and value.strip()]
-        if prose and any(ARABIC.search(line[i][1]) for i in prose):
-            first, last = prose[0], prose[-1]
-            mixed = any(re.search(r"[A-Za-z0-9]", line[i][1]) for i in prose)
-            if mixed and line[first][1].startswith(RLE) and line[last][1].endswith(PDF):
-                line[first] = ("text", line[first][1][1:])
-                line[last] = ("text", line[last][1][:-1])
-            # Legacy ASS layout otherwise splits mixed prose into wrongly ordered
-            # runs even with RLM. RLE preserves Latin order without reversing text.
-            line[first] = ("text", (RLE if mixed else "") + RLM + line[first][1])
-            line[last] = ("text", line[last][1] + RLM + (PDF if mixed else ""))
-        output.append("".join(value for _, value in line))
-        line.clear()
-
-    for type_, value in pieces(text, kind):
-        if type_ != "text":
-            line.append((type_, value))
-            continue
-        # Keep isolates supplied after visual review; replace only boundary RLMs.
-        value = value.replace(RLM, "")
-        for part in re.split(r"(\\N|\\n)" if kind == "ass" else r"(\n)", value):
-            if part in {r"\N", r"\n", "\n"}:
-                flush()
-                output.append(part)
-            else:
-                line.append(("text", part))
-    flush()
-    return "".join(output)
-
-
 def style_references(cue: Cue) -> set[str]:
     refs = {cue.fields.get("style", "Default").strip()}
     for type_, value in pieces(cue.text, "ass"):
         if type_ == "tag":
-            refs.update(match.strip() for match in re.findall(r"\\r([^\\}]+)", value))
+            refs.update(argument.strip() for name, argument, _, _ in overrides(value)
+                        if name == "r" and argument.strip())
     return refs
 
 
@@ -242,6 +205,8 @@ def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str
     cues = sorted(cues, key=lambda cue: cue.start)  # Ties retain their source/layer order.
     if not cues:
         raise ValueError("Refusing an episode with no retained cues")
+    for cue in cues:
+        effective_times(cue.start, cue.end, doc.kind)
     if doc.kind == "srt":
         return "\n\n".join(f"{i}\n{timecode(c.start, 'srt')} --> {timecode(c.end, 'srt')}\n{c.text}"
                            for i, c in enumerate(cues, 1)) + "\n"
@@ -278,10 +243,11 @@ def srt_to_ass(cue: Cue) -> Cue:
         ass_tag = "s" if tag == "s" else tag
         text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I)
         text = re.sub(f"</{tag}>", lambda _: "{\\" + ass_tag + "0}", text, flags=re.I)
-    if re.search(r"<[^>]*>", text):
+    if any(type_ == "tag" for type_, _ in pieces(text, "srt")):
         raise ValueError("SRT donor uses markup requiring explicit ASS adaptation")
     if "{" in cue.text or "}" in cue.text or "\\" in cue.text:
         raise ValueError("SRT donor contains ASS control syntax; adapt it explicitly")
     fields = dict(zip([f.strip().lower() for f in ASS_FIELDS.split(",")],
                       ["0", "", "", "Default", "", "0", "0", "0", "", ""]))
-    return Cue(cue.id, cue.start, cue.end, text.replace("\n", r"\N"), fields)
+    start, end = effective_times(cue.start, cue.end, "ass")
+    return Cue(cue.id, start, end, text.replace("\n", r"\N"), fields)

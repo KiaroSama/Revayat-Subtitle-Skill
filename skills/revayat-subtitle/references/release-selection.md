@@ -6,6 +6,12 @@ Use this when assigning episode numbers or comparing multiple subtitle releases.
 
 Group only candidates for the same episode and video edition. Confirm the season,
 episode and OVA numbers. Do not extract a number from a resolution, year or CRC.
+Before assigning a candidate, compare its series/episode metadata, language,
+encoding, cue timeline and the beginning, middle and ending against the actual
+episode when video is available. A different cut or an implausible timeline stays
+unassigned for investigation. A release-group label or resolution is not proof of
+a match or mismatch. If no matching video is available, record that cut matching
+remains unverified and use the candidates' content and timing as limited evidence.
 Use `S01E01`, `S01OVA01`, `S02E01` and `S02OVA01`. Movies, specials, episode zero
 and ambiguous numbering need the user's naming decision.
 

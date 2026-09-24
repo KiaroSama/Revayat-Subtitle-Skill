@@ -18,6 +18,11 @@ Distinguish checked file integrity from editorial accuracy. The command cannot
 prove that an agent understood every line or actually looked at a frame. If asked
 to assess language or visual quality, read the relevant source/target and images.
 `sync_verified: false` means no audiovisual synchronization certification.
+If matching media was supplied, the using agent also checks real audio just
+before the first cue and after the last, and tests the intended external Persian
+track in a player for collisions with embedded, forced or burned-in subtitles.
+Report either observation or the exact unavailable capability; `qa` alone does
+not perform those media checks.
 
 This command reports findings. Do not edit the subtitles, sign reviews or create
 a replacement ZIP unless the user also asks for repairs.

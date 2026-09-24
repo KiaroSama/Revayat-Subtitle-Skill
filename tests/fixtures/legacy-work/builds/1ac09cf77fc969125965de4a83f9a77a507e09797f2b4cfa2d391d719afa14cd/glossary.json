@@ -1,0 +1,17 @@
+{
+  "series": "Fixture Series",
+  "terms_reviewed": true,
+  "research": [
+    {
+      "url": "https://example.org/fixture",
+      "note": "Structural test reference only; this authored fixture is not a real anime."
+    }
+  ],
+  "terms": [
+    {
+      "source": "Rin",
+      "target": "رین",
+      "locked": true
+    }
+  ]
+}

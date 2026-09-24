@@ -1,5 +1,36 @@
 # Revayat Subtitle — روایت زیرنویس
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
+[![Plugin version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-0d6efd?style=flat-square)](plugin.json)
+[![Python: 3.10 or newer](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](docs/platforms.md)
+[![Skills: one](https://img.shields.io/badge/Skills-1-0f766e?style=flat-square)](skills/revayat-subtitle/SKILL.md)
+[![Plugins: one](https://img.shields.io/badge/Plugins-1-0f766e?style=flat-square)](plugin.json)
+[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1?style=flat-square)](README.fa.md)
+
+[![Cross-platform CI status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
+[![CodeQL analysis status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml)
+[![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
+[![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
+[![Dependabot: monthly checks](https://img.shields.io/badge/Dependabot-monthly-6f42c1?style=flat-square)](.github/dependabot.yml)
+
+[![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
+[![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Source languages: multilingual](https://img.shields.io/badge/Sources-multilingual-2563eb?style=flat-square)](skills/revayat-subtitle/references/source-languages.md)
+[![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
+[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-2563eb?style=flat-square)](skills/revayat-subtitle/references/persian-typography.md)
+[![Standard: Agent Skills](https://img.shields.io/badge/Standard-Agent%20Skills-008080?style=flat-square)](https://agentskills.io/specification)
+[![Standard: Agent Plugins](https://img.shields.io/badge/Standard-Agent%20Plugins-008080?style=flat-square)](https://agent-plugins.org/plugin-authors/manifest)
+[![Works with Codex, Claude Code, Cursor and Kiro](https://img.shields.io/badge/Works%20with-Codex%20%7C%20Claude%20Code%20%7C%20Cursor%20%7C%20Kiro-2563eb?style=flat-square)](docs/platforms.md)
+[![Also works with Cline, Hermes, OpenCode and Antigravity](https://img.shields.io/badge/Also-Cline%20%7C%20Hermes%20%7C%20OpenCode%20%7C%20Antigravity-2563eb?style=flat-square)](docs/platforms.md)
+
+[![GitHub stars](https://img.shields.io/github/stars/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/forks)
+[![Open issues](https://img.shields.io/github/issues/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues)
+[![Open pull requests](https://img.shields.io/github/issues-pr/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/pulls)
+[![Maintainer: KiaroSama](https://img.shields.io/badge/Maintainer-KiaroSama-6f42c1?style=flat-square)](https://github.com/KiaroSama)
+[![Last commit on main](https://img.shields.io/github/last-commit/KiaroSama/Revayat-Subtitle-Skill/main?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/commits/main)
+[![Support through GitHub Sponsors](https://img.shields.io/badge/Support-GitHub%20Sponsors-ea4aaa?style=flat-square)](https://github.com/sponsors/KiaroSama)
+
 **Translate anime subtitles from any source language into spoken Persian, or repair Persian subtitles, and get one reviewed file per episode inside `Sub.zip`.**
 
 An agent skill for Claude Code, Codex, Cursor, Kiro, Cline, Hermes, OpenCode,
@@ -23,8 +54,10 @@ Persian/English text that must display correctly in a real subtitle renderer.
 | **Japanese honorifics remain Japanese** | سان، کون، ساما، چان and اونی-چان stay forms of address rather than becoming آقا or خانم. |
 | **One edition per episode** | A usable ASS release supplies presentation; better wording and missing content can come from other candidates without concatenating duplicate translations. |
 | **RTL is inspected, not assumed** | Logical Unicode, real direction marks and FFmpeg images expose mixed-script order, punctuation, quote scope, missing glyphs and clipping. |
+| **Real-media boundaries matter** | With matching video, the agent checks audio outside the first/last cue and whether embedded or forced subtitles collide with the selected Persian track. |
 | **Effects remain effects** | Vector paths, positioning, animation, karaoke controls and intentional layers stay distinct from the signs and dialogue that need translation. |
 | **Fonts are a choice** | When embedded fonts are found, the agent asks whether to retain or remove them unless the user already decided for this batch; the replacement font is checked after removal. |
+| **Optional parallel editing** | The agent asks before assigning disjoint episodes or cue ranges to subagents. Shared names, separate worker logs and coordinator review keep the results consistent. |
 | **Narrow cleanup** | Verified promotion, empty cues, hidden comments and unused styles are removed; story dialogue, profanity and sexual language retain their meaning and intensity. |
 | **The delivery checks its own evidence** | `qa` and packaging use the same source, subtitle, glossary and image checks, and the finished ZIP is read back before success. |
 
@@ -184,9 +217,12 @@ creates a different build identity and requires matching evidence.
 | Module | Role |
 | --- | --- |
 | `subtitle_formats.py` | ASS/SRT document model, strict parsing, stable serialization, drawing/text separation and bidi marks |
+| `markup.py` / `validation.py` | Shared override/direction parsing and strict editable-record contracts |
 | `workflow.py` | source inventory, worksheets, glossary records, release merging and build identity |
 | `render.py` | FFmpeg samples, shared QA gate and verified ZIP delivery |
 | `runtime.py` | UTF-8 I/O, hashes, bounded subprocesses, staging directories and per-run logging |
+| `process_control.py` / `process_supervisor.py` | Owned process groups/Windows Jobs with wall, idle and output limits |
+| `publication.py` / `png_validation.py` | Complete-file publication and bounded PNG decoding |
 | `revayat-subtitle.py` | one CLI entry point for every stage |
 | `install/install.py` | shared agent routing and allowlisted skill/plugin installation |
 
@@ -221,20 +257,26 @@ The skill routes to these references at the step that needs them:
 - [release-selection.md](skills/revayat-subtitle/references/release-selection.md) — candidate comparison and episode identity.
 - [subtitle-formats.md](skills/revayat-subtitle/references/subtitle-formats.md) — ASS/SRT, comments, styles, drawings and optional font removal.
 - [workflow.md](skills/revayat-subtitle/references/workflow.md) — workspace, worksheet and review contracts.
+- [parallel-editorial.md](skills/revayat-subtitle/references/parallel-editorial.md) — consent, assignments, worker logs and final integration.
 - [troubleshooting.md](skills/revayat-subtitle/references/troubleshooting.md) — refusals, recovery and execution logs.
 
 ## Development
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python tests/check.py
 python tests/check.py --render
 python evaluation/score.py --answers my-answers.json
 ```
 
 The stdlib test runner bounds its worker process and exercises the real CLI and
-native installers. CI checks Linux, macOS and Windows; Linux also exercises libass
-and 10-bit video previews. CodeQL analyzes Python and workflows, Dependency Review
-runs on pull requests, and Dependabot maintains Actions and security updates.
+native installers. Development dependencies add bounded generated cases and native
+process-identity checks; the installed skill still has no pip runtime dependencies.
+CI covers Linux, macOS and Windows, with libass and 10-bit preview lanes on Linux
+and Windows. CodeQL analyzes Python and workflows; actionlint and zizmor block
+workflow defects. Dependency Review runs on PRs; Dependabot covers Actions, the
+development manifest and the empty runtime manifest. Read exact-commit Actions
+results before claiming a pass.
 
 [evaluation/](evaluation/README.md) contains short authored language cases. Known
 acceptable answers are recognized; unseen wording is reported for human review,
@@ -247,7 +289,9 @@ the subtitles, and place that log beside the translated files as required by
 `SKILL.md`. Chat updates and helper execution logs do not replace this agent log.
 
 Execution logs record progress/errors without subtitle bodies;
-read-only installations fall back to stderr. See
+`REVAYAT_LOG_LEVEL=DEBUG` enables bounded diagnostic detail (default `INFO`).
+Read-only installations fall back to formatted stderr. Native installer bootstrap
+logs also cover missing Python. See
 [execution logs](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs).
 
 ## Donate

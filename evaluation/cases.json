@@ -12,5 +12,15 @@
   {"id":"fr_restriction","source_language":"fr","source":"Il n'a que deux clés.","accepted":["فقط دو تا کلید داره."],"focus":"Ne...que restricts; it does not negate possession."},
   {"id":"fr_expletive_ne","source_language":"fr","source":"Je crains qu'il ne parte.","accepted":["می‌ترسم بره."],"focus":"Expletive ne does not mean fear that he will not leave."},
   {"id":"es_negative_concord","source_language":"es","source":"No vino nadie.","accepted":["هیچ‌کس نیومد."],"focus":"Negative concord remains a negative statement."},
-  {"id":"es_voseo","source_language":"es","source":"¿Vos querés venir?","accepted":["تو می‌خوای بیای؟","می‌خوای بیای؟"],"focus":"Voseo can address one familiar person, not a plural group."}
+  {"id":"es_voseo","source_language":"es","source":"¿Vos querés venir?","accepted":["تو می‌خوای بیای؟","می‌خوای بیای؟"],"focus":"Voseo can address one familiar person, not a plural group."},
+  {"id":"ja_omitted_subject","source_language":"ja","context":"Rin is being discussed. The reply answers whether Rin has arrived.","source":"まだ来ていない。","accepted":["هنوز نیومده."],"focus":"Use the established referent; do not invent a new speaker or completed arrival."},
+  {"id":"ja_negative_request","source_language":"ja","source":"触らないで。","accepted":["دست نزن.","بهش دست نزن."],"focus":"Keep the negative request; do not turn it into permission."},
+  {"id":"zh_not_yet","source_language":"zh","source":"他还没回来。","accepted":["هنوز برنگشته."],"focus":"Not yet is not never; retain the unresolved return."},
+  {"id":"zh_only_two","source_language":"zh","source":"我只有两个。","accepted":["فقط دو تا دارم."],"focus":"Restriction must survive without inventing the omitted object."},
+  {"id":"fr_false_friend","source_language":"fr","source":"Je suis actuellement à Paris.","accepted":["الان پاریسم.","الان تو پاریسم."],"focus":"Actuellement means currently, not actually."},
+  {"id":"fr_polite_singular","source_language":"fr","context":"A guard politely addresses one visitor.","source":"Vous pouvez entrer.","accepted":["می‌تونید بیاید داخل.","می‌تونید وارد بشید."],"focus":"Preserve polite address without inventing a group of visitors."},
+  {"id":"es_no_longer","source_language":"es","source":"Ya no vive aquí.","accepted":["دیگه اینجا زندگی نمی‌کنه."],"focus":"No longer is not not yet; preserve the changed situation."},
+  {"id":"es_embarrassed","source_language":"es","source":"Me da vergüenza.","accepted":["خجالت می‌کشم."],"focus":"Express embarrassment naturally without inventing pregnancy or blame."},
+  {"id":"literal_comparison","source_language":"en","source":"Keep x < 5 and y > 2.","accepted":["x < 5 و y > 2 رو نگه دار."],"focus":"Angle delimiters are visible math, not removable markup."},
+  {"id":"interrupted_dialogue","source_language":"en","source":"I didn't say he—","accepted":["من نگفتم اون—"],"focus":"Retain negation and interruption; do not complete the speaker's thought."}
 ]

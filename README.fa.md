@@ -2,6 +2,37 @@
 
 # روایت زیرنویس — Revayat Subtitle
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
+[![Plugin version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-0d6efd?style=flat-square)](plugin.json)
+[![Python: 3.10 or newer](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](docs/platforms.md)
+[![Skills: one](https://img.shields.io/badge/Skills-1-0f766e?style=flat-square)](skills/revayat-subtitle/SKILL.md)
+[![Plugins: one](https://img.shields.io/badge/Plugins-1-0f766e?style=flat-square)](plugin.json)
+[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1?style=flat-square)](README.fa.md)
+
+[![Cross-platform CI status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
+[![CodeQL analysis status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml)
+[![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
+[![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
+[![Dependabot: monthly checks](https://img.shields.io/badge/Dependabot-monthly-6f42c1?style=flat-square)](.github/dependabot.yml)
+
+[![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
+[![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Source languages: multilingual](https://img.shields.io/badge/Sources-multilingual-2563eb?style=flat-square)](skills/revayat-subtitle/references/source-languages.md)
+[![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
+[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-2563eb?style=flat-square)](skills/revayat-subtitle/references/persian-typography.md)
+[![Standard: Agent Skills](https://img.shields.io/badge/Standard-Agent%20Skills-008080?style=flat-square)](https://agentskills.io/specification)
+[![Standard: Agent Plugins](https://img.shields.io/badge/Standard-Agent%20Plugins-008080?style=flat-square)](https://agent-plugins.org/plugin-authors/manifest)
+[![Works with Codex, Claude Code, Cursor and Kiro](https://img.shields.io/badge/Works%20with-Codex%20%7C%20Claude%20Code%20%7C%20Cursor%20%7C%20Kiro-2563eb?style=flat-square)](docs/platforms.md)
+[![Also works with Cline, Hermes, OpenCode and Antigravity](https://img.shields.io/badge/Also-Cline%20%7C%20Hermes%20%7C%20OpenCode%20%7C%20Antigravity-2563eb?style=flat-square)](docs/platforms.md)
+
+[![GitHub stars](https://img.shields.io/github/stars/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/forks)
+[![Open issues](https://img.shields.io/github/issues/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues)
+[![Open pull requests](https://img.shields.io/github/issues-pr/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/pulls)
+[![Maintainer: KiaroSama](https://img.shields.io/badge/Maintainer-KiaroSama-6f42c1?style=flat-square)](https://github.com/KiaroSama)
+[![Last commit on main](https://img.shields.io/github/last-commit/KiaroSama/Revayat-Subtitle-Skill/main?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/commits/main)
+[![Support through GitHub Sponsors](https://img.shields.io/badge/Support-GitHub%20Sponsors-ea4aaa?style=flat-square)](https://github.com/sponsors/KiaroSama)
+
 **زیرنویس انیمه را از هر زبانی به فارسی گفتاری ترجمه کنید یا زیرنویس فارسی را کامل اصلاح کنید؛ خروجی هر قسمت یک فایل بازبینی‌شده داخل `Sub.zip` است.**
 
 اسکیلی برای Claude Code، Codex، Cursor، Kiro، Cline، Hermes، OpenCode،
@@ -24,8 +55,10 @@ Antigravity و هر ایجنتی که `SKILL.md` را می‌خواند. تمر�
 | **پسوندهای ژاپنی حفظ می‌شوند** | سان، کون، ساما، چان و اونی-چان به آقا و خانم تبدیل نمی‌شوند. |
 | **یک خروجی برای هر قسمت** | نسخهٔ مناسب ASS مبنای نمایش است؛ متن بهتر یا محتوای جاافتاده از نسخه‌های دیگر با تطبیق دقیق وارد می‌شود. |
 | **RTL واقعاً دیده می‌شود** | متن یونیکد با ترتیب منطقی، نشانه‌های جهت و تصاویر FFmpeg، اشکال ترتیب فارسی/انگلیسی، علائم، نقل‌قول و بریدگی را آشکار می‌کنند. |
+| **مرزهای ویدئو هم بررسی می‌شوند** | اگر ویدئوی منطبق موجود باشد، ایجنت صدای قبل از اولین و بعد از آخرین خط و تداخل زیرنویس داخلی یا اجباری با فایل فارسی را بررسی می‌کند. |
 | **افکت با متن اشتباه نمی‌شود** | مسیرهای برداری، موقعیت، حرکت، کارائوکه و لایه‌های عمدی از متن تابلوها و دیالوگ جدا هستند. |
 | **فونت انتخاب کاربر است** | اگر فونت جاسازی‌شده وجود داشته باشد، ایجنت دربارهٔ حذف یا حفظ آن سؤال می‌کند؛ مگر کاربر قبلاً برای همان کار تصمیم داده باشد. فونت جایگزین پس از حذف بررسی می‌شود. |
+| **ویرایش موازی اختیاری است** | ایجنت پیش از تقسیم قسمت‌ها یا بازه‌های خطوط بین ساب‌ایجنت‌ها سؤال می‌کند؛ واژه‌نامهٔ مشترک، لاگ جدا و بازبینی هماهنگ‌کننده الزامی است. |
 | **پاک‌سازی محدود و دقیق** | تبلیغات تأییدشده، خطوط خالی، کامنت‌های مخفی و استایل‌های بی‌استفاده حذف می‌شوند؛ محتوای داستان و شدت فحش و الفاظ جنسی حفظ می‌شود. |
 | **خروجی شواهد خودش را بررسی می‌کند** | QA و بسته‌بندی از بررسی مشترک ورودی، زیرنویس، واژه‌نامه و تصویر استفاده می‌کنند؛ ZIP نهایی دوباره خوانده می‌شود. |
 
@@ -250,9 +283,12 @@ ASSهای واقعی انتخاب‌شده فونت جاسازی‌شده ندا
 
 ## توسعه
 
+راهنمای [کار موازی](skills/revayat-subtitle/references/parallel-editorial.md) رضایت کاربر، تقسیم بدون تداخل، خروجی و لاگ جداگانه و بازبینی نهایی را مشخص می‌کند. بدون رضایت یا پشتیبانی میزبان، کار ترتیبی ادامه پیدا می‌کند.
+
 <div dir="ltr">
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python tests/check.py
 python tests/check.py --render
 python evaluation/score.py --answers my-answers.json
@@ -262,9 +298,11 @@ python evaluation/score.py --answers my-answers.json
 
 رانر مبتنی بر کتابخانهٔ استاندارد، زمان اجرای فرایند را محدود و خط فرمان و
 نصب‌کنندهٔ واقعی را بررسی می‌کند. CI روی Linux، macOS و Windows اجرا می‌شود؛
-Linux رندر libass و پیش‌نمایش ویدئوی ۱۰بیتی را هم بررسی می‌کند. CodeQL کد Python
+Linux و Windows رندر libass و پیش‌نمایش ویدئوی ۱۰بیتی را هم بررسی می‌کنند. CodeQL کد Python
 و گردش‌کارها را تحلیل می‌کند؛ Dependency Review برای PRهاست و Dependabot
-اکشن‌ها و به‌روزرسانی‌های امنیتی را مدیریت می‌کند.
+اکشن‌ها، وابستگی‌های توسعه و مانیفست خالی اجرای اسکیل را مدیریت می‌کند. actionlint و zizmor خطاهای گردش‌کار را مسدود می‌کنند. نتیجهٔ اجرای همان commit ملاک قبولی است. بسته‌های تست وارد اسکیل نصب‌شده نمی‌شوند.
+
+سطح لاگ پیش‌فرض `INFO` است؛ `REVAYAT_LOG_LEVEL=DEBUG` جزئیات تشخیصی را فعال می‌کند. لاگ آغاز نصب، نبود Python را هم ثبت می‌کند؛ نبود دسترسی نوشتن باعث ارسال لاگ قالب‌بندی‌شده به stderr می‌شود.
 
 [بخش ارزیابی](evaluation/README.md) نمونه‌های زبانی کوتاه و تألیفی دارد. پاسخ‌های
 پذیرفته‌شدهٔ شناخته‌شده تشخیص داده می‌شوند؛ بیان تازه برای بازبینی انسانی گزارش

@@ -12,6 +12,10 @@ Use the original series identity, season numbering, locked names and font policy
 Read the previous activity log and create a new run log beside the translated
 files, identifying the resumed batch and recording subsequent actions as they occur.
 
+For parallel work, read `references/parallel-editorial.md`: retain an explicit batch
+choice, or ask before dispatch. Reconcile saved worker IDs, source/glossary revisions
+and disjoint ranges before retrying missing work; stop abandoned workers first.
+
 Continue from the corresponding numbered step in `SKILL.md`. Keep completed
 decisions and original cue IDs. `prepare` creates a new workspace and must not
 be run over this one. A sequel loads the previous glossary before any translation.

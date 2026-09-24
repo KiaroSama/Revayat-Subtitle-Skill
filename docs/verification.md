@@ -9,13 +9,23 @@ font blocks, drawing preservation, SRT sorting and OVA names, license inclusion,
 installation source protection and replacement backups. CI covers Python 3.10
 and 3.14 on Linux, and Python 3.14 on Windows and macOS.
 
-The Linux render tier additionally checks that subsecond samples contain actual
+The Linux and Windows render tiers additionally check that subsecond samples contain actual
 caption pixels, 10-bit video produces viewable 8-bit PNGs, incomplete visual
 reviews prevent packaging, image modifications invalidate approval, and ZIP bytes
 match the reviewed edition. Automated signoffs in this test are deliberately
 labelled gate-contract fixtures, not human visual judgments. CodeQL analyzes
 Python and workflows. Dependency Review is triggered on pull requests; Dependabot
-maintains GitHub Actions and its security updates are enabled for the repository.
+maintains GitHub Actions and pinned development dependencies. Blocking actionlint
+and zizmor workflow checks use pinned releases; runtime remains stdlib.
+
+Discovered regression modules cover publication write/flush/close/race failures,
+multi-target installation rollback and ancestor changes, malformed JSON/PNG records,
+literal markup, bidi idempotence, canonical identities, provenance, legacy migration,
+default sampler associations, and exited-leader/cancellation/output-limit processes.
+Hypothesis generates finite deterministic format examples; native checks use psutil
+only in development. Authored failure logs/images are size-limited CI artifacts;
+private real-media work is never uploaded. Native render fixtures bind a selected
+font file and prove visible pixels, not linguistic or shaping correctness by themselves.
 
 Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions)
 for the result on the commit being evaluated; configuration alone is not a pass.
@@ -41,6 +51,11 @@ typography also required a Persian font, resetting inherited negative tracking,
 and libass whole-text layout for two sign layers with separately scaled numbers.
 The latter is a libass-specific adaptation; VSFilter compatibility was not tested.
 The skill documents these as decisions to make after actual image inspection.
+
+The newer instructions also request audio coverage before the first and after the
+last cue and player track selection when matching media exists. Those checks are
+not established by the earlier real-media run or by automated PNG validation;
+they require a fresh media-backed review to claim completion for a new batch.
 
 ## Limits
 

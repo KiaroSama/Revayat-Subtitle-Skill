@@ -14,6 +14,12 @@ are content. A physical line break would corrupt an ASS row; use literal `\N`.
 SRT block numbers are regenerated after a stable sort by start time. Equal-start
 events retain their order; overlap is not automatically an error.
 
+SRT-to-ASS conversion floors each timestamp to a centisecond and records original,
+reviewed and emitted times. Durations that become zero are refused. Literal angle
+comparisons such as `x < 5` remain visible; unsupported HTML needs an explicit edit.
+Real ASS style resets are parsed inside override blocks, including transforms;
+reset-looking prose outside those blocks is not rewritten.
+
 ## Readable text versus effects
 
 Override blocks, vector paths, clips, masks, positioning, animation, colors and
@@ -29,6 +35,12 @@ sections, standalone `{inline comments}`, SRT HTML comments and genuinely empty
 cues. Remove empty display lines within a retained cue without losing its content.
 For `{note\i1}`, separate the comment from the real tag manually and document the
 structural change. A hidden override block may still control visible output.
+
+Meaningful interior direction controls and ZWNJ are preserved; unbalanced direction
+scopes are refused. Output language selects paragraph direction independently of
+embedded names. An explicit worksheet `direction` (`ltr`/`rtl`) needs `direction_note`.
+Intentional blank layout uses `preserve_empty_lines: true` plus `structure_note`;
+soft breaks, drawings and karaoke are not blindly stripped.
 
 Prune empty and unused styles, retaining those used only by `\rStyle` resets.
 Style changes and vector modifications require `structure_note` and visual review.

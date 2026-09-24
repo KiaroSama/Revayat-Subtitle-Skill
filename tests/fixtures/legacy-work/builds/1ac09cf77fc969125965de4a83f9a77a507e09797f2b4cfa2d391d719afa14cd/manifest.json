@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "identity": "1ac09cf77fc969125965de4a83f9a77a507e09797f2b4cfa2d391d719afa14cd",
+  "series": "Fixture Series",
+  "target_language": "fa",
+  "font_policy": "keep",
+  "episodes": [
+    {
+      "id": "S01E01",
+      "file": "Sub/S01E01.ass",
+      "sha256": "e7c6c0f5be6633b72b489efd97721a45481f208474f8a6bcec1a1468735a40c6",
+      "cues": 7,
+      "sources": [
+        "s0001",
+        "s0002"
+      ],
+      "comparison": "ASS presentation; SRT supplies a missing sign and comparison wording.",
+      "provenance": [
+        {
+          "source": "s0001",
+          "cue": "c000001"
+        },
+        {
+          "source": "s0001",
+          "cue": "c000002"
+        },
+        {
+          "source": "s0001",
+          "cue": "c000003"
+        },
+        {
+          "source": "s0001",
+          "cue": "c000006"
+        },
+        {
+          "source": "s0001",
+          "cue": "c000007"
+        },
+        {
+          "source": "s0001",
+          "cue": "c000008"
+        },
+        {
+          "source": "s0002",
+          "cue": "c000003"
+        }
+      ]
+    }
+  ],
+  "reviewed_cues": 11
+}
