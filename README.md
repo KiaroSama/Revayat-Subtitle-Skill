@@ -27,6 +27,7 @@ Persian/English text that must display correctly in a real subtitle renderer.
 | **Japanese honorifics remain Japanese** | سان، کون، ساما، چان and اونی-چان stay forms of address rather than becoming آقا or خانم. |
 | **One edition per episode** | A usable ASS release supplies presentation; better wording and missing content can come from other candidates without concatenating duplicate translations. |
 | **RTL is inspected, not assumed** | Logical Unicode, real direction marks and FFmpeg images expose mixed-script order, punctuation, quote scope, missing glyphs and clipping. |
+| **Real-media boundaries matter** | With matching video, the agent checks audio outside the first/last cue and whether embedded or forced subtitles collide with the selected Persian track. |
 | **Effects remain effects** | Vector paths, positioning, animation, karaoke controls and intentional layers stay distinct from the signs and dialogue that need translation. |
 | **Fonts are a choice** | When embedded fonts are found, the agent asks whether to retain or remove them unless the user already decided for this batch; the replacement font is checked after removal. |
 | **Optional parallel editing** | The agent asks before assigning disjoint episodes or cue ranges to subagents. Shared names, separate worker logs and coordinator review keep the results consistent. |
@@ -246,8 +247,9 @@ native installers. Development dependencies add bounded generated cases and nati
 process-identity checks; the installed skill still has no pip runtime dependencies.
 CI covers Linux, macOS and Windows, with libass and 10-bit preview lanes on Linux
 and Windows. CodeQL analyzes Python and workflows; actionlint and zizmor block
-workflow defects. Dependency Review runs on PRs; Dependabot covers Actions and
-the development manifest. Read exact-commit Actions results before claiming a pass.
+workflow defects. Dependency Review runs on PRs; Dependabot covers Actions, the
+development manifest and the empty runtime manifest. Read exact-commit Actions
+results before claiming a pass.
 
 [evaluation/](evaluation/README.md) contains short authored language cases. Known
 acceptable answers are recognized; unseen wording is reported for human review,

@@ -239,6 +239,15 @@ overlap, font fallback, positions and effects. Use
 [persian-typography.md](references/persian-typography.md) when inherited typography
 needs adaptation; inspect more samples or a clip when motion remains uncertain.
 
+When matching video/audio is supplied and can be inspected, check spoken content
+just before the first subtitle cue and after the last as well as representative
+middle scenes; a correctly rendered first/last cue cannot reveal missing edge
+dialogue. If the video has embedded, forced or burned-in subtitles, inspect
+playback with the intended external Persian track selected for duplicate visible
+text. Preserve intentional ASS dialogue/sign layers. If audio access or a player
+is unavailable, report that coverage or track selection was unverified; FFmpeg
+preview frames alone do not establish either claim.
+
 Only after inspection, mark the frame reviewed and record a concrete observation.
 Then run the same gate that packaging uses:
 

@@ -52,6 +52,11 @@ and libass whole-text layout for two sign layers with separately scaled numbers.
 The latter is a libass-specific adaptation; VSFilter compatibility was not tested.
 The skill documents these as decisions to make after actual image inspection.
 
+The newer instructions also request audio coverage before the first and after the
+last cue and player track selection when matching media exists. Those checks are
+not established by the earlier real-media run or by automated PNG validation;
+they require a fresh media-backed review to claim completion for a new batch.
+
 ## Limits
 
 - No full episode/season semantic certification or audiovisual synchronization audit.

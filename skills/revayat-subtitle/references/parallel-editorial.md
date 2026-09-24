@@ -34,6 +34,8 @@ Give each worker:
 - Exact assigned source/cue IDs, immutable source text/hashes and output language.
 - The same locked glossary and its revision/hash, character voice and language profile.
 - Read-only surrounding dialogue and resolved speaker/referent notes.
+- Any approved neighboring Persian cues as read-only style context, clearly
+  separated from source evidence and never re-emitted as assigned output.
 - A unique result file and a unique activity-log filename; the required review schema.
 - The complete preservation, Japanese-honorific, no-censorship, markup and uncertainty rules.
 

@@ -39,6 +39,18 @@ current cue IDs; do not emit the neighbors twice or move a revelation ahead of i
 spoken time. Adjust batch size to scene and complexity, not English word counts.
 Do not split a sentence mechanically at punctuation or count CJK characters as
 English words. A cue boundary alone does not justify adding an ellipsis.
+If one source sentence spans adjacent cues, read the complete sentence across
+their IDs before translating it. Distribute fluent Persian back across those
+same cue IDs and original display times; check that each part appears when its
+meaning is available, with no repeated or missing phrase. Do not combine or
+drop cues to make the sentence easier. If its meaning cannot be assigned safely
+within those boundaries, keep the affected IDs pending and document the timing
+or source uncertainty for review rather than inventing a complete answer.
+
+Previously approved Persian neighbor cues can also inform voice and the flow of
+a split sentence. Keep them read-only, identify their cue IDs, and check them
+against the source if they conflict. Stale translations and unapproved donors
+are not evidence of meaning.
 
 Keep brief scene notes with speaker/addressee, confirmed referents, name readings,
 relationship/register and unresolved cue IDs. Use the existing glossary for stable
