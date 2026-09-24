@@ -14,6 +14,7 @@ import validation
 
 from runtime import digest, local_path, read_json, read_limited, staging_directory, write_json
 from markup import clean_empty_lines, paragraph_direction, remap_resets
+from publication import rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times)
 
@@ -161,7 +162,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
             raise ValueError("No ASS/SRT subtitles found")
         write_json(stage / "project.json", project)
         write_json(stage / "glossary.json", terms)
-        stage.rename(work)
+        rename_noreplace(stage, work)
     logging.info("Imported sources=%d cues=%d", len(project["sources"]), total_cues)
     return {"work": str(work), "sources": project["sources"], "next": "Read and fill every worksheet; map episodes in project.json"}
 
@@ -392,7 +393,7 @@ def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
 
 def build(work: Path) -> dict:
     manifest, files, glossary = assemble(work)
-    destination = work / "builds" / manifest["identity"]
+    destination = local_path(work, "builds/" + manifest["identity"])
     if destination.exists():
         old = read_json(destination / "manifest.json")
         if old != manifest or any((destination / "Sub" / name).read_bytes() != data for name, data in files.items()):
@@ -406,6 +407,6 @@ def build(work: Path) -> dict:
                 (stage / "Sub" / name).write_bytes(data)
             write_json(stage / "manifest.json", manifest)
             write_json(stage / "glossary.json", glossary)
-            stage.rename(destination)
+            rename_noreplace(stage, destination)
     logging.info("Built episodes=%d reviewed_cues=%d", len(manifest["episodes"]), manifest["reviewed_cues"])
     return {"build": str(destination), **manifest}

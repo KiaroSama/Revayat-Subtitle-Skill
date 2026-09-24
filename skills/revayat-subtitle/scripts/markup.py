@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from html.parser import HTMLParser
 
 RLM, LRM = "\u200f", "\u200e"
 RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
@@ -20,6 +21,16 @@ def has_rtl(text: str) -> bool:
 
 def has_ltr(text: str) -> bool:
     return any(char not in BIDI and unicodedata.bidirectional(char) in {"L", "EN"} for char in text)
+
+
+def srt_font_names(tag: str) -> set[str]:
+    class FontTag(HTMLParser):
+        def handle_starttag(self, name, attributes):
+            if name == "font":
+                names.update(value.strip() for key, value in attributes if key == "face" and value and value.strip())
+    names = set()
+    FontTag(convert_charrefs=False).feed(tag)
+    return names
 
 
 def overrides(block: str, *, nested: bool = True):
@@ -199,7 +210,8 @@ def clean_empty_lines(text: str, kind: str, preserve: bool = False) -> str:
             retained.append(pending + "".join(value for _, value in line))
             pending = ""
         else:
-            pending += "".join(value for type_, value in line if type_ == "tag")
+            pending += "".join(value if type_ == "tag" else "".join(char for char in value if char in BIDI)
+                               for type_, value in line)
     return delimiter.join(retained) + pending
 
 

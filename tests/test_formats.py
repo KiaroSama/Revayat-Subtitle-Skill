@@ -9,6 +9,17 @@ from workflow import merge_donor, reviewed_cues
 
 
 class FormatTests(WorkspaceCase):
+    def test_bidi_only_blank_lines_keep_their_balanced_scope(self):
+        source = "Hello\\N\u2067\\Nسلام\u2069"
+        doc = Document("ass", [Cue("c000001", 1000, 2000, source)])
+        row = {"id": "c000001", "source_text": source, "text": source, "reviewed": True,
+               "action": "edit", "start_ms": 1000, "end_ms": 2000, "links": []}
+        kept, _ = reviewed_cues(doc, [row])
+        self.assertEqual(visible(kept[0].text, "ass"), "Hello\nسلام")
+        self.assertEqual(kept[0].text.count("\u2067"), 1)
+        self.assertEqual(kept[0].text.count("\u2069"), 1)
+        validate_bidi(kept[0].text, "ass")
+
     def test_resets_change_only_real_override_arguments(self):
         doc = parse((FIXTURES / "episode.ass").read_text(encoding="utf-8"), "ass")
         donor = parse((FIXTURES / "episode.ass").read_text(encoding="utf-8"), "ass")

@@ -20,6 +20,14 @@ from png_validation import decode_png
 
 
 class DeliveryTests(WorkspaceCase):
+    def test_middle_srt_font_is_sampled_and_identified(self):
+        from subtitle_formats import Document
+        doc = Document("srt", [Cue("a", 1000, 2000, "First"),
+                               Cue("b", 3000, 4000, '<font face="Example Sans">Middle</font>'),
+                               Cue("c", 5000, 6000, "Last")])
+        self.assertIn(3.5, sample_times(doc, False))
+        self.assertEqual(requested_fonts(doc), ["Example Sans"])
+
     @unittest.skipUnless(os.name == "nt", "Windows inherited publication permissions")
     def test_published_file_inherits_destination_permissions(self):
         output = self.root / "published.bin"

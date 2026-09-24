@@ -139,8 +139,10 @@ class SubtitleChecks(WorkspaceCase):
         self.assertIn(RLM + "من دیروز OVA رو دیدم." + RLM, raw)
         self.assertIn(r"{\i1}" + RLM + "دروازهٔ شمالی" + RLM + r"{\i0}", raw)
         self.assertEqual((FIXTURES / "episode.ass").read_bytes(), original)
-        logs = list((self.root / "logs").glob("*.log"))
+        logs = list((self.root / "logs").glob("revayat-subtitle_*.log"))
         self.assertEqual(len(logs), 3)
+        supervisor_logs = list((self.root / "logs").glob("process-supervisor_*.log"))
+        self.assertEqual(len(supervisor_logs), 3 if os.name == "nt" else 0)
         entries = "".join(path.read_text(encoding="utf-8") for path in logs)
         self.assertIn("exit=2", entries)
         self.assertNotIn("اون مترجم بود", entries)
@@ -275,8 +277,9 @@ class SubtitleChecks(WorkspaceCase):
         installed = project / ".agents" / "skills" / "revayat-subtitle"
         self.assertFalse(list(installed.rglob("*.log")))
         self.assertFalse((project / "AGENTS.md").exists())
-        with self.assertRaisesRegex(ValueError, "already exists"):
+        with self.assertRaises(ValueError) as caught:
             run(command, timeout=15)
+        self.assertIn("already exists", caught.exception.stderr.decode("utf-8"))
         plugin = self.root / "plugin copy"
         run([sys.executable, str(ROOT / "install" / "install.py"), "--plugin", "--destination", str(plugin)], timeout=15)
         self.assertEqual(read_json(plugin / "plugin.json")["name"], "revayat-subtitle")

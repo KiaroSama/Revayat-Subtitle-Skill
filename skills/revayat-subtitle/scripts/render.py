@@ -15,7 +15,7 @@ import validation
 
 from runtime import digest, file_fingerprint, local_path, output_directory, read_json, read_limited, run, write_json
 from subtitle_formats import ARABIC, has_drawing, parse, visible, pieces, style_references
-from markup import has_ltr, has_rtl, overrides
+from markup import has_ltr, has_rtl, overrides, srt_font_names
 from publication import publish_bytes
 from png_validation import decode_png, MAX_PNG_BYTES
 
@@ -80,6 +80,8 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
         commands = [(name, argument) for type_, value in pieces(cue.text, doc.kind)
                     if type_ == "tag" and doc.kind == "ass"
                     for name, argument, _, _ in overrides(value)]
+        if doc.kind == "srt":
+            commands = [("srt-tag", value.casefold()) for type_, value in pieces(cue.text, doc.kind) if type_ == "tag"]
         tokens[index] = commands
         refs = style_references(cue) if doc.kind == "ass" else {"Default"}
         signature = (cue.fields.get("style", "Default"), tuple(commands))
@@ -126,6 +128,8 @@ def requested_fonts(doc) -> list[str]:
         for type_, value in pieces(cue.text, doc.kind):
             if type_ == "tag" and doc.kind == "ass":
                 names.update(arg.strip() for name, arg, _, _ in overrides(value) if name == "fn" and arg.strip())
+            elif type_ == "tag" and doc.kind == "srt":
+                names.update(srt_font_names(value))
     return sorted(names)
 
 

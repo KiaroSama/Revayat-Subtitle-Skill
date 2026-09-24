@@ -15,9 +15,36 @@ from check import CLI, WorkspaceCase, completed
 from runtime import read_json, write_json
 from workflow import build, load, prepare
 from subtitle_formats import parse, visible
+from publication import rename_noreplace
+from check import FIXTURES
 
 
 class ContractTests(WorkspaceCase):
+    def test_concurrent_empty_workspace_and_edition_are_not_replaced(self):
+        created = []
+        def competitor(source, destination):
+            destination.mkdir()
+            created.append((destination, destination.stat().st_ino))
+            return rename_noreplace(source, destination)
+
+        with patch("workflow.rename_noreplace", competitor):
+            with self.assertRaises(OSError):
+                prepare([FIXTURES / "episode.ass"], self.work, "Fixture Series", 1,
+                        "utf-8-sig", None, "fa")
+        self.assertEqual(created[0][0], self.work)
+        self.assertEqual(self.work.stat().st_ino, created[0][1])
+        self.assertEqual(list(self.work.iterdir()), [])
+
+        self.work.rmdir()
+        self.import_work()
+        completed(self.work)
+        with patch("workflow.rename_noreplace", competitor):
+            with self.assertRaises(OSError):
+                build(self.work)
+        edition, original_inode = created[1]
+        self.assertEqual(edition.stat().st_ino, original_inode)
+        self.assertEqual(list(edition.iterdir()), [])
+
     def test_aggregate_workspace_bounds_apply_when_loading_existing_work(self):
         self.import_work()
         for limit, value, message in (("MAX_TOTAL_CUES", 1, "cue limits"),
