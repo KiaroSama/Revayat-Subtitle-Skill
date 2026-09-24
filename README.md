@@ -9,7 +9,7 @@
 
 [![Cross-platform CI status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
 [![CodeQL analysis status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml)
-[![Workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
+[![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
 [![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
 [![Dependabot: monthly checks](https://img.shields.io/badge/Dependabot-monthly-6f42c1?style=flat-square)](.github/dependabot.yml)
 
@@ -27,7 +27,7 @@
 [![GitHub forks](https://img.shields.io/github/forks/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/forks)
 [![Open issues](https://img.shields.io/github/issues/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues)
 [![Open pull requests](https://img.shields.io/github/issues-pr/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/pulls)
-[![GitHub contributors](https://img.shields.io/github/contributors/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/graphs/contributors)
+[![Maintainer: KiaroSama](https://img.shields.io/badge/Maintainer-KiaroSama-6f42c1?style=flat-square)](https://github.com/KiaroSama)
 [![Last commit on main](https://img.shields.io/github/last-commit/KiaroSama/Revayat-Subtitle-Skill/main?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/commits/main)
 [![Support through GitHub Sponsors](https://img.shields.io/badge/Support-GitHub%20Sponsors-ea4aaa?style=flat-square)](https://github.com/sponsors/KiaroSama)
 
