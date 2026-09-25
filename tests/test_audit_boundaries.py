@@ -233,8 +233,9 @@ class BoundaryTests(unittest.TestCase):
         output = Path(workflow.build(work)["build"])
         path = output / "Sub/S01E01.srt"
         path.write_bytes(path.read_bytes() + b"x" * 100)
-        with self.assertRaisesRegex(ValueError, "byte limit"):
+        with self.assertRaisesRegex(ValueError, "byte limit") as caught:
             workflow.build(work)
+        self.assertIn("modified", str(caught.exception))
 
     def test_json_short_write_preserves_existing_target(self):
         path = self.root / "record.json"

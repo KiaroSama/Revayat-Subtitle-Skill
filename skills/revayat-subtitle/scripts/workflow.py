@@ -414,7 +414,13 @@ def build(work: Path) -> dict:
         old = read_json(local_path(destination, "manifest.json"))
         if read_json(local_path(destination, "glossary.json")) != glossary:
             raise ValueError("Existing build glossary differs from the reviewed glossary")
-        if old != manifest or any(read_limited(local_path(destination, "Sub/" + name), len(data)) != data for name, data in files.items()):
+        try:
+            modified = old != manifest or any(
+                read_limited(local_path(destination, "Sub/" + name), len(data)) != data
+                for name, data in files.items())
+        except ValueError as error:
+            raise ValueError(f"Existing build has been modified: {error}") from None
+        if modified:
             raise ValueError("Existing build has been modified; restore it or create a fresh workspace")
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)
