@@ -11,6 +11,7 @@ import re
 import os
 from pathlib import Path
 import signal
+import stat
 import shutil
 import subprocess
 import sys
@@ -19,12 +20,21 @@ import time
 import uuid
 
 
+MAX_JSON_BYTES = 64 * 1024 * 1024
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
 def read_limited(path: Path, maximum: int) -> bytes:
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError("File byte limit must be a nonnegative integer")
+    if not stat.S_ISREG(path.stat().st_mode):
+        raise ValueError(f"{path.name}: expected a regular artifact file")
     with path.open("rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError(f"{path.name}: artifact type changed while opening")
         data = handle.read(maximum + 1)
     if len(data) > maximum:
         raise ValueError(f"{path.name}: file exceeds the supported byte limit")
@@ -73,7 +83,9 @@ def read_json(path: Path, maximum: int = 64 * 1024 * 1024):
             raise ValueError("JSON integer is too long")
         return int(value)
 
-    maximum = min(maximum, 64 * 1024 * 1024)
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError("JSON byte limit must be a nonnegative integer")
+    maximum = min(maximum, MAX_JSON_BYTES)
     if path.stat().st_size > maximum:
         raise ValueError(f"{path.name}: JSON exceeds its byte limit")
     try:
@@ -84,15 +96,21 @@ def read_json(path: Path, maximum: int = 64 * 1024 * 1024):
 
 
 def write_json(path: Path, value) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     data = (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    if len(data) > MAX_JSON_BYTES:
+        raise ValueError(f"{path.name}: JSON exceeds its byte limit")
+    path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=".write-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
+            if handle.write(data) != len(data):
+                raise OSError("JSON write was incomplete")
         os.replace(temporary, path)
     finally:
-        Path(temporary).unlink(missing_ok=True)
+        try:
+            Path(temporary).unlink(missing_ok=True)
+        except OSError:
+            logging.warning("JSON staging cleanup failed; original operation result is preserved")
 
 
 def local_path(root: Path, relative: str) -> Path:

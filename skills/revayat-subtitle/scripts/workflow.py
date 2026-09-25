@@ -34,7 +34,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 3, "normalization": 3, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 4, "normalization": 4, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -130,11 +130,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
             glossary: Path | None, target_language: str) -> dict:
     validation.string(series, "series")
     validation.integer(season, "season", 1, 99)
-    validation.string(encoding, "encoding")
-    try:
-        codecs.lookup(encoding)
-    except LookupError:
-        raise ValueError("encoding: unknown codec") from None
+    validation.text_encoding(encoding, "encoding")
     if not series.strip() or not 1 <= season <= 99:
         raise ValueError("A series title and season from 1 to 99 are required")
     if work.exists():
@@ -418,7 +414,13 @@ def build(work: Path) -> dict:
         old = read_json(local_path(destination, "manifest.json"))
         if read_json(local_path(destination, "glossary.json")) != glossary:
             raise ValueError("Existing build glossary differs from the reviewed glossary")
-        if old != manifest or any(local_path(destination, "Sub/" + name).read_bytes() != data for name, data in files.items()):
+        try:
+            modified = old != manifest or any(
+                read_limited(local_path(destination, "Sub/" + name), len(data)) != data
+                for name, data in files.items())
+        except ValueError as error:
+            raise ValueError(f"Existing build has been modified: {error}") from None
+        if modified:
             raise ValueError("Existing build has been modified; restore it or create a fresh workspace")
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)

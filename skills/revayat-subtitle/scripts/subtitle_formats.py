@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from markup import ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment
+from markup import SRT_BREAK, ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment
 from validation import MAX_TIME_MS
 
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -102,6 +102,7 @@ def parse(data: str, kind: str) -> Document:
             doc.cues.append(Cue(f"c{len(doc.cues) + 1:06}", start, end, "\n".join(lines[2:])))
     elif kind == "ass":
         section, lines = "", []
+        seen_sections = set()
         known_sections = {"[script info]", "[v4+ styles]", "[v4 styles]", "[events]", "[fonts]",
                           "[graphics]", "[aegisub project garbage]", "[aegisub extradata]"}
         for line in data.split("\n"):
@@ -111,8 +112,9 @@ def parse(data: str, kind: str) -> Document:
                 header = header and stripped.casefold() in known_sections
             if header:
                 section = stripped
-                if any(name.casefold() == section.casefold() for name, _ in doc.sections):
+                if section.casefold() in seen_sections:
                     raise ValueError("Repeated ASS sections are not supported")
+                seen_sections.add(section.casefold())
                 lines = []
                 doc.sections.append((section, lines))
             elif section:
@@ -245,7 +247,7 @@ def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str
 
 
 def srt_to_ass(cue: Cue) -> Cue:
-    text = cue.text.replace("\r\n", "\n").replace("\r", "\n")
+    text = SRT_BREAK.sub("\n", cue.text.replace("\r\n", "\n").replace("\r", "\n"))
     for tag in ("i", "b", "u", "s"):
         ass_tag = "s" if tag == "s" else tag
         text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I)

@@ -10,9 +10,10 @@ RLM, LRM = "\u200f", "\u200e"
 RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
+SRT_BREAK = re.compile(r"<br\s*/?>", re.I)
 ASS_BLOCK = re.compile(r"\{[^{}]*\}")
-SRT_BLOCK = re.compile(r"<!--.*?-->|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
-TAG_NAME = re.compile(r"(?:fscx|fscy|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
+SRT_BLOCK = re.compile(r"<br\s*/?>|<!--.*?-->|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
+TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
 
 
 def has_rtl(text: str) -> bool:
@@ -57,7 +58,21 @@ def overrides(block: str, *, nested: bool = True):
                     finish += 1
                 if level:
                     raise ValueError("Unbalanced ASS override parentheses")
-                yield name, block[begin:finish], begin, finish
+                if name in {"t", "clip", "iclip", "pos", "org", "move", "fad", "fade"}:
+                    yield name, block[begin:finish], begin, finish
+                else:
+                    # libass accepts a parenthesized single scalar argument. Its
+                    # delimiters are syntax, not part of a style/font name.
+                    argument_start, argument_end = begin + 1, finish - 1
+                    # Scalar consumers use the first nonempty argument, as the
+                    # renderer does; leave ignored arguments in the source.
+                    while argument_start < finish - 1:
+                        comma = block.find(",", argument_start, finish - 1)
+                        argument_end = finish - 1 if comma < 0 else comma
+                        if block[argument_start:argument_end].strip() or comma < 0:
+                            break
+                        argument_start = comma + 1
+                    yield name, block[argument_start:argument_end], argument_start, argument_end
                 if name == "t" and nested:
                     yield from scan(begin + 1, finish - 1, depth + 1)
             else:
@@ -91,10 +106,13 @@ def pieces(text: str, kind: str):
                 if name == "p":
                     if not re.fullmatch(r"[0-9]+", argument.strip()):
                         raise ValueError("ASS drawing mode must be a nonnegative integer")
-                    drawing = int(argument.strip()) > 0
+                    drawing = bool(argument.strip().lstrip("0"))
                 elif name == "r":
                     drawing = False
-        yield "tag", block
+        if kind == "srt" and SRT_BREAK.fullmatch(block):
+            yield "text", "\n"
+        else:
+            yield "tag", block
         cursor = match.end()
     if cursor < len(text):
         yield "drawing" if drawing else "text", text[cursor:]
@@ -162,7 +180,15 @@ def rtl(text: str, kind: str, direction: str = "rtl", *, force: bool = False) ->
             if force or any(has_rtl(line[i][1]) for i in indices):
                 mixed = any(has_ltr(line[i][1]) for i in indices)
                 mark = RLM if direction == "rtl" else LRM
-                embedding = (RLE if direction == "rtl" else LRE) if mixed else ""
+                # A wrapper cannot end inside an isolate opened by the source
+                # on another display line. Preserve crossing source scopes and
+                # use direction marks alone on those lines.
+                self_contained = True
+                try:
+                    validate_bidi("".join(value for _, value in line), kind)
+                except ValueError:
+                    self_contained = False
+                embedding = (RLE if direction == "rtl" else LRE) if mixed and self_contained else ""
                 line[first] = ("text", embedding + mark + line[first][1])
                 line[last] = ("text", line[last][1] + mark + (PDF if embedding else ""))
         output.append("".join(value for _, value in line))

@@ -66,9 +66,16 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 3
+SAMPLER_VERSION = 4
 ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
+
+
+def animated_event(cue, commands) -> bool:
+    # Legacy ASS Effect animations are event-local, even without override tags.
+    effect = cue.fields.get("effect", "")
+    return effect.startswith(("Banner;", "Scroll up;", "Scroll down;")) or any(
+        name in ANIMATED_TAGS for name, _ in commands)
 
 
 def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
@@ -85,10 +92,11 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
             commands = [("srt-tag", value.casefold()) for type_, value in pieces(cue.text, doc.kind) if type_ == "tag"]
         tokens[index] = commands
         refs = style_references(cue) if doc.kind == "ass" else {"Default"}
-        signature = (cue.fields.get("style", "Default"), tuple(commands))
+        signature = (cue.fields.get("style", "Default"), tuple(commands),
+                     tuple(cue.fields.get(field, "") for field in ("layer", "marginl", "marginr", "marginv", "effect")))
         prose = visible(cue.text, doc.kind)
         risky = has_rtl(prose) and (has_ltr(prose) or re.search(r"[\"'«»“”()<>\[\]]", prose))
-        animated = any(name in ANIMATED_TAGS for name, _ in commands)
+        animated = animated_event(cue, commands)
         if (all_cues or animated or risky or has_drawing(cue.text, doc.kind) or refs - styles
                 or signature not in signatures or "\n" in prose):
             chosen.add(index)
@@ -99,7 +107,7 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
         if not 0 <= index < len(doc.cues):
             raise ValueError("Changed-structure cue index is outside the episode")
         cue = doc.cues[index]
-        animated = any(name in ANIMATED_TAGS for name, _ in tokens[index])
+        animated = animated_event(cue, tokens[index])
         for fraction in ((0.1, 0.5, 0.9) if animated else (0.5,)):
             seconds = round((cue.start + (cue.end - cue.start) * fraction) / 1000, 4)
             times.setdefault(seconds, set()).add(index + 1)
