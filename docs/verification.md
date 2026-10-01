@@ -30,6 +30,14 @@ font file and prove visible pixels, not linguistic or shaping correctness by the
 Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions)
 for the result on the commit being evaluated; configuration alone is not a pass.
 
+The text-boundary regressions additionally cover FFmpeg-compatible SRT break
+names, parenthesized ASS scalar spans and ignored prefixes, balanced bidi scopes
+crossing display lines, nontext codecs, regular-file reads, JSON expansion/short
+writes/cleanup failures, legacy Effect phases and ordered duplicate-section refusal.
+Pixel comparisons require a full nonblank RGB frame before equivalence is accepted.
+Their temporary artifacts stay inside the repository's test scratch directory.
+These are mechanical contracts; rendering equivalence does not establish meaning.
+
 ## Real local media, 2026-09-14
 
 Four real ASS candidates, including two Persian releases and two English tracks

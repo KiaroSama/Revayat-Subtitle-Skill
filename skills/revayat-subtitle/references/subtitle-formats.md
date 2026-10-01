@@ -20,6 +20,14 @@ comparisons such as `x < 5` remain visible; unsupported HTML needs an explicit e
 Real ASS style resets are parsed inside override blocks, including transforms;
 reset-looking prose outside those blocks is not rewritten.
 
+Supported SRT `br`/`br/` tags become display breaks, including ASCII-space
+attributes and `<br/ >`. A tab or nonbreaking space attached to the tag name is
+literal text, following FFmpeg rather than browser HTML rules. ASS parenthesized
+scalar values take precedence over ignored prefixes: `\rIgnored(Default)` refers
+to `Default`, while literal reset-looking prose remains untouched. The helper
+preserves delimiters/ignored source arguments when remapping the actual style value.
+Malformed or unsupported controls still require deliberate source-preserving repair.
+
 ## Readable text versus effects
 
 Override blocks, vector paths, clips, masks, positioning, animation, colors and

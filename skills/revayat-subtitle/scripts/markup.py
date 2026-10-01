@@ -10,9 +10,9 @@ RLM, LRM = "\u200f", "\u200e"
 RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
-SRT_BREAK = re.compile(r"<br\s*/?>", re.I)
+SRT_BREAK = re.compile(r"<br/?(?: +[^<>]*)?>", re.I)
 ASS_BLOCK = re.compile(r"\{[^{}]*\}")
-SRT_BLOCK = re.compile(r"<br\s*/?>|<!--.*?-->|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
+SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--.*?-->|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
 TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
 
 
@@ -51,14 +51,20 @@ def overrides(block: str, *, nested: bool = True):
                 cursor = slash + 1
                 continue
             name, begin = match[0], match.end()
-            if begin < end and block[begin] == "(":
+            next_slash = block.find("\\", begin, end)
+            argument_limit = end if next_slash < 0 else next_slash
+            opening = block.find("(", begin, argument_limit)
+            complex_argument = name in {"t", "clip", "iclip", "pos", "org", "move", "fad", "fade"}
+            if opening >= 0:
+                # Parenthesized values precede an ignored scalar prefix in libass.
+                begin = opening
                 level, finish = 1, begin + 1
                 while finish < end and level:
-                    level += (block[finish] == "(") - (block[finish] == ")")
+                    level += (complex_argument and block[finish] == "(") - (block[finish] == ")")
                     finish += 1
                 if level:
                     raise ValueError("Unbalanced ASS override parentheses")
-                if name in {"t", "clip", "iclip", "pos", "org", "move", "fad", "fade"}:
+                if complex_argument:
                     yield name, block[begin:finish], begin, finish
                 else:
                     # libass accepts a parenthesized single scalar argument. Its
@@ -72,6 +78,8 @@ def overrides(block: str, *, nested: bool = True):
                         if block[argument_start:argument_end].strip() or comma < 0:
                             break
                         argument_start = comma + 1
+                    if not block[argument_start:argument_end].strip():
+                        argument_start, argument_end = match.end(), opening
                     yield name, block[argument_start:argument_end], argument_start, argument_end
                 if name == "t" and nested:
                     yield from scan(begin + 1, finish - 1, depth + 1)

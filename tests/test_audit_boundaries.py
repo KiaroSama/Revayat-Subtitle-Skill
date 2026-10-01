@@ -32,7 +32,9 @@ def ass_source(text="Hello."):
 
 class BoundaryTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="subtitle-boundaries-")
+        scratch = ROOT / ".scratch" / "checks"
+        scratch.mkdir(parents=True, exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(prefix="subtitle-boundaries-", dir=scratch)
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
         logging.info("Boundary regression case=%s", self.id())
@@ -51,6 +53,15 @@ class BoundaryTests(unittest.TestCase):
         for tag in ("<br>", "<br/>", "<br />", "<BR>"):
             with self.subTest(tag=tag):
                 self.assertEqual(srt_to_ass(Cue("c000001", 1000, 2000, "A" + tag + "B")).text, r"A\NB")
+
+    def test_break_boundaries_match_ffmpeg_tag_names(self):
+        for tag, expected in (("<br/ >", "A\nB"), ("<br class='line'>", "A\nB"),
+                              ("<br\t>", "A<br\t>B"), ("<br\u00a0>", "A<br\u00a0>B")):
+            with self.subTest(tag=tag):
+                source = "A" + tag + "B"
+                self.assertEqual(visible(source, "srt"), expected)
+                donor = srt_to_ass(Cue("c000001", 1000, 2000, source))
+                self.assertEqual(visible(donor.text, "ass"), expected)
 
     def test_break_only_source_is_empty_not_literal_prose(self):
         self.assertEqual(visible("<br><br/>", "srt"), "")
@@ -74,6 +85,24 @@ class BoundaryTests(unittest.TestCase):
         for _, arg, start, end in values:
             self.assertEqual(source[start:end], arg)
         self.assertTrue(any(kind == "drawing" for kind, _ in markup.pieces(r"{\p(1)}m 0 0 l 1 1{\p(0)}Hi", "ass")))
+
+    def test_scalar_parentheses_take_precedence_over_ignored_prefixes(self):
+        for block, name, argument in ((r"{\rIgnored(Default)}", "r", "Default"),
+                                      (r"{\r (Default)}", "r", "Default"),
+                                      (r"{\p1(0)}", "p", "0"),
+                                      (r"{\p1(,,)}", "p", "1"),
+                                      (r"{\rDefault()}", "r", "Default"),
+                                      (r"{\fnIgnored(DejaVu Sans)}", "fn", "DejaVu Sans")):
+            with self.subTest(block=block):
+                values = list(markup.overrides(block))
+                self.assertEqual(len(values), 1)
+                actual_name, actual_argument, start, end = values[0]
+                self.assertEqual((actual_name, actual_argument), (name, argument))
+                self.assertEqual(block[start:end], argument)
+        self.assertEqual(markup.remap_resets(r"{\rIgnored(Default)}x", {"Default": "Donor"}),
+                         r"{\rIgnored(Donor)}x")
+        doc = parse(ass_source(r"{\rIgnored(Default)\p1(0)}Hi"), "ass")
+        self.assertIn("Hi", serialize(doc, doc.cues))
 
     def test_rotation_blur_and_scale_aliases_are_not_shorter_tags(self):
         self.assertEqual([(name, arg) for name, arg, _, _ in markup.overrides(r"{\fr45\be1\fsc100}")],
@@ -343,6 +372,22 @@ class BoundaryTests(unittest.TestCase):
 
     @unittest.skipUnless("--render" in sys.argv or os.environ.get("REVAYAT_TEST_RENDER") == "1",
                          "Explicit FFmpeg integration tier")
+    def test_real_srt_break_decoder_matches_donor(self):
+        from render import ffmpeg_path
+        for tag, expected in (("<br/ >", "A\nB"), ("<br class='line'>", "A\nB"),
+                              ("<br\t>", "A<br\t>B"), ("<br\u00a0>", "A<br\u00a0>B")):
+            with self.subTest(tag=tag):
+                source = self.root / "input.srt"
+                source.write_text("1\n00:00:01,000 --> 00:00:03,000\nA" + tag + "B\n", encoding="utf-8")
+                decoded = runtime.run([ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-nostdin",
+                                       "-i", str(source), "-f", "ass", "pipe:1"], timeout=20)
+                cue = parse(decoded.decode("utf-8"), "ass").cues[0]
+                self.assertEqual(visible(cue.text, "ass"), expected)
+                donor = srt_to_ass(Cue("c000001", 1000, 3000, "A" + tag + "B"))
+                self.assertEqual(visible(donor.text, "ass"), expected)
+
+    @unittest.skipUnless("--render" in sys.argv or os.environ.get("REVAYAT_TEST_RENDER") == "1",
+                         "Explicit FFmpeg integration tier")
     def test_real_srt_break_and_parenthesized_scalar_pixel_equivalence(self):
         from render import ffmpeg_path
         def pixels(name, cue):
@@ -353,11 +398,16 @@ class BoundaryTests(unittest.TestCase):
                                 "-i", "color=s=320x180:r=1:d=1", "-filter_threads", "1", "-vf",
                                 f"setpts=PTS+1.5/TB,ass={name}.ass", "-frames:v", "1", "-threads", "1",
                                 "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"], cwd=self.root, timeout=20)
+        def visible_pixels(name, cue):
+            result = pixels(name, cue)
+            self.assertEqual(len(result), 320 * 180 * 3)
+            self.assertGreater(len(set(result)), 1, "Caption pixels must differ from the black background")
+            return result
         a = srt_to_ass(Cue("c000001", 1000, 3000, "A<br>B"))
         b = srt_to_ass(Cue("c000001", 1000, 3000, "A\nB"))
-        self.assertEqual(pixels("br", a), pixels("lf", b))
+        self.assertEqual(visible_pixels("br", a), visible_pixels("lf", b))
         a.text, b.text = r"{\r(Default)\fr(12)\be(1)}سلام OVA", r"{\rDefault\fr12\be1}سلام OVA"
-        self.assertEqual(pixels("parenthesized", a), pixels("plain", b))
+        self.assertEqual(visible_pixels("parenthesized", a), visible_pixels("plain", b))
 
 
 if __name__ == "__main__":
