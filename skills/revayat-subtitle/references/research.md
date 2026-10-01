@@ -46,6 +46,17 @@ meaning check. No external subtitle corpus was imported or redistributed.
 
 ## What changed in this skill
 
+2026-10-01 refresh: the MIT [Persian skill](https://github.com/Mojtaba-Alehosseini/persian-skill/blob/4264f6ef03f7568bc15b14287a3db09bc815fc31/SKILL.md)
+and its protected-token/idempotence regression script informed the additional
+[typography pass](persian-typography.md). Preserve locked names, numeric meaning
+and ASS/SRT technical spans while reviewing readable Persian. The Gemini and OOMOL
+skills above were rechecked at the same revisions: exact requested cue identities,
+read-only neighboring context and source-bound resume remain the adopted contracts.
+Their count-only assignment, blanket bidi insertion and cloud dependencies were
+not adopted. This guidance is independently written; no upstream script, prompt,
+dictionary, subtitle corpus or model was imported. No install-count or translation
+quality claim is inferred from repository popularity or a small upstream benchmark.
+
 The [source-language guide](source-languages.md) applies direct original→Persian
 translation, read-only neighboring cues, a small speaker/referent record, two
 distinct fidelity/fluency passes, and specific Japanese/Chinese/French/Spanish

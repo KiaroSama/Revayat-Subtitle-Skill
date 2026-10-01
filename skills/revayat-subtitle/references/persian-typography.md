@@ -25,7 +25,8 @@ boundaries, outside ASS commands and drawing payloads. The six literal character
 For mixed Persian/Latin or Persian/number lines it also uses balanced U+202B RLE
 and U+202C PDF. RLM alone left word groups in the wrong order in actual libass
 renders. This embeds direction without reversing the logical string. Preserve
-valid isolates and repair accidental overrides only in editable prose. For a
+valid isolates, including scopes crossing display lines; those lines receive marks
+without an extra embedding wrapper. Repair accidental overrides only in editable prose. For a
 difficult Latin phrase, test U+2066 LRI with U+2069 PDI in the real renderer.
 Never use U+202E RLO as a substitute for correct logical text.
 
@@ -45,6 +46,18 @@ mirroring in mind.
 Normalize Arabic ي/ك to Persian ی/ک in Persian prose when appropriate; use ZWNJ
 consistently without changing names or valid colloquial forms. Never run a global
 alphabet/punctuation replacement over commands, timestamps, vector paths or fonts.
+
+Before a typography pass, identify protected spans: locked glossary spellings,
+Latin names, URLs, version numbers, quantities, ASS overrides and drawing payloads.
+Change only the readable Persian prose. Compare polarity, numbers, units and speaker
+register against the original after the pass; a typographic fix must preserve them.
+Reapplying the same correction must leave the text unchanged. A second changing
+pass signals an unstable rule that needs review before building.
+
+This adapts the protected-token and idempotence checks in the MIT-licensed
+[Persian skill](https://github.com/Mojtaba-Alehosseini/persian-skill/blob/4264f6ef03f7568bc15b14287a3db09bc815fc31/SKILL.md)
+to subtitle structure; its linter and automatic numeral/unit conversions are not
+part of this workflow. Source evidence and the approved glossary decide meaning.
 
 ## ASS styles and fonts
 
