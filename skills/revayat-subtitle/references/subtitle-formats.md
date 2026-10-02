@@ -20,6 +20,17 @@ comparisons such as `x < 5` remain visible; unsupported HTML needs an explicit e
 Real ASS style resets are parsed inside override blocks, including transforms;
 reset-looking prose outside those blocks is not rewritten.
 
+ASS block scanning follows the selected libass renderer: the first closing brace
+ends a block, escaped opening braces remain literal prose, and an unclosed opening
+is not silently removed. Do not repeatedly remove innermost brace pairs or apply
+an odd/even-backslash escape rule. Escaped literal braces are a libass extension,
+not a promise of identical behavior in every other player.
+
+Before adding retained ASS donor cues, reconcile differing track-global settings
+as well as the canvas: LayoutRes, Kerning, YCbCr Matrix, Language, Collisions and
+Timer can belong to the source presentation contract. The helper refuses differing
+values rather than silently applying the base header to a donor's presentation.
+
 Supported SRT `br`/`br/` tags become display breaks, including ASCII-space
 attributes and `<br/ >`. A tab or nonbreaking space attached to the tag name is
 literal text, following FFmpeg rather than browser HTML rules. ASS parenthesized
@@ -35,6 +46,9 @@ timing controls are not prose. A line with `\p1` may later switch back to readab
 text with `\p0`. Translate that text while retaining its effect. A vector event
 with no words is not an empty cue. Karaoke lyrics remain readable content; adapt
 their text with timing and syllable/tag alignment checked in actual images.
+Style reset `\r` does not leave drawing mode. Drawing assignments inside supported
+`\t` controls also affect the following payload. Such vector changes require the
+same structural explanation and visual review as ordinary `\p` drawing changes.
 
 ## Cleanup
 

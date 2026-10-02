@@ -140,13 +140,26 @@ def output_directory(parent: Path, prefix: str) -> Path:
 @contextlib.contextmanager
 def staging_directory(parent: Path, prefix: str):
     path = output_directory(parent, prefix)
+    info = path.lstat()
+    owned = (info.st_dev, info.st_ino)
     try:
         yield path
     finally:
-        if path.exists():
-            if path.resolve().parent != parent.resolve():
-                raise ValueError("Staging cleanup escapes its parent directory")
-            shutil.rmtree(path)
+        try:
+            current = path.lstat()
+            if (not stat.S_ISDIR(current.st_mode) or path.is_symlink()
+                    or getattr(current, "st_file_attributes", 0) & 1024
+                    or (current.st_dev, current.st_ino) != owned
+                    or path.resolve().parent != parent.resolve()):
+                logging.warning("Staging identity changed; replacement preserved: %s", path)
+            else:
+                shutil.rmtree(path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Cleanup cannot undo a published import/build or replace its actual
+            # validation error. Preserve the outcome and an explicit recovery path.
+            logging.warning("Staging cleanup failed; operation outcome preserved; recovery path: %s", path)
 
 
 def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,

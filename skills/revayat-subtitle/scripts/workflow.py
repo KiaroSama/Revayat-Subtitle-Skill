@@ -34,7 +34,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 4, "normalization": 4, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 5, "normalization": 5, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -305,8 +305,12 @@ def merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool) 
         return {line.partition(":")[0].strip().casefold(): line.partition(":")[2].strip()
                 for name, lines in doc.sections if name.casefold() == "[script info]" for line in lines if ":" in line}
     a, b = script_info(base), script_info(donor)
-    if any(a.get(key) != b.get(key) for key in ("playresx", "playresy", "wrapstyle", "scaledborderandshadow")):
-        raise ValueError("ASS candidates use different canvas/wrapping settings; align before merging")
+    global_fields = ("playresx", "playresy", "layoutresx", "layoutresy", "wrapstyle",
+                     "scaledborderandshadow", "kerning", "ycbcr matrix", "language", "collisions", "timer")
+    differences = [key for key in global_fields if a.get(key) != b.get(key)]
+    if differences:
+        raise ValueError("ASS candidates use different canvas/wrapping or track settings ("
+                         + ", ".join(differences) + "); align before merging")
     mapping = {}
     for name, values in donor.styles.items():
         mapped = f"{source_id}__{name}"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import logging
 import unicodedata
 from html.parser import HTMLParser
 
@@ -11,8 +12,8 @@ RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
 SRT_BREAK = re.compile(r"<br/?(?: +[^<>]*)?>", re.I)
-ASS_BLOCK = re.compile(r"\{[^{}]*\}")
-SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--.*?-->|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
+ASS_BLOCK = re.compile(r"\{[^}]*\}")
+SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
 TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
 
 
@@ -95,40 +96,85 @@ def overrides(block: str, *, nested: bool = True):
     yield from scan(1, len(block) - 1, 0)
 
 
+def block_spans(text: str, kind: str):
+    """Yield disjoint markup spans without rescanning unmatched opening delimiters."""
+    cursor, missing_comment_end = 0, False
+    while cursor < len(text):
+        if kind == "ass":
+            start = text.find("{", cursor)
+            if start < 0:
+                break
+            if start and text[start - 1] == "\\":
+                # libass consumes escaped braces as text, including after another
+                # literal backslash. An odd/even escape-parity rule is incorrect.
+                cursor = start + 1
+                continue
+            end = text.find("}", start + 1)
+            if end < 0:
+                break
+            end += 1  # The first closing brace ends an ASS override/comment.
+        else:
+            match = SRT_BLOCK.search(text, cursor)
+            if match is None:
+                break
+            start, end = match.span()
+            if match[0] == "<!--":
+                closing = -1 if missing_comment_end else text.find("-->", end)
+                if closing < 0:
+                    missing_comment_end = True
+                    cursor = end
+                    continue  # Keep unterminated comment text, as before.
+                end = closing + 3
+        yield start, end
+        cursor = end
+
+
 def uncomment(text: str, kind: str) -> str:
-    if kind == "srt":
-        return re.sub(r"<!--.*?-->", "", text, flags=re.S)
-    return ASS_BLOCK.sub(lambda m: m[0] if "\\" in m[0] else "", text)
+    output, cursor, removed = [], 0, 0
+    for start, end in block_spans(text, kind):
+        block = text[start:end]
+        output.append(text[cursor:start])
+        hidden = block.startswith("<!--") if kind == "srt" else "\\" not in block
+        if hidden:
+            removed += 1
+        else:
+            output.append(block)
+        cursor = end
+    output.append(text[cursor:])
+    if removed:
+        logging.getLogger(__name__).debug("Removed hidden comments format=%s count=%d", kind, removed)
+    return "".join(output)
 
 
 def pieces(text: str, kind: str):
     drawing, cursor = False, 0
-    text = uncomment(text, kind)
-    pattern = ASS_BLOCK if kind == "ass" else SRT_BLOCK
-    for match in pattern.finditer(text):
-        if match.start() > cursor:
-            yield "drawing" if drawing else "text", text[cursor:match.start()]
-        block = match[0]
+    for start, end in block_spans(text, kind):
+        if start > cursor:
+            yield "drawing" if drawing else "text", text[cursor:start]
+        block = text[start:end]
+        cursor = end
+        if (kind == "ass" and "\\" not in block) or (kind == "srt" and block.startswith("<!--")):
+            continue
         if kind == "ass":
-            for name, argument, _, _ in overrides(block, nested=False):
+            for name, argument, _, _ in overrides(block):
                 if name == "p":
                     if not re.fullmatch(r"[0-9]+", argument.strip()):
                         raise ValueError("ASS drawing mode must be a nonnegative integer")
                     drawing = bool(argument.strip().lstrip("0"))
-                elif name == "r":
-                    drawing = False
+                # A style reset does not reset drawing mode in libass. Drawing
+                # controls inside a transform also apply without interpolation.
         if kind == "srt" and SRT_BREAK.fullmatch(block):
             yield "text", "\n"
         else:
             yield "tag", block
-        cursor = match.end()
     if cursor < len(text):
         yield "drawing" if drawing else "text", text[cursor:]
 
 
 def remap_resets(text: str, mapping: dict[str, str]) -> str:
-    def remap(match):
-        block = match[0]
+    output, cursor = [], 0
+    for begin, finish in block_spans(text, "ass"):
+        block = text[begin:finish]
         replacements = []
         for name, argument, start, end in overrides(block):
             if name != "r" or not argument.strip():
@@ -138,8 +184,10 @@ def remap_resets(text: str, mapping: dict[str, str]) -> str:
             replacements.append((start, end, mapping[argument.strip()]))
         for start, end, value in reversed(replacements):
             block = block[:start] + value + block[end:]
-        return block
-    return ASS_BLOCK.sub(remap, text)
+        output.extend((text[cursor:begin], block))
+        cursor = finish
+    output.append(text[cursor:])
+    return "".join(output)
 
 
 def validate_bidi(text: str, kind: str) -> None:

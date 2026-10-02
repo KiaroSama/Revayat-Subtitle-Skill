@@ -190,6 +190,7 @@ def visible(text: str, kind: str) -> str:
     result = "".join(value for type_, value in pieces(text, kind) if type_ == "text")
     if kind == "ass":
         result = result.replace(r"\N", "\n").replace(r"\n", " ").replace(r"\h", " ")
+        result = result.replace(r"\{", "{").replace(r"\}", "}")
     return result.translate(str.maketrans("", "", BIDI)).strip()
 
 
