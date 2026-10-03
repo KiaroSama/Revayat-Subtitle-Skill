@@ -83,7 +83,12 @@ def overrides(block: str, *, nested: bool = True):
                         argument_start, argument_end = match.end(), opening
                     yield name, block[argument_start:argument_end], argument_start, argument_end
                 if name == "t" and nested:
-                    yield from scan(begin + 1, finish - 1, depth + 1)
+                    nested_start = block.find("\\", begin + 1, finish - 1)
+                    # libass ignores transforms with over three nonempty prefix
+                    # arguments; commas after the first backslash belong to tags.
+                    prefix = block[begin + 1:nested_start] if nested_start >= 0 else ""
+                    if nested_start >= 0 and sum(bool(arg.strip()) for arg in prefix.split(",")[:-1]) <= 3:
+                        yield from scan(nested_start, finish - 1, depth + 1)
             else:
                 finish = block.find("\\", begin, end)
                 if finish < 0:

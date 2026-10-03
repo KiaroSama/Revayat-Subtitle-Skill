@@ -151,6 +151,19 @@ class PreservationTests(unittest.TestCase):
                     workflow.reviewed_cues(parse(ass_source(source), 'ass'),
                                           [row(source, action='edit', text=source.replace('l 20', 'l 70'))])
 
+    def test_rejected_transform_does_not_clear_drawing_mode(self):
+        for arguments in ('0,1,2,3,', '0,1,2,3,4,', '0,,1,2,3,'):
+            with self.subTest(arguments=arguments):
+                source = r'{\p1\t(' + arguments + r'\p0)}m 0 0 l 20 0 20 20'
+                self.assertTrue(has_drawing(source, 'ass'))
+                self.assertEqual(visible(source, 'ass'), '')
+                with self.assertRaisesRegex(ValueError, 'tags/drawings'):
+                    workflow.reviewed_cues(parse(ass_source(source), 'ass'),
+                        [row(source, action='edit', text=source.replace('l 20', 'l 70'))])
+        for arguments in ('0,,100,', '0,100,2,0'):
+            source = r'{\p1\t(' + arguments + r'\p0)}Hello'
+            self.assertEqual(visible(source, 'ass'), 'Hello')
+
     def test_explicit_p0_returns_to_prose_after_resets_and_transforms(self):
         for tag in (r'\p0', r'\t(\p0)', r'\t(0,100,\p(0))'):
             source = r'{\p1}m 0 0 l 20 0 20 20{\r}{' + tag + '}Hello'
@@ -255,6 +268,22 @@ class PreservationTests(unittest.TestCase):
                 self.assertIn(field.lower(), str(caught.exception))
                 self.assertEqual(base, original)
 
+    def test_noncanonical_global_shadow_refuses_before_mutation(self):
+        for shadow in ('kerning: no', 'Kerning : no', 'KERNING: no'):
+            base = parse(ass_source(headers='Kerning: yes\n' + shadow), 'ass')
+            donor = parse(ass_source(headers='Kerning: no'), 'ass')
+            original, cues = copy.deepcopy(base), copy.deepcopy(donor.cues)
+            with self.assertRaisesRegex(ValueError, 'settings'):
+                workflow.merge_donor(base, donor, cues, 's0002', True)
+            self.assertEqual(base, original)
+            self.assertEqual(cues, donor.cues)
+        base = parse(ass_source(headers='Kerning: yes'), 'ass')
+        donor = parse(ass_source(headers='kerning: yes'), 'ass')
+        original = copy.deepcopy(base)
+        with self.assertRaisesRegex(ValueError, 'settings'):
+            workflow.merge_donor(base, donor, copy.deepcopy(donor.cues), 's0002', True)
+        self.assertEqual(base, original)
+
     def test_matching_globals_and_empty_donor_are_accepted(self):
         headers = 'Kerning: yes\nLayoutResX: 320\nLayoutResY: 180\nLanguage: fa\n'
         base, donor = parse(ass_source(headers=headers), 'ass'), parse(ass_source(headers=headers), 'ass')
@@ -287,7 +316,8 @@ class PreservationTests(unittest.TestCase):
     @unittest.skipUnless(RENDER, 'Explicit FFmpeg integration tier')
     def test_real_vector_mutations_change_pixels_and_require_review(self):
         for index, source in enumerate((r'{\p1}m 0 0 l 20 0 20 20{\r}m 30 0 l 50 0 50 20',
-                                        r'{\t(\p1)}m 0 0 l 20 0 20 20')):
+                                        r'{\t(\p1)}m 0 0 l 20 0 20 20',
+                                        r'{\p1\t(0,1,2,3,\p0)}m 0 0 l 20 0 20 20')):
             changed = source.replace('l 50', 'l 70') if r'{\r}' in source else source.replace('l 20', 'l 70')
             self.assertNotEqual(self.pixels('before' + str(index), ass_source(source)),
                                 self.pixels('after' + str(index), ass_source(changed)))

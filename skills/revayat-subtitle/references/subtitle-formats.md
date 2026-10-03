@@ -30,6 +30,8 @@ Before adding retained ASS donor cues, reconcile differing track-global settings
 as well as the canvas: LayoutRes, Kerning, YCbCr Matrix, Language, Collisions and
 Timer can belong to the source presentation contract. The helper refuses differing
 values rather than silently applying the base header to a donor's presentation.
+Tracked headers must use canonical spelling, such as `Kerning:`; noncanonical
+case or whitespace before the colon cannot shadow a renderer-effective setting.
 
 Supported SRT `br`/`br/` tags become display breaks, including ASCII-space
 attributes and `<br/ >`. A tab or nonbreaking space attached to the tag name is
@@ -49,6 +51,9 @@ their text with timing and syllable/tag alignment checked in actual images.
 Style reset `\r` does not leave drawing mode. Drawing assignments inside supported
 `\t` controls also affect the following payload. Such vector changes require the
 same structural explanation and visual review as ordinary `\p` drawing changes.
+Transforms with more than three nonempty comma-terminated arguments before the
+backslash argument are ignored by libass; their nested tags do not change drawing
+state. Generation and sampler recipe 6 invalidate earlier review receipts.
 
 ## Cleanup
 
