@@ -331,15 +331,18 @@ class PreservationTests(unittest.TestCase):
         for index, source in enumerate((r'A\{Important}B', 'A{comment{inner}VISIBLE}B',
                 r'\{\rLiteral} then {\rDefault}Hi', r'{\p1}m 0 0 l 20 0 20 20{\r}m 30 0 l 50 0 50 20',
                 r'{\t(\p1)}m 0 0 l 20 0 20 20',
-                r'{\p1}m 0 0 l 20 0{comment}l 20 20 0 20{\p0}',
+                r'{\p1}m 0 0 l 20 0 20 20{comment}l 20 30 0 30{\p0}',
                 r'{\p1}m 0 0 l 20 0 20 20\{\p0}Hello',
                 r'{\t(\ p1)}m 0 0 l 20 0 20 20',
                 r'{\t(\p+1)}m 0 0 l 20 0 20 20')):
             with self.subTest(index=index):
                 doc = parse(ass_source(source), 'ass')
                 kept, _ = workflow.reviewed_cues(doc, [row(source)])
-                self.assertEqual(self.pixels('source' + str(index), ass_source(source)),
-                                 self.pixels('output' + str(index), serialize(doc, kept)))
+                original = self.pixels('source' + str(index), ass_source(source))
+                self.assertEqual(original, self.pixels('output' + str(index), serialize(doc, kept)))
+                if '{comment}' in source:
+                    self.assertNotEqual(original, self.pixels('joined' + str(index),
+                                        ass_source(source.replace('{comment}', ''))))
 
     @unittest.skipUnless(RENDER, 'Explicit FFmpeg integration tier')
     def test_real_vector_mutations_change_pixels_and_require_review(self):
