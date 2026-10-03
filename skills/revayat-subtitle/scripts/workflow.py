@@ -21,7 +21,7 @@ except ImportError:
 
 ZIP_DECODE_ERRORS = (EOFError, zlib.error) + ((lzma.LZMAError,) if lzma is not None else ())
 
-from runtime import digest, local_path, read_json, read_limited, staging_directory, write_json
+from runtime import digest, local_path, read_json, read_limited, staging_directory, write_json, same_json
 from markup import clean_empty_lines, paragraph_direction, remap_resets
 from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
@@ -35,7 +35,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 8, "normalization": 8, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 9, "normalization": 9, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -445,10 +445,10 @@ def build(work: Path) -> dict:
     destination = local_path(work, "builds/" + manifest["identity"])
     if destination.exists():
         old = read_json(local_path(destination, "manifest.json"))
-        if read_json(local_path(destination, "glossary.json")) != glossary:
+        if not same_json(read_json(local_path(destination, "glossary.json")), glossary):
             raise ValueError("Existing build glossary differs from the reviewed glossary")
         try:
-            modified = old != manifest or any(
+            modified = not same_json(old, manifest) or any(
                 read_limited(local_path(destination, "Sub/" + name), len(data)) != data
                 for name, data in files.items())
         except ValueError as error:

@@ -69,7 +69,7 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation and sampler recipe 8 invalidate earlier review receipts.
+state. Generation and sampler recipe 9 invalidate earlier review receipts.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
 space/tab after a tag backslash and signed-positive drawing scales stay supported.
@@ -91,6 +91,24 @@ soft breaks, drawings and karaoke are not blindly stripped.
 Prune empty and unused styles, retaining those used only by `\rStyle` resets.
 Style changes and vector modifications require `structure_note` and visual review.
 Promotion removal follows [translation-policy.md](translation-policy.md).
+
+## Grammar and immutable metadata
+
+SRT formatting names are ASCII syntax even when the dialogue is Unicode. Names
+such as `<ſ>`, `<İ>` and `<ı>` are literal text, not strike/italic aliases. Only
+ASCII space separates a supported formatting name from its attributes; a tab,
+NBSP or other Unicode whitespace attached to a tag name remains literal. Do not
+apply Unicode case folding or general HTML whitespace rules to this grammar.
+
+Directional normalization joins adjacent prose fragments exposed by removed
+comments before choosing its boundary controls. It never joins across an actual
+override, style, drawing payload or retained vector-object boundary. Reapplying
+the normalizer must preserve both logical content and already-normalized bytes.
+
+Immutable manifests and saved glossaries must retain their decoded JSON types:
+`true`, `1` and `1.0` are not interchangeable metadata. JSON key order and
+formatting are not an identity change. Do not transfer image approvals after
+output or recipe changes; build and inspect the new edition.
 
 ## Embedded fonts are optional to remove
 

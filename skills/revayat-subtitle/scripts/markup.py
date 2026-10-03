@@ -11,9 +11,9 @@ RLM, LRM = "\u200f", "\u200e"
 RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
-SRT_BREAK = re.compile(r"</?(?=[^<>]{0,127}>)br/?(?: [^<>]*)?>", re.I)
+SRT_BREAK = re.compile(r"</?(?=[^<>]{0,127}>)br/?(?: [^<>]*)?>", re.I | re.ASCII)
 ASS_BLOCK = re.compile(r"\{[^}]*\}")
-SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?:\s[^<>]*)?>|\{\\an[1-9]\}", re.I | re.S)
+SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?: [^<>]*)?>|\{\\an[1-9]\}", re.I | re.S | re.ASCII)
 TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
 
 
@@ -242,6 +242,21 @@ def validate_bidi(text: str, kind: str) -> None:
         raise ValueError("Unclosed bidi embedding or isolate")
 
 
+def _text_runs(tokens):
+    """Coalesce adjacent prose without reparsing or joining across real controls."""
+    pending = []
+    for type_, value in tokens:
+        if type_ == "text":
+            pending.append(value)
+            continue
+        if pending:
+            yield "text", "".join(pending)
+            pending.clear()
+        yield type_, value
+    if pending:
+        yield "text", "".join(pending)
+
+
 def rtl(text: str, kind: str, direction: str = "rtl", *, force: bool = False) -> str:
     if direction not in {"ltr", "rtl"}:
         raise ValueError("Paragraph direction must be ltr or rtl")
@@ -275,7 +290,7 @@ def rtl(text: str, kind: str, direction: str = "rtl", *, force: bool = False) ->
                 line[last] = ("text", line[last][1] + mark + (PDF if embedding else ""))
         output.append("".join(value for _, value in line))
         line.clear()
-    for type_, value in pieces(text, kind):
+    for type_, value in _text_runs(pieces(text, kind)):
         if type_ != "text":
             line.append((type_, value))
             continue

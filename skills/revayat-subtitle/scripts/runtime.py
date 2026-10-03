@@ -27,6 +27,26 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def same_json(actual, expected) -> bool:
+    """Compare decoded immutable JSON without Python's bool/int/float coercion."""
+    pending = [(actual, expected)]
+    while pending:
+        left, right = pending.pop()
+        if type(left) is not type(right):
+            return False
+        if isinstance(left, dict):
+            if left.keys() != right.keys():
+                return False
+            pending.extend((left[key], right[key]) for key in left)
+        elif isinstance(left, list):
+            if len(left) != len(right):
+                return False
+            pending.extend(zip(left, right))
+        elif left != right:
+            return False
+    return True
+
+
 def read_limited(path: Path, maximum: int) -> bytes:
     if type(maximum) is not int or maximum < 0:
         raise ValueError("File byte limit must be a nonnegative integer")

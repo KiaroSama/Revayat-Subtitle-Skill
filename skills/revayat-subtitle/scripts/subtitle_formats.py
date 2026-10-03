@@ -261,7 +261,7 @@ def validate_srt_donor_markup(text: str) -> None:
                   and not body.startswith(" ")
                   and (closing or match.start() == 0 or text[match.start() - 1] != "<"))
         supported = (SRT_BREAK.fullmatch(match[0]) is not None
-                     or re.fullmatch(r"</?[bisu]>", match[0], re.I) is not None)
+                     or re.fullmatch(r"</?[bisu]>", match[0], re.I | re.ASCII) is not None)
         if (recognized or likely) and not supported:
             raise ValueError("SRT donor uses unsupported decoder markup; adapt it explicitly before ASS conversion")
 
@@ -274,8 +274,8 @@ def srt_to_ass(cue: Cue) -> Cue:
     text = SRT_BREAK.sub(lambda match: "\n" if srt_tag_fits(match[0]) else match[0], text)
     for tag in ("i", "b", "u", "s"):
         ass_tag = "s" if tag == "s" else tag
-        text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I)
-        text = re.sub(f"</{tag}>", lambda _: "{\\" + ass_tag + "0}", text, flags=re.I)
+        text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I | re.ASCII)
+        text = re.sub(f"</{tag}>", lambda _: "{\\" + ass_tag + "0}", text, flags=re.I | re.ASCII)
     if any(type_ == "tag" for type_, _ in pieces(text, "srt")):
         raise ValueError("SRT donor uses markup requiring explicit ASS adaptation")
     fields = dict(zip([f.strip().lower() for f in ASS_FIELDS.split(",")],

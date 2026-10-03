@@ -13,7 +13,7 @@ import time
 import zipfile
 import validation
 
-from runtime import digest, file_fingerprint, local_path, output_directory, read_json, read_limited, run, write_json
+from runtime import digest, file_fingerprint, local_path, output_directory, read_json, read_limited, run, write_json, same_json
 from subtitle_formats import ARABIC, has_drawing, parse, visible, pieces, style_references
 from markup import has_ltr, has_rtl, overrides, srt_font_names
 from publication import publish_bytes
@@ -50,11 +50,11 @@ def load_build(build: Path):
     work = build.parent.parent
     expected, files, glossary = assemble(work)
     current = expected["identity"]
-    if manifest != expected:
+    if not same_json(manifest, expected):
         raise ValueError("Build manifest or workspace modified; rebuild and review the new edition")
     if build.name != current or build.parent.name != "builds":
         raise ValueError("Build must remain at its original workspace path")
-    if read_json(local_path(build, "glossary.json")) != glossary:
+    if not same_json(read_json(local_path(build, "glossary.json")), glossary):
         raise ValueError("Build glossary differs from the reviewed continuity glossary")
     docs = {}
     for episode in manifest["episodes"]:
@@ -66,7 +66,7 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 8
+SAMPLER_VERSION = 9
 ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
 
