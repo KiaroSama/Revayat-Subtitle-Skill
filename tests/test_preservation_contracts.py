@@ -70,15 +70,14 @@ class PreservationTests(unittest.TestCase):
             self.fail('The selected renderer tier requires FFmpeg')
         (self.root / (name + '.ass')).write_text(source, encoding='utf-8')
         logging.debug('Rendering authored oracle fixture=%s', name)
-        result = subprocess.run([executable, '-hide_banner', '-loglevel', 'error', '-nostdin',
+        pixels = runtime.run([executable, '-hide_banner', '-loglevel', 'error', '-nostdin',
             '-f', 'lavfi', '-i', 'color=s=320x180:r=1:d=1', '-filter_threads', '1',
             '-vf', f'setpts=PTS+1.5/TB,ass={name}.ass', '-frames:v', '1', '-threads', '1',
             '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'], cwd=self.root,
-            capture_output=True, timeout=20)
-        self.assertEqual(result.returncode, 0, 'Authored FFmpeg fixture failed')
-        self.assertEqual(len(result.stdout), 320 * 180 * 3)
-        self.assertGreater(max(result.stdout), 32, 'Authored oracle must contain visible raster content')
-        return runtime.digest(result.stdout)
+            timeout=20, idle_timeout=20, max_output=320 * 180 * 3 + 65536)
+        self.assertEqual(len(pixels), 320 * 180 * 3)
+        self.assertGreater(max(pixels), 32, 'Authored oracle must contain visible raster content')
+        return runtime.digest(pixels)
 
     def test_escaped_opening_braces_are_visible_prose(self):
         for source, expected in ((r'\{Important\}', '{Important}'),
@@ -182,6 +181,30 @@ class PreservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nonempty'):
             workflow.reviewed_cues(parse(ass_source(source), 'ass'), [row(source, action='empty')])
 
+    def test_spaced_and_positive_signed_drawing_controls_require_review(self):
+        for tag in (r'\t(\ p1)', r'\t(\p+1)'):
+            source = '{' + tag + '}m 0 0 l 20 0 20 20'
+            self.assertTrue(has_drawing(source, 'ass'))
+            with self.assertRaisesRegex(ValueError, 'tags/drawings'):
+                workflow.reviewed_cues(parse(ass_source(source), 'ass'),
+                    [row(source, action='edit', text=source.replace('l 20', 'l 70'))])
+
+    def test_drawing_comment_boundary_is_preserved(self):
+        source = r'{\p1}m 0 0 l 20 0{comment}l 20 20 0 20{\p0}'
+        expected = source.replace('{comment}', '{}')
+        self.assertEqual(markup.uncomment(source, 'ass'), expected)
+        kept, _ = workflow.reviewed_cues(parse(ass_source(source), 'ass'), [row(source)])
+        self.assertEqual(kept[0].text, expected)
+        self.assertEqual(markup.uncomment(expected, 'ass'), expected)
+
+    def test_drawing_reader_does_not_escape_override_opening(self):
+        source = r'{\p1}m 0 0 l 20 0 20 20\{\p0}Hello'
+        self.assertEqual(visible(source, 'ass'), 'Hello')
+        changed = source.replace('Hello', 'سلام')
+        kept, _ = workflow.reviewed_cues(parse(ass_source(source), 'ass'),
+            [row(source, action='edit', text=changed)])
+        self.assertIn('سلام', visible(kept[0].text, 'ass'))
+
     def test_srt_comments_break_dialect_and_entities_are_preserved(self):
         self.assertEqual(markup.uncomment('A<!--x\ny-->B', 'srt'), 'AB')
         self.assertEqual(visible('A<!--x-->B<br a="b">C', 'srt'), 'AB\nC')
@@ -193,7 +216,8 @@ class PreservationTests(unittest.TestCase):
         # A generous process timeout guards accidental quadratic rescanning.
         code = ('import sys;sys.path.insert(0,sys.argv[1]);import markup;'
                 'text="<!--"*50000+"tail";assert markup.uncomment(text,"srt")==text;'
-                'text="{"*50000+"tail";assert markup.uncomment(text,"ass")==text')
+                'text="{"*50000+"tail";assert markup.uncomment(text,"ass")==text;'
+                'text="<b"+" "*50000;assert markup.uncomment(text,"srt")==text')
         try:
             result = subprocess.run([sys.executable, '-S', '-c', code, str(SCRIPTS)],
                                     capture_output=True, timeout=8)
@@ -306,7 +330,11 @@ class PreservationTests(unittest.TestCase):
     def test_real_preservation_has_identical_pixels(self):
         for index, source in enumerate((r'A\{Important}B', 'A{comment{inner}VISIBLE}B',
                 r'\{\rLiteral} then {\rDefault}Hi', r'{\p1}m 0 0 l 20 0 20 20{\r}m 30 0 l 50 0 50 20',
-                r'{\t(\p1)}m 0 0 l 20 0 20 20')):
+                r'{\t(\p1)}m 0 0 l 20 0 20 20',
+                r'{\p1}m 0 0 l 20 0{comment}l 20 20 0 20{\p0}',
+                r'{\p1}m 0 0 l 20 0 20 20\{\p0}Hello',
+                r'{\t(\ p1)}m 0 0 l 20 0 20 20',
+                r'{\t(\p+1)}m 0 0 l 20 0 20 20')):
             with self.subTest(index=index):
                 doc = parse(ass_source(source), 'ass')
                 kept, _ = workflow.reviewed_cues(doc, [row(source)])

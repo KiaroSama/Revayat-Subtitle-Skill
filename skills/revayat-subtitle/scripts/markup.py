@@ -13,7 +13,7 @@ BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
 SRT_BREAK = re.compile(r"<br/?(?: +[^<>]*)?>", re.I)
 ASS_BLOCK = re.compile(r"\{[^}]*\}")
-SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?:\s+[^<>]*)?\s*>|\{\\an[1-9]\}", re.I | re.S)
+SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?:\s[^<>]*)?>|\{\\an[1-9]\}", re.I | re.S)
 TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
 
 
@@ -47,7 +47,10 @@ def overrides(block: str, *, nested: bool = True):
             slash = block.find("\\", cursor, end)
             if slash < 0:
                 break
-            match = TAG_NAME.match(block, slash + 1, end)
+            name_start = slash + 1
+            while name_start < end and block[name_start] in " \t":
+                name_start += 1
+            match = TAG_NAME.match(block, name_start, end)
             if not match:
                 cursor = slash + 1
                 continue
@@ -101,15 +104,24 @@ def overrides(block: str, *, nested: bool = True):
     yield from scan(1, len(block) - 1, 0)
 
 
+def drawing_mode(block: str, drawing: bool) -> bool:
+    for name, argument, _, _ in overrides(block):
+        if name == "p":
+            if not re.fullmatch(r"\+?[0-9]+", argument.strip()):
+                raise ValueError("ASS drawing mode must be a nonnegative integer")
+            drawing = bool(argument.strip().lstrip("+0"))
+    return drawing
+
+
 def block_spans(text: str, kind: str):
     """Yield disjoint markup spans without rescanning unmatched opening delimiters."""
-    cursor, missing_comment_end = 0, False
+    cursor, missing_comment_end, drawing = 0, False, False
     while cursor < len(text):
         if kind == "ass":
             start = text.find("{", cursor)
             if start < 0:
                 break
-            if start and text[start - 1] == "\\":
+            if not drawing and start and text[start - 1] == "\\":
                 # libass consumes escaped braces as text, including after another
                 # literal backslash. An odd/even escape-parity rule is incorrect.
                 cursor = start + 1
@@ -118,6 +130,7 @@ def block_spans(text: str, kind: str):
             if end < 0:
                 break
             end += 1  # The first closing brace ends an ASS override/comment.
+            drawing = drawing_mode(text[start:end], drawing)
         else:
             match = SRT_BLOCK.search(text, cursor)
             if match is None:
@@ -135,15 +148,19 @@ def block_spans(text: str, kind: str):
 
 
 def uncomment(text: str, kind: str) -> str:
-    output, cursor, removed = [], 0, 0
+    output, cursor, removed, drawing = [], 0, 0, False
     for start, end in block_spans(text, kind):
         block = text[start:end]
         output.append(text[cursor:start])
         hidden = block.startswith("<!--") if kind == "srt" else "\\" not in block
         if hidden:
             removed += 1
+            if kind == "ass" and drawing:
+                output.append("{}")  # Keep the renderer's separate drawing-object boundary.
         else:
             output.append(block)
+        if kind == "ass":
+            drawing = drawing_mode(block, drawing)
         cursor = end
     output.append(text[cursor:])
     if removed:
@@ -159,15 +176,11 @@ def pieces(text: str, kind: str):
         block = text[start:end]
         cursor = end
         if (kind == "ass" and "\\" not in block) or (kind == "srt" and block.startswith("<!--")):
+            if kind == "ass" and drawing:
+                yield "tag", "{}"
             continue
         if kind == "ass":
-            for name, argument, _, _ in overrides(block):
-                if name == "p":
-                    if not re.fullmatch(r"[0-9]+", argument.strip()):
-                        raise ValueError("ASS drawing mode must be a nonnegative integer")
-                    drawing = bool(argument.strip().lstrip("0"))
-                # A style reset does not reset drawing mode in libass. Drawing
-                # controls inside a transform also apply without interpolation.
+            drawing = drawing_mode(block, drawing)
         if kind == "srt" and SRT_BREAK.fullmatch(block):
             yield "text", "\n"
         else:

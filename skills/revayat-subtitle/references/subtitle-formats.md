@@ -53,7 +53,10 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation and sampler recipe 6 invalidate earlier review receipts.
+state. Generation and sampler recipe 7 invalidate earlier review receipts.
+Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
+Removing a hidden comment between vector objects retains an empty `{}` boundary;
+space/tab after a tag backslash and signed-positive drawing scales stay supported.
 
 ## Cleanup
 

@@ -34,7 +34,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 6, "normalization": 6, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 7, "normalization": 7, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
