@@ -33,13 +33,29 @@ values rather than silently applying the base header to a donor's presentation.
 Tracked headers must use canonical spelling, such as `Kerning:`; noncanonical
 case or whitespace before the colon cannot shadow a renderer-effective setting.
 
-Supported SRT `br`/`br/` tags become display breaks, including ASCII-space
-attributes and `<br/ >`. A tab or nonbreaking space attached to the tag name is
+Supported SRT `br`/`br/` tags, including closing forms such as `</br>`, become
+display breaks, including ASCII-space attributes and `<br/ >`, when the tag body
+fits FFmpeg's 127 UTF-8-byte scan limit (excluding `<`, an optional closing `/`,
+and `>`). Longer tags remain literal text, including multibyte attributes.
+A tab or nonbreaking space attached to the tag name is
 literal text, following FFmpeg rather than browser HTML rules. ASS parenthesized
 scalar values take precedence over ignored prefixes: `\rIgnored(Default)` refers
 to `Default`, while literal reset-looking prose remains untouched. The helper
 preserves delimiters/ignored source arguments when remapping the actual style value.
 Malformed or unsupported controls still require deliberate source-preserving repair.
+Before SRT-to-ASS conversion, renderer-consumed but unsupported markup such as
+`<small>`, `<foo>`, `<>` or `</>` is refused rather than exposed as visible ASS
+dialogue. Completed hidden comments are removed before checking the remaining
+source for ASS controls; unterminated comments are retained and may require repair.
+Adapt the worksheet explicitly after checking the source; do not blindly remove
+all angle-bracket content. Literal comparisons, entities and guillemets remain
+literal. Repeated simple bold/italic/underline/strike tags use binary toggles,
+not browser-style nested formatting stacks.
+
+Inputs must be regular files; a ZIP-looking pipe or device is not an archive.
+Source copies and emitted subtitles are byte-verified before publishing their
+workspace or edition. Failed conversion leaves the donor and base objects intact
+so that a corrected retry cannot inherit partly remapped styles.
 
 ## Readable text versus effects
 
@@ -53,7 +69,7 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation and sampler recipe 7 invalidate earlier review receipts.
+state. Generation and sampler recipe 8 invalidate earlier review receipts.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
 space/tab after a tag backslash and signed-positive drawing scales stay supported.

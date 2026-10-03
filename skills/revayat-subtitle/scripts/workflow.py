@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import zipfile
 import zlib
 import validation
@@ -22,7 +23,7 @@ ZIP_DECODE_ERRORS = (EOFError, zlib.error) + ((lzma.LZMAError,) if lzma is not N
 
 from runtime import digest, local_path, read_json, read_limited, staging_directory, write_json
 from markup import clean_empty_lines, paragraph_direction, remap_resets
-from publication import rename_noreplace
+from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times)
 
@@ -34,7 +35,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 7, "normalization": 7, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 8, "normalization": 8, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -69,6 +70,8 @@ def inputs(paths: list[Path]):
         for candidate in candidates:
             if candidate.is_symlink():
                 continue
+            if not stat.S_ISREG(candidate.lstat().st_mode):
+                raise ValueError("Subtitle/archive input must be a regular file, not a pipe or device")
             relative = candidate.relative_to(path).as_posix() if path.is_dir() else candidate.name
             origin = {"root_id": f"input{root_index:03}", "root_label": path.name or "filesystem-root",
                       "relative_path": relative, "member": None, "member_index": None}
@@ -158,7 +161,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
                 raise ValueError("Workspace exceeds 250000 imported cues")
             source_id = f"s{i:04}"
             relative = f"sources/{source_id}.{kind}"
-            (stage / relative).write_bytes(raw)
+            publish_bytes(stage / relative, raw)
             project["sources"].append({"id": source_id, "name": name, "file": relative, "kind": kind,
                                        "sha256": digest(raw), "encoding": encoding, "cues": len(doc.cues),
                                        "comments_removed": doc.comments, "origin": origin})
@@ -288,6 +291,20 @@ def reviewed_cues(doc, sheet: list, target_language: str = "fa") -> tuple[list[C
 
 
 def merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool) -> list[Cue]:
+    """Commit donor presentation only after all conversion and validation succeeds."""
+    if not cues:
+        return []
+    candidate = copy.copy(base)
+    candidate.styles = copy.deepcopy(base.styles)
+    candidate.sections = copy.deepcopy(base.sections)
+    prepared = copy.deepcopy(cues)
+    result = _merge_donor(candidate, donor, prepared, source_id, keep_fonts)
+    base.styles, base.sections = candidate.styles, candidate.sections
+    logging.debug("Merged donor source=%s cues=%d", source_id, len(result))
+    return result
+
+
+def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool) -> list[Cue]:
     if not cues:
         return []
     if base.kind == "srt":
@@ -444,7 +461,7 @@ def build(work: Path) -> dict:
             stage = Path(temporary) / "edition"
             (stage / "Sub").mkdir(parents=True)
             for name, data in files.items():
-                (stage / "Sub" / name).write_bytes(data)
+                publish_bytes(stage / "Sub" / name, data)
             write_json(stage / "manifest.json", manifest)
             write_json(stage / "glossary.json", glossary)
             rename_noreplace(stage, destination)

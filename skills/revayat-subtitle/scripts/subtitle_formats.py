@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from markup import SRT_BREAK, ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment
+from markup import SRT_BREAK, ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment, srt_tag_fits
 from validation import MAX_TIME_MS
 
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -247,16 +247,37 @@ def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str
     return "\n".join(output)
 
 
+def validate_srt_donor_markup(text: str) -> None:
+    """Refuse unimplemented decoder markup rather than expose it as ASS prose."""
+    for match in re.finditer(r"<([^<>]{0,128})>", text):
+        if not srt_tag_fits(match[0]):
+            continue
+        body = match[1]
+        closing = body.startswith("/")
+        body = body[1:] if closing else body
+        name = body.lstrip(" ").split(" ", 1)[0]
+        recognized = name.lower() in {"b", "i", "s", "u", "font", "br", "br/"}
+        likely = (re.fullmatch(r"[A-Za-z0-9_/]*", name) is not None
+                  and not body.startswith(" ")
+                  and (closing or match.start() == 0 or text[match.start() - 1] != "<"))
+        supported = (SRT_BREAK.fullmatch(match[0]) is not None
+                     or re.fullmatch(r"</?[bisu]>", match[0], re.I) is not None)
+        if (recognized or likely) and not supported:
+            raise ValueError("SRT donor uses unsupported decoder markup; adapt it explicitly before ASS conversion")
+
+
 def srt_to_ass(cue: Cue) -> Cue:
-    text = SRT_BREAK.sub("\n", cue.text.replace("\r\n", "\n").replace("\r", "\n"))
+    text = uncomment(cue.text.replace("\r\n", "\n").replace("\r", "\n"), "srt")
+    validate_srt_donor_markup(text)
+    if any(char in text for char in ("{", "}", "\\")):
+        raise ValueError("SRT donor contains ASS control syntax; adapt it explicitly before ASS conversion")
+    text = SRT_BREAK.sub(lambda match: "\n" if srt_tag_fits(match[0]) else match[0], text)
     for tag in ("i", "b", "u", "s"):
         ass_tag = "s" if tag == "s" else tag
         text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I)
         text = re.sub(f"</{tag}>", lambda _: "{\\" + ass_tag + "0}", text, flags=re.I)
     if any(type_ == "tag" for type_, _ in pieces(text, "srt")):
         raise ValueError("SRT donor uses markup requiring explicit ASS adaptation")
-    if "{" in cue.text or "}" in cue.text or "\\" in cue.text:
-        raise ValueError("SRT donor contains ASS control syntax; adapt it explicitly")
     fields = dict(zip([f.strip().lower() for f in ASS_FIELDS.split(",")],
                       ["0", "", "", "Default", "", "0", "0", "0", "", ""]))
     start, end = effective_times(cue.start, cue.end, "ass")

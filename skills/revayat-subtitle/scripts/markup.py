@@ -11,10 +11,15 @@ RLM, LRM = "\u200f", "\u200e"
 RLE, LRE, PDF = "\u202b", "\u202a", "\u202c"
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 ARABIC = re.compile(r"[\u0620-\u063f\u0641-\u064a\u0660-\u0669\u066e-\u06d3\u06f0-\u06fc]")
-SRT_BREAK = re.compile(r"<br/?(?: +[^<>]*)?>", re.I)
+SRT_BREAK = re.compile(r"</?(?=[^<>]{0,127}>)br/?(?: [^<>]*)?>", re.I)
 ASS_BLOCK = re.compile(r"\{[^}]*\}")
 SRT_BLOCK = re.compile(SRT_BREAK.pattern + r"|<!--|</?(?:i|b|u|s|font)(?:\s[^<>]*)?>|\{\\an[1-9]\}", re.I | re.S)
 TAG_NAME = re.compile(r"(?:fscx|fscy|fsc|iclip|alpha|xbord|ybord|xshad|yshad|border|blur|bord|shad|move|fade|clip|frx|fry|frz|fr|be|fax|fay|pbo|pos|org|fad|fsp|fn|fs|fe|kf|ko|kt|an|[1-4][ac]|[biuskKqrptac])")
+
+
+def srt_tag_fits(tag: str) -> bool:
+    """FFmpeg scans at most 127 UTF-8 bytes after the optional closing slash."""
+    return len(tag[2 if tag.startswith("</") else 1:-1].encode("utf-8")) <= 127
 
 
 def has_rtl(text: str) -> bool:
@@ -143,6 +148,9 @@ def block_spans(text: str, kind: str):
                     cursor = end
                     continue  # Keep unterminated comment text, as before.
                 end = closing + 3
+            elif not srt_tag_fits(match[0]):
+                cursor = end
+                continue
         yield start, end
         cursor = end
 
