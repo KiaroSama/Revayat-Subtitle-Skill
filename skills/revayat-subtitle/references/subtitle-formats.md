@@ -104,7 +104,9 @@ Renderer-active suffixes on section names require deliberate repair.
 
 Unknown/editor sections do not necessarily reset libass parser state. Active event,
 style, format or track-setting rows inside them are refused rather than copied or
-removed outside cue review. Harmless metadata and opaque font payloads stay intact.
+removed outside cue review. This also includes the exact legacy FFmpeg generator
+signature: it can remain effective under an unknown header while Script Info is
+active. Harmless metadata and opaque font payloads stay intact.
 
 Declared style names and event references ignore leading stars; events also map
 ASCII case variants of `Default` to `Default`. Reset arguments have exact, separate

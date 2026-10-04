@@ -314,6 +314,26 @@ class StyleTests(TrackWorkspace):
 
 
 class LegacyTests(TrackWorkspace):
+    def test_unknown_section_generator_signature_is_refused(self):
+        for section in ("[Notes]", "[Aegisub Project Garbage]", "[Graphics]"):
+            for prefix in ("", "\t", "﻿ "):
+                text = source(headers=section + "\n" + prefix + SIGNATURE)
+                with self.subTest(section=section, prefix=repr(prefix)):
+                    with self.assertRaisesRegex(ValueError, "outside"):
+                        formats.parse(text, "ass")
+        doc = formats.parse(source(headers="[Notes]\n; Harmless authored note"), "ass")
+        self.assertEqual(len(doc.cues), 1)
+
+    @unittest.skipUnless(RENDER, "Explicit FFmpeg integration tier")
+    def test_native_unknown_section_signature_requires_refusal(self):
+        text = source(headers="[Notes]\n" + SIGNATURE, text=r"{\bord8\shad4}VISIBLE")
+        native = self.pixels("unknown-signature", text)
+        self.assertGreater(max(native), 32)
+        self.assertEqual(native, self.pixels("explicit-yes", text.replace(SIGNATURE, "ScaledBorderAndShadow: yes")))
+        self.assertNotEqual(native, self.pixels("explicit-no", text.replace(SIGNATURE, "ScaledBorderAndShadow: no")))
+        with self.assertRaisesRegex(ValueError, "outside"):
+            formats.parse(text, "ass")
+
     def test_legacy_signature_scaling_materialized(self):
         doc = formats.parse(source(headers=SIGNATURE), "ass")
         self.assertIn("ScaledBorderAndShadow: yes", formats.serialize(doc, doc.cues))

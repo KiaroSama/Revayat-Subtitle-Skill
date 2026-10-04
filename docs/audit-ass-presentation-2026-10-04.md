@@ -44,6 +44,39 @@ Inline `\r` resets retain **exact** name semantics and are not processed with ev
 
 **Acceptance:** positive signature/style cases, nonmatching signature case, additional renderer headers, multiple styles, explicit yes/no controls, idempotent serialization, legacy/nonlegacy donor compatibility refusal before mutation, and matching explicit-yes donor acceptance. Actual scaled-raster tests require native/output equality and inequality against the explicit-no control.
 
+## Independent integration review
+
+Review of the actual PR10 source, callers and native evidence confirmed E01–E04.
+An additional E03/E04 interaction was reproduced: an exact legacy FFmpeg signature
+under `[Notes]` leaves native Script Info state active. The original PR accepted
+it but missed materializing scaling, then removed the signature. The native source
+matched explicit `yes` and differed from explicit `no`; the required parse refusal
+failed before the repair. The same native regression passed after adding the
+signature prefix to the existing unsupported-section guard. A portable nine-case
+section/indent matrix and harmless-comment control accompany that native test.
+Opaque Fonts payload stays excluded; no generalized parser-state model was added.
+The final module contains **40 methods, five equipped native methods**; the 38-method
+proposal evidence below is historical, not verification of this correction.
+
+The retained private workspace was rebuilt with recipe 10: all 150 previous files
+remained byte-identical before and after rendering and delivery. All ten fresh
+1920×1080 images were actually inspected for Persian joining, mixed Latin order,
+punctuation, margins, title placement and animated sign/credit separation before
+recording new hash-bound review notes. QA passed for the 40-cue excerpt; the single
+ASS ZIP passed member, CRC and manifest-hash checks. The installed 25-file skill
+and 34-member plugin payload match current source; the previous installation was
+backed up. No private media, archive or review body is published. This is not
+full-episode linguistic, audio-sync or alternate-player certification.
+
+The existing deterministic/native corpus and minimized new regression suffice for
+this bounded repair; a larger generated corpus is not selected. A user-facing
+style-binding diagnostic and alternate-player lane are not selected because
+neither is necessary for the requested contracts. No runtime dependency was added.
+Owner-attributed raw identities use the permitted public address; legitimate
+signed Dependabot/GitHub provenance is preserved, not rewritten as owner history.
+The final corrected PR and integrated-main SHAs must have their own successful
+native/security/workflow checks; the proposal's green run does not certify them.
+
 ## Verification and compatibility
 
 The new automatically discovered `tests/test_ass_track_contracts.py` adds **38 test methods**, including four equipped FFmpeg methods: ignored/hidden-row oracles, a style/reset raster corpus, scaled legacy rendering and a two-episode build → render → QA → hash-verified ZIP. Other tests cover import/CLI failure-and-retry, source/caller-object preservation, alias semantics, migration and negative controls. Existing tests and assertions remain enabled. The shared positive `tests/fixtures/episode.ass` contained a bare `Style:` row that changes native defaults; remove that invalid row from the positive fixture and retain the behavior as an explicit new rejection/raster regression. This is not deletion of the empty-style boundary test.
