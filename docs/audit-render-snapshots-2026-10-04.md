@@ -34,6 +34,27 @@ This closes the unchecked-copy boundary; it does not introduce cryptographic aut
 
 **Acceptance:** cover 11 tracked fields × 7 non-ASCII whitespace characters × both merge directions (154 deterministic combinations), identical-value and ASCII-padding controls, native kerning pixels, exception atomicity and complete build refusal/retry without changing imported sources. The 154 combinations are not 154 independent bugs; not every header/character pair is claimed to yield a distinct screenshot.
 
+## R04 — ASCII padding can change a hexadecimal track value
+
+Independent integration review found a native counterexample to treating every
+ASCII-padded value as equivalent. libass `parse_int_header` chooses hexadecimal
+base only when `&H`/`0x` starts at the original value's first byte, before skipping
+ASCII spaces/tabs. `PlayResX:&H140` resolves to 320; `PlayResX: &H140` resolves to
+zero, then the 180-height fallback gives a 240-wide canvas. Actual nonblank native
+rasters prove unpadded hex equals decimal 320, padded hex equals decimal 240 and
+the two differ. The proposed comparator nevertheless allowed their donor merge.
+The same minimized regression failed on missing refusal, then passed after repair;
+its four raster controls and atomicity assertions were not weakened.
+
+The shared comparator now refuses leading ASCII padding before hexadecimal
+prefixes in PlayResX/Y, LayoutResX/Y and WrapStyle. It does not implement a second
+native integer parser. Unpadded hexadecimal values, hexadecimal suffix padding
+and padded decimal values remain supported. Empty donors impose no unused
+constraint; refusal preserves both source objects and a corrected retry works.
+Three permanent methods extend the original 31 unchanged methods to 34, including
+10 equipped-renderer methods. The portable 60-case prefix/field/padding matrix is
+one defect class, not 60 independent bugs.
+
 ## Compatibility and verification
 
 Project/build schemas and generation/normalization recipe stay unchanged at 2 and 10. The render sampler/receipt recipe advances to 11 so existing receipts created before the snapshot boundary must be regenerated; valid build identities, sources, worksheets, glossary and previous edition bytes remain unchanged. Re-render the existing valid edition, inspect every fresh image, then record genuine observations. Never transfer old approval flags to new screenshots.
@@ -54,6 +75,41 @@ Use the owner's existing logged PowerShell 7 runner and check every native exit 
 The current CI already runs Python 3.10/3.14, Linux/Windows/macOS, native Linux/Windows FFmpeg, CodeQL, blocking workflow lint and Dependency Review. Dependabot covers Actions and both pip locations. Extend these gates with the new discovered regressions rather than adding redundant jobs or permanent write permissions.
 
 Evaluate optional improvements against actual demand: a read-only effective-track-value diagnostic with escaped code points; a bounded, version-pinned libass differential corpus; structured failure summaries that link source/cue IDs without copying dialogue or credentials. Accept or decline each with a reason in the owner's required records. None is a prerequisite to hide an unresolved R01–R03 defect, and adopting one must include its tests in the same session.
+
+The three optional enhancements were evaluated and not selected for this repair:
+existing source/cue-linked exceptions suffice without a new diagnostic command;
+the authored native positive/negative controls cover the confirmed discrepancy
+without a new corpus maintenance dependency; existing structured operational logs
+already preserve failure category and recovery context without copying dialogue.
+These decisions do not defer any confirmed R01–R04 correction.
+
+## Independent delivery and identity evidence
+
+A separately copied retained edition was rendered with sampler 11. All ten fresh
+images were actually viewed and received new hash-bound visual observations;
+no old approval flag was transferred. QA verified 40 reviewed cues and ten frames.
+The single-ASS delivery ZIP passed member, CRC and subtitle SHA-256 checks.
+All 166 original workspace files stayed byte-identical; copied previous files and
+the prior sampler-10 review were preserved. The generation-10 build identity did
+not change. The installed 25-file skill and 34-file plugin archive match current
+source, and the previous installation is backed up. This is bounded excerpt
+visual/mechanical evidence, not audio synchronization, full-episode translation
+or active-player track certification. No private media or font was published.
+
+The two unsigned, GitHub-owner-linked proposal commits were corrected locally
+with a verified private bundle and metadata-only partial rewrite:
+`124f9831e6af6241043212ab31e18e3540e22208` →
+`5f17562059e4db75e10c1824a0a263c3b2725161`, and
+`fcf3f629642701aaa392904b16c7cabff9067b5a` →
+`6dbd275a31cdcf301312c905448c4d37397ec927`.
+Raw author and committer emails use the approved public identity. Content trees,
+parent topology, contributor names, dates and messages remain unchanged; no
+signature was invalidated and genuine bot/third-party ancestors remain intact.
+Remote publication requires an exact affected-ref lease against the observed
+original head. Historical green CI on the original proposal is not evidence for
+the final correction; current PR and integrated-main checks must verify their
+exact SHAs before closure. Hosting-provider test objects and cached originals
+are different surfaces; this rewrite does not promise their global erasure.
 
 ## Primary references and related implementations
 

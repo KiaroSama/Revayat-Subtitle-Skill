@@ -395,6 +395,51 @@ class SnapshotTests(TrackWorkspace):
 
 
 class GlobalValueTests(TrackWorkspace):
+    @unittest.skipUnless(RENDER, 'Explicit FFmpeg numeric-header oracle')
+    def test_native_numeric_prefix_padding_requires_refusal(self):
+        plain = source(text='AVAVAV To To').replace('PlayResX: 320', 'PlayResX:&H140')
+        padded = plain.replace('PlayResX:&H140', 'PlayResX: &H140')
+        a = self.pixels('plain-hex', plain)
+        b = self.pixels('padded-hex', padded)
+        self.assertGreater(max(a), 32)
+        self.assertGreater(max(b), 32)
+        self.assertEqual(a, self.pixels('decimal-320', plain.replace('&H140', '320')))
+        self.assertEqual(b, self.pixels('decimal-240', plain.replace('&H140', '240')))
+        self.assertNotEqual(a, b)
+        base, donor = formats.parse(plain, 'ass'), formats.parse(padded, 'ass')
+        before = copy.deepcopy((base, donor))
+        with self.assertRaisesRegex(ValueError, 'hexadecimal'):
+            workflow.merge_donor(base, donor, donor.cues, 's0002', True)
+        self.assertEqual((base, donor), before)
+
+    def test_padded_hexadecimal_integer_headers_are_refused_atomically(self):
+        for header in ('PlayResX', 'PlayResY', 'LayoutResX', 'LayoutResY', 'WrapStyle'):
+            for token in ('&H140', '&h140', '0x140', '0X140'):
+                for padding in (' ', '\t', ' \t'):
+                    with self.subTest(header=header, token=token, padding=repr(padding)):
+                        text = source(headers=header + ':' + token)
+                        if header in ('PlayResX', 'PlayResY'):
+                            original = header + (': 320' if header == 'PlayResX' else ': 180')
+                            text = source().replace(original, header + ':' + token)
+                        padded = text.replace(header + ':' + token, header + ':' + padding + token)
+                        base, donor = formats.parse(text, 'ass'), formats.parse(padded, 'ass')
+                        before = copy.deepcopy((base, donor))
+                        with self.assertRaisesRegex(ValueError, 'hexadecimal'):
+                            workflow.merge_donor(base, donor, donor.cues, 's0002', True)
+                        self.assertEqual((base, donor), before)
+                        self.assertEqual(workflow.merge_donor(base, donor, [], 's0002', True), [])
+                        self.assertEqual((base, donor), before)
+                        donor = formats.parse(text, 'ass')
+                        self.assertEqual(len(workflow.merge_donor(base, donor, donor.cues, 's0002', True)), 1)
+
+    def test_decimal_integer_padding_and_hexadecimal_suffix_padding_still_merge(self):
+        for value, other in (('320', ' \t320\t '), ('&H140', '&H140\t '), ('0x140', '0x140 ')):
+            with self.subTest(value=value):
+                text = source().replace('PlayResX: 320', 'PlayResX:' + value)
+                base = formats.parse(text, 'ass')
+                donor = formats.parse(text.replace('PlayResX:' + value, 'PlayResX:' + other), 'ass')
+                self.assertEqual(len(workflow.merge_donor(base, donor, donor.cues, 's0002', True)), 1)
+
     def pair(self, header, first, second):
         def document(value):
             text = source(headers='Kerning: yes')

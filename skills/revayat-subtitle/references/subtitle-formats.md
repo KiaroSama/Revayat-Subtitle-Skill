@@ -32,6 +32,12 @@ Timer can belong to the source presentation contract. The helper refuses differi
 values rather than silently applying the base header to a donor's presentation.
 Tracked headers must use canonical spelling, such as `Kerning:`; noncanonical
 case or whitespace before the colon cannot shadow a renderer-effective setting.
+Compared values retain Unicode whitespace literally; only equivalent ASCII
+space/tab padding is removed. Numeric PlayRes, LayoutRes and WrapStyle values
+with leading ASCII padding before an `&H` or `0x` hexadecimal prefix require
+explicit repair: libass chooses the numeric base before skipping that padding.
+Unpadded hexadecimal values, trailing ASCII padding and padded decimal values
+remain supported. An empty donor imposes no unused track-setting constraint.
 
 Supported SRT `br`/`br/` tags, including closing forms such as `</br>`, become
 display breaks, including ASCII-space attributes and `<br/ >`, when the tag body
@@ -69,7 +75,8 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation and sampler recipe 10 invalidate earlier review receipts.
+state. Generation recipe remains 10; render sampler 11 invalidates earlier
+review receipts without changing valid edition identities.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
 space/tab after a tag backslash and signed-positive drawing scales stay supported.

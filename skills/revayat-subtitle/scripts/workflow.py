@@ -334,8 +334,11 @@ def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool)
                     # ignored spelling shadow a renderer-effective setting.
                     if label != global_fields[key]:
                         raise ValueError("ASS track settings require canonical header spelling (" + key + ")")
-                    # Only renderer-ignored ASCII padding is equivalent.
-                    # Unicode whitespace can change the effective header value.
+                    stripped = value.lstrip(" \t")
+                    if (key in {"playresx", "playresy", "layoutresx", "layoutresy", "wrapstyle"}
+                            and stripped != value and ass_key(stripped).startswith(("&h", "0x"))):
+                        raise ValueError("ASS hexadecimal track settings with leading padding require explicit repair (" + key + ")")
+                    # Other ASCII edge padding is equivalent; Unicode remains significant.
                     result[key] = value.strip(" \t")
         return result
     a, b = script_info(base), script_info(donor)
