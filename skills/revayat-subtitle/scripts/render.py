@@ -13,7 +13,8 @@ import time
 import zipfile
 import validation
 
-from runtime import digest, file_fingerprint, local_path, output_directory, read_json, read_limited, run, write_json, same_json
+from runtime import (digest, file_fingerprint, local_path, output_directory, read_json, read_limited,
+                     run, staging_directory, write_json, same_json)
 from subtitle_formats import ARABIC, has_drawing, parse, visible, pieces, style_references
 from markup import has_ltr, has_rtl, overrides, srt_font_names
 from publication import publish_bytes
@@ -25,6 +26,19 @@ def ffmpeg_path(override: str | None = None) -> str:
     if not executable or not Path(executable).is_file():
         raise ValueError("FFmpeg not found; install a libass-enabled build or set REVAYAT_FFMPEG")
     return str(Path(executable).resolve())
+
+
+# The parser accepts at most 16 Mi characters, or 64 MiB of four-byte UTF-8.
+MAX_SUBTITLE_BYTES = 64 * 1024 * 1024
+
+
+def subtitle_snapshot(build: Path, episode: dict) -> bytes:
+    """Capture exactly the verified bytes consumed by a renderer or ZIP writer."""
+    raw = read_limited(local_path(build, episode["file"]), MAX_SUBTITLE_BYTES)
+    if digest(raw) != episode["sha256"]:
+        raise ValueError("Subtitle snapshot differs from the verified build; preserve sources and retry from a valid edition")
+    logging.debug("Verified subtitle snapshot bytes=%d", len(raw))
+    return raw
 
 
 def doctor(override: str | None = None) -> dict:
@@ -66,7 +80,7 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 10
+SAMPLER_VERSION = 11
 ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
 
@@ -191,10 +205,9 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
     frames = []
     rendered_bytes = 0
     try:
-        with tempfile.TemporaryDirectory(prefix=".render-", dir=build) as temporary:
-            stage = Path(temporary)
+        with staging_directory(build, ".render-") as stage:
             input_name = "input." + doc.kind
-            shutil.copyfile(local_path(build, episode["file"]), stage / input_name)
+            publish_bytes(stage / input_name, subtitle_snapshot(build, episode))
             font_option = ""
             if fonts:
                 if not fonts.is_dir():
@@ -213,7 +226,10 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
                         font_total += info["bytes"]
                         if font_total > 64 * 1024 * 1024 or len(recipe["fonts"]) >= 128:
                             raise ValueError("Selected fonts exceed the 64 MiB/128-file budget")
-                        shutil.copyfile(font, stage / "fonts" / font.name)
+                        font_bytes = read_limited(font, 32 * 1024 * 1024)
+                        if len(font_bytes) != info["bytes"] or digest(font_bytes) != info["sha256"]:
+                            raise ValueError("Font changed during render staging")
+                        publish_bytes(stage / "fonts" / font.name, font_bytes)
                         if file_fingerprint(stage / "fonts" / font.name, 32 * 1024 * 1024) != info:
                             raise ValueError("Font changed during render staging")
                         recipe["fonts"].append(info)
@@ -244,7 +260,7 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
                 rendered_bytes += len(raw)
                 if rendered_bytes > 2 * 1024**3:
                     raise ValueError("Render exceeded its 2 GiB episode artifact budget")
-                shutil.copyfile(frame, destination / filename)
+                publish_bytes(destination / filename, raw)
                 frames.append({"file": (destination / filename).relative_to(build).as_posix(),
                                **sample, "sha256": digest(raw), "width": width, "height": height})
                 logging.info("Rendered episode=%s frame=%d total=%d", episode_id, index, len(samples))
@@ -368,7 +384,7 @@ def package(build: Path, output: Path) -> dict:
                 entry.compress_type = zipfile.ZIP_DEFLATED
                 entry.create_system = 3
                 entry.external_attr = 0o100644 << 16
-                archive.writestr(entry, local_path(build, episode["file"]).read_bytes())
+                archive.writestr(entry, subtitle_snapshot(build, episode))
         with zipfile.ZipFile(archive_path) as archive:
             if archive.namelist() != names or archive.testzip() is not None:
                 raise ValueError("ZIP content validation failed")

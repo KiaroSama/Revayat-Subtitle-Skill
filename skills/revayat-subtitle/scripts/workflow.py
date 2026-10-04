@@ -334,7 +334,9 @@ def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool)
                     # ignored spelling shadow a renderer-effective setting.
                     if label != global_fields[key]:
                         raise ValueError("ASS track settings require canonical header spelling (" + key + ")")
-                    result[key] = value.strip()
+                    # Only renderer-ignored ASCII padding is equivalent.
+                    # Unicode whitespace can change the effective header value.
+                    result[key] = value.strip(" \t")
         return result
     a, b = script_info(base), script_info(donor)
     differences = [key for key in global_fields if a.get(key) != b.get(key)]
