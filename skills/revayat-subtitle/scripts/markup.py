@@ -84,24 +84,33 @@ def overrides(block: str, *, nested: bool = True):
                     while argument_start < finish - 1:
                         comma = block.find(",", argument_start, finish - 1)
                         argument_end = finish - 1 if comma < 0 else comma
-                        if block[argument_start:argument_end].strip() or comma < 0:
+                        if block[argument_start:argument_end].strip(" \t") or comma < 0:
                             break
                         argument_start = comma + 1
-                    if not block[argument_start:argument_end].strip():
+                    if not block[argument_start:argument_end].strip(" \t"):
                         argument_start, argument_end = match.end(), opening
+                    else:
+                        # Parenthesized scalar arguments skip leading ASCII space.
+                        while argument_start < argument_end and block[argument_start] in " \t":
+                            argument_start += 1
+                    while argument_end > argument_start and block[argument_end - 1] in " \t":
+                        argument_end -= 1
                     yield name, block[argument_start:argument_end], argument_start, argument_end
                 if name == "t" and nested:
                     nested_start = block.find("\\", begin + 1, finish - 1)
                     # libass ignores transforms with over three nonempty prefix
                     # arguments; commas after the first backslash belong to tags.
                     prefix = block[begin + 1:nested_start] if nested_start >= 0 else ""
-                    if nested_start >= 0 and sum(bool(arg.strip()) for arg in prefix.split(",")[:-1]) <= 3:
+                    if nested_start >= 0 and sum(bool(arg.strip(" \t")) for arg in prefix.split(",")[:-1]) <= 3:
                         yield from scan(nested_start, finish - 1, depth + 1)
             else:
                 finish = block.find("\\", begin, end)
                 if finish < 0:
                     finish = end
-                yield name, block[begin:finish], begin, finish
+                argument_end = finish
+                while argument_end > begin and block[argument_end - 1] in " \t":
+                    argument_end -= 1
+                yield name, block[begin:argument_end], begin, argument_end
             count += 1
             if count > 4096:
                 raise ValueError("ASS override block exceeds token budget")
@@ -112,9 +121,9 @@ def overrides(block: str, *, nested: bool = True):
 def drawing_mode(block: str, drawing: bool) -> bool:
     for name, argument, _, _ in overrides(block):
         if name == "p":
-            if not re.fullmatch(r"\+?[0-9]+", argument.strip()):
+            if not re.fullmatch(r"\+?[0-9]+", argument.strip(" \t")):
                 raise ValueError("ASS drawing mode must be a nonnegative integer")
-            drawing = bool(argument.strip().lstrip("+0"))
+            drawing = bool(argument.strip(" \t").lstrip("+0"))
     return drawing
 
 
@@ -203,11 +212,11 @@ def remap_resets(text: str, mapping: dict[str, str]) -> str:
         block = text[begin:finish]
         replacements = []
         for name, argument, start, end in overrides(block):
-            if name != "r" or not argument.strip():
+            if name != "r" or not argument:
                 continue
-            if argument.strip() not in mapping:
+            if argument not in mapping:
                 raise ValueError("Donor reset references an undefined style")
-            replacements.append((start, end, mapping[argument.strip()]))
+            replacements.append((start, end, mapping[argument]))
         for start, end, value in reversed(replacements):
             block = block[:start] + value + block[end:]
         output.extend((text[cursor:begin], block))

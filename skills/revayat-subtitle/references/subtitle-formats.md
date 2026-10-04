@@ -69,7 +69,7 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation and sampler recipe 9 invalidate earlier review receipts.
+state. Generation and sampler recipe 10 invalidate earlier review receipts.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
 space/tab after a tag backslash and signed-positive drawing scales stay supported.
@@ -88,9 +88,34 @@ embedded names. An explicit worksheet `direction` (`ltr`/`rtl`) needs `direction
 Intentional blank layout uses `preserve_empty_lines: true` plus `structure_note`;
 soft breaks, drawings and karaoke are not blindly stripped.
 
-Prune empty and unused styles, retaining those used only by `\rStyle` resets.
+Prune unused styles using renderer-effective names, retaining exact `\rStyle` references.
+A bare empty `Style:` row can instantiate renderer defaults and requires deliberate
+repair; an empty Name field in an otherwise complete style resolves to `Default`.
 Style changes and vector modifications require `structure_note` and visual review.
 Promotion removal follows [translation-policy.md](translation-policy.md).
+
+## ASS track grammar and presentation
+
+ASS row labels must use canonical `Format:`, `Style:`, `Dialogue:` and `Comment:`
+spelling. Unlike section/field names, they are not case-insensitive. Do not activate
+renderer-ignored rows by rewriting their labels. Syntax case folding and indentation
+use ASCII rules, not Unicode text normalization. Styles must precede Events.
+Renderer-active suffixes on section names require deliberate repair.
+
+Unknown/editor sections do not necessarily reset libass parser state. Active event,
+style, format or track-setting rows inside them are refused rather than copied or
+removed outside cue review. Harmless metadata and opaque font payloads stay intact.
+
+Declared style names and event references ignore leading stars; events also map
+ASCII case variants of `Default` to `Default`. Reset arguments have exact, separate
+name semantics. Trailing ASCII spaces and Unicode spaces in names are meaningful.
+Ambiguous effective-name collisions or undefined exact references need deliberate
+repair, not fallback guessing. Original rows/identifiers remain source evidence.
+
+When the supported original track matches libass's legacy FFmpeg signature heuristic,
+materialize `ScaledBorderAndShadow: yes` before removing the signature or pruning/
+merging styles. Preserve explicit settings and do not infer legacy behavior from
+an arbitrary comment. The original source file itself remains unchanged.
 
 ## Grammar and immutable metadata
 

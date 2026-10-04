@@ -66,7 +66,7 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 9
+SAMPLER_VERSION = 10
 ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
 
