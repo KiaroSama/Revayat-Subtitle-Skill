@@ -114,7 +114,7 @@ build under its original workspace: render/package recheck that workspace. A cha
 edit creates a new build; use that new path, not the old one. Repeated identical
 builds are read back and checked, so accidental output edits are refused.
 
-Generation recipe 3 is part of the edition identity, separate from reviewed-input
+Generation recipe 11 is part of the edition identity, separate from reviewed-input
 identity. Schema-1 workspaces remain readable; rebuild and rerender legacy editions
 with the current recipe. Old editions/decisions stay intact; image approvals are
 not copied to changed output. Provenance retains input-root/member origins without
@@ -128,7 +128,13 @@ mixed direction, changed structure and every animated event's phases, even when
 its override commands match another event. Use `--all-cues` for
 complete cue coverage. Equal pixels at different samples are allowed; reused paths
 or hardlinked image files are not. System fallback fonts still need visual review.
-Generation, normalization and sampler recipes are now 4, while project schema stays 2.
+Generation is 11, text normalization is 10, and sampler is 12; schemas remain 2.
+ASS preserves incoming read order within connected overlap groups and sorts only
+independent groups chronologically. Base cues precede retained donors in declared
+candidate order; provenance follows the physical emitted rows even with repeated
+cue IDs. Default ASS sampling includes earliest/latest onsets and the longest-ending
+cue, not merely the first and last file rows. This is representative coverage, not
+inspection of every overlapping instant; use `--all-cues` for complete cue sampling.
 Legacy `Banner`/`Scroll` effects receive event-specific phases; layer/margin changes
 also distinguish sample layouts. Rebuild in the same workspace after upgrading:
 old source decisions and editions remain, but changed output needs fresh images

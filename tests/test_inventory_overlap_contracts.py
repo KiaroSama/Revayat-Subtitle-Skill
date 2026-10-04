@@ -6,7 +6,6 @@ import logging
 import os
 from pathlib import Path
 import random
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -258,9 +257,8 @@ class OrderTests(AuditCase):
         code = ('import sys;sys.path.insert(0,sys.argv[1]);from subtitle_formats import Cue,presentation_order;'
                 'c=[Cue(str(i),i*10,i*10+20,"x") for i in reversed(range(100000))];'
                 'assert presentation_order(c,"ass")==list(range(100000))')
-        result = subprocess.run([sys.executable, '-S', '-c', code, str(SCRIPTS)],
-                                capture_output=True, timeout=12)
-        self.assertEqual(result.returncode, 0, 'Bounded component-order regression failed')
+        runtime.run([sys.executable, '-X', 'utf8', '-S', '-c', code, str(SCRIPTS)],
+                    timeout=12, idle_timeout=10, max_output=2 * 1024 * 1024)
 
     def test_sampler_covers_timeline_edges_in_nonchronological_rows(self):
         document = formats.Document('ass', self.cues([(5000, 20000), (1000, 20000),

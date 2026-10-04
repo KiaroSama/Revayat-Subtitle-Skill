@@ -101,6 +101,8 @@ def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
     earliest = min(range(len(doc.cues)), key=lambda index: doc.cues[index].start)
     latest = max(range(len(doc.cues)), key=lambda index: doc.cues[index].start)
     chosen = {0, len(doc.cues) - 1, earliest, latest, *(index - 1 for index in changed_indices)}
+    if doc.kind == "ass":
+        chosen.add(max(range(len(doc.cues)), key=lambda index: doc.cues[index].end))
     styles, signatures = set(), set()
     tokens = {}
     for index, cue in enumerate(doc.cues):

@@ -219,7 +219,7 @@ compare releases <------------------+
 agent reads, translates and records every cue decision
        |
        v
-build -> timing sort, cleanup, RTL, one file per episode
+build -> overlap-safe ASS order / stable SRT timing sort, cleanup, RTL, one file per episode
        |
        v
 render -> FFmpeg PNGs -> agent inspection and observations

@@ -279,6 +279,8 @@ def presentation_order(cues: list[Cue], kind: str) -> list[int]:
     emitted timestamps, including ASS centisecond quantization. SRT remains
     chronological. Return indices so cue provenance follows the identical order.
     """
+    if kind not in {"ass", "srt"}:
+        raise ValueError("Cue ordering requires ASS or SRT format")
     times = [effective_times(cue.start, cue.end, kind) for cue in cues]
     chronological = sorted(range(len(cues)), key=lambda index: times[index][0])
     if kind != "ass":

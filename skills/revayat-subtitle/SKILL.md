@@ -205,7 +205,9 @@ python "SKILL_DIR/scripts/revayat-subtitle.py" build --work "WORK"
 
 The builder sorts SRT by start time with stable ties and renumbers its blocks.
 For ASS it sorts disjoint temporal groups while preserving incoming row order
-inside connected overlap groups, so sorting cannot change same-layer compositing.
+inside connected overlap groups, preserving active-pair read order for compositing
+and collision placement. Base cues precede retained donors in declared candidate
+order; inspect their combined presentation. Layers and timing are not rewritten.
 It removes unused styles and hidden comments and adds actual U+200F marks to Persian display
 lines. Mixed text also gets balanced directional embedding. It preserves logical
 text and checks its serialization. SRT-only episodes remain SRT; an ASS base stays ASS.

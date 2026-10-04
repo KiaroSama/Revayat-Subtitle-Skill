@@ -16,6 +16,10 @@ ASS is preferred when available and usable.
 **Cue**: One timed subtitle event, which may contain speech, readable signs,
 lyrics, decorative effects, or credits.
 
+**Read order**: The incoming sequence of ASS events, which affects same-layer
+composition. Overlapping effective intervals retain that sequence, including
+transitive groups; independent groups need not retain one global time order.
+
 **Glossary**: Researched names, places, honorifics, and recurring terms with
 locked target spellings and source links.
 

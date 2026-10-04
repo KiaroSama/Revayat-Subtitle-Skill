@@ -61,7 +61,7 @@ This does **not** blanket-refuse valid overlaps, flatten layers, invent replacem
 
 `assemble` uses the returned indices on complete `(cue, provenance)` pairs before assigning `emitted_index`. `serialize` applies the same idempotent ordering, preventing a second independent reorder from invalidating provenance. Edited timings use emitted rather than original bounds. Repeated builds remain deterministic.
 
-An ASS overlap component can intentionally contain nonchronological rows. `sample_plan` therefore adds the true minimum-start and maximum-start cue indices explicitly, while preserving prior physical boundary, changed-structure, style, drawing, animation and mixed-text coverage. Sample times remain sorted; indices always address actual emitted rows. The empty-document helper reports a controlled error. This is representative visual sampling, not certification of every possible overlap phase or complete audio synchronization.
+An ASS overlap component can intentionally contain nonchronological rows. `sample_plan` therefore adds the true minimum-start, maximum-start and longest-ending cue indices explicitly, while preserving prior physical boundary, changed-structure, style, drawing, animation and mixed-text coverage. Sample times remain sorted; indices always address actual emitted rows. The empty-document helper reports a controlled error. This is representative visual sampling, not certification of every possible overlap phase or complete audio synchronization.
 
 **Acceptance:** native before/after and wrong-order controls; multiple phases/components/layers; disjoint sorting; transitive bridges; half-open touching; quantized boundaries; invalid collapsed timing; no input mutation; SRT behavior unchanged; 250 deterministic generated interval sets checking all overlapping pairs and idempotence; a bounded 100000-event connected component; worksheet retiming; retained donors; exact emitted provenance; chronological sample edges; existing-edition preservation; full build → render → unreviewed-QA refusal → explicitly labelled mechanical review fixture → hash-checked ZIP; stale sampler refusal.
 
@@ -79,7 +79,7 @@ Automated review-note fixtures exercise the QA gate only. They are not a claim t
 
 ## Compatibility and shipped documentation
 
-Project/build JSON schemas remain **2**. Generation/normalization advance **10 → 11**; sampler advances **11 → 12**. Existing input bytes, IDs, worksheets, glossary, notes and previous editions remain untouched. Build a new edition from the same valid reviewed workspace, render fresh evidence and inspect the new images; never carry old approval flags across changed output or sampler recipes.
+Project/build JSON schemas remain **2**. Generation advances **10 → 11**; text normalization remains **10** because its algorithm is unchanged. Sampler advances **11 → 12**. Existing input bytes, IDs, worksheets, glossary, notes and previous editions remain untouched. Build a new edition from the same valid reviewed workspace, render fresh evidence and inspect the new images; never carry old approval flags across changed output or sampler recipes.
 
 Shipped `SKILL.md` and `references/subtitle-formats.md` now distinguish SRT chronological order from ASS overlap-safe group ordering, document actual emitted provenance, and explain exact owned-stage exclusion. The accepted Unicode and leading-padding hexadecimal header protections remain intact. Existing historical audit documents describe their own revisions and are not rewritten as current guarantees.
 
@@ -117,3 +117,52 @@ Maintain a finite I01/O01 requirement → code → regression → native-result 
 **All previous and future controlled published raw author and committer email fields must be `Kiaro.Sama.Dev@gmail.com`.** Inspect this PR and all controlled branch/tag history, including bot/merge commits. Immediately correct differing stored metadata under Rules using verified private backups, preserved genuine author names/content/topology/messages, an old-to-new map and explicit expected-ref protection. A `.mailmap` or a statement in the commit message is not raw metadata correction. Rewriting signed commits invalidates their signatures; preserve real attribution and re-sign only as legitimately authorized. Do not claim hosting-provider synthetic refs, cached originals or unreachable objects are erased. Inspect and rerun checks on resulting SHAs. The current connector exposes no identity override; the handoff must state the observed new-commit email honestly as a pre-integration gate if it differs.
 
 Review **ALL repository PRs according to owner Rules**. Merge acceptable validated work. Where direct merge is unsuitable, repair the implementation or integrate and verify an equivalent, then merge or close the superseded proposal with code/test evidence. Closing unfixed work merely to empty the list is not DONE. Complete the selected repairs, documentation, required hooks, identity corrections, Spec Kit convergence, commit/push and verification of the actual integrated target SHA before declaring completion. Do not bypass real permission/safety blockers or conceal them as success. This audit author opens/updates repair PRs only and does not merge/close PRs/issues or alter main.
+
+## Independent event-order integration follow-through
+
+The supplied O01 acceptance overlaps this existing proposal; it is integrated here,
+not through a second production helper or parallel PR. All 30 proposal methods and
+all 27 event-order acceptance methods remain, with the latter using the equivalent
+`presentation_order` public helper. Budget probes use the existing owned, bounded
+process supervisor rather than an unmanaged subprocess. No assertion was weakened.
+
+Independent exact-baseline reproduction verified all 92 raw tracked blobs from
+`9483392`, then ran five minimized old-API methods: six intended assertion/subtest
+failures, zero errors/skips. The native method covers positioned compositing and
+unpositioned text collision with nonblank/reversed-order controls. That same native
+method passes on the integrated implementation. Initial baseline export validation
+failed because Git archive applied EOL conversion to eight text files; raw Git blobs
+were used as the exact oracle before executing the real baseline tests. No isolated
+reconstruction history was published.
+
+Three finite acceptance gaps were also reproduced before correction: a missing
+longest-ending ASS sample, an unsupported ordering format accepted silently, and
+normalization recipe 11 despite unchanged text normalization. Their identical
+narrow tests now pass. Generation 11, normalization 10 and sampler 12 are separate
+contracts; the added maximum-end anchor is representative sampling, not a guarantee
+of every overlap transition or continuous collision history. Native renderer state
+and system-font differences remain explicit limits, not invented extra bug totals.
+
+Optional overlap diagnostics, interval-tree dependency, all-transition sampling,
+topology-generation expansion and another player lane were evaluated and not
+selected: the shared sweep and retained authored/seeded/native controls cover the
+confirmed repair; existing logs suffice and no additional player target was requested.
+Current corrected-head CI, identity verification and fresh retained-edition delivery
+must complete before final branch integration; original proposal CI is historical.
+
+Fresh retained-edition acceptance: a separate copy preserves all 179 prior files,
+including original inputs, decisions, sampler-11 approvals and older editions.
+Generation11/normalization10 creates a new edition with unchanged reviewed-input
+identity. Ten sampler-12 images were actually viewed and received new hash-bound
+observations; none inherited earlier approval flags. QA verifies 40 reviewed cues
+and ten frames. The one-ASS ZIP passes member/CRC/SHA checks; the installed25-file
+skill and34-file plugin archive match source, with previous installation backed up.
+This is bounded excerpt evidence, not full-episode meaning/audio/player certification.
+
+The unsigned owner-linked proposal object was backed up privately and corrected
+metadata-only: `cf4610cbb55b80266c7006a7b3ef7c1a585ed567` →
+`bdaec2229e8e3958d103762d6d25d350f4ad530c`. Raw owner author/committer email is
+`Kiaro.Sama.Dev@gmail.com`; tree, parent, names, dates and message are unchanged.
+No signature was invalidated; genuine bot ancestors remain intact. Final publication
+uses an exact original-head lease, and branch integration occurs only at the END
+following current corrected-head acceptance, as the owner explicitly requested.
