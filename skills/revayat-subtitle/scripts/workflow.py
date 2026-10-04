@@ -25,7 +25,8 @@ from runtime import digest, local_path, read_json, read_limited, staging_directo
 from markup import clean_empty_lines, paragraph_direction, remap_resets
 from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
-                              rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times)
+                              rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times,
+                              ass_key, ass_line_start, ass_style_name)
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_TOTAL = 256 * 1024 * 1024
@@ -35,7 +36,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 9, "normalization": 9, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 10, "normalization": 10, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path):
@@ -323,11 +324,11 @@ def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool)
     def script_info(doc):
         result = {}
         for name, lines in doc.sections:
-            if name.casefold() != "[script info]":
+            if ass_key(name) != "[script info]":
                 continue
             for line in lines:
-                label, separator, value = line.lstrip().partition(":")
-                key = label.strip().casefold()
+                label, separator, value = ass_line_start(line).partition(":")
+                key = ass_key(label.strip(" \t"))
                 if separator and key in global_fields:
                     # libass header prefixes are case-sensitive. Do not let an
                     # ignored spelling shadow a renderer-effective setting.
@@ -350,14 +351,14 @@ def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool)
         values[base.style_fields.index("name")] = mapped
         base.styles[mapped] = values
     if keep_fonts:
-        donor_fonts = [lines for name, lines in donor.sections if name.casefold() == "[fonts]"]
-        base_fonts = [lines for name, lines in base.sections if name.casefold() == "[fonts]"]
+        donor_fonts = [lines for name, lines in donor.sections if ass_key(name) == "[fonts]"]
+        base_fonts = [lines for name, lines in base.sections if ass_key(name) == "[fonts]"]
         if donor_fonts and base_fonts and donor_fonts != base_fonts:
             raise ValueError("Different embedded font sets: reconcile fonts before merging ASS donor events")
         if donor_fonts and not base_fonts:
             base.sections.append(("[Fonts]", donor_fonts[0].copy()))
     for cue in cues:
-        old = cue.fields["style"].strip()
+        old = ass_style_name(cue.fields["style"], reference=True)
         if old not in mapping:
             raise ValueError("Donor references an undefined style")
         cue.fields["style"] = mapping[old]

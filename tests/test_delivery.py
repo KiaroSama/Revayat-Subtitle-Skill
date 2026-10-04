@@ -253,6 +253,27 @@ class DeliveryTests(WorkspaceCase):
 
     def test_legacy_workspace_gets_new_edition_without_rewriting_history(self):
         shutil.copytree(FIXTURES / "legacy-work", self.work)
+        ambiguous = self.work
+        retained = {p.relative_to(ambiguous): p.read_bytes() for p in ambiguous.rglob("*") if p.is_file()}
+        # The archived source includes a native-default Style row. Stricter
+        # parsing must refuse it without modifying any historical artifact.
+        with self.assertRaisesRegex(ValueError, "Empty ASS Style"):
+            build(ambiguous)
+        self.assertEqual({p.relative_to(ambiguous): p.read_bytes()
+                          for p in ambiguous.rglob("*") if p.is_file()}, retained)
+        # Author a separate canonical schema-1 test variant BEFORE the migration
+        # snapshot. This setup is not an automatic repair of an immutable source.
+        self.work = self.root / "canonical-legacy-work"
+        shutil.copytree(ambiguous, self.work)
+        project = read_json(self.work / "project.json")
+        source = next(item for item in project["sources"] if item["kind"] == "ass")
+        source_path = self.work / source["file"]
+        raw = source_path.read_bytes()
+        self.assertEqual(raw.count(b"\nStyle:\n"), 1)
+        canonical = raw.replace(b"\nStyle:\n", b"\n", 1)
+        source_path.write_bytes(canonical)
+        source["sha256"] = digest(canonical)
+        write_json(self.work / "project.json", project)
         before = {p.relative_to(self.work): p.read_bytes() for p in self.work.rglob("*") if p.is_file()}
         legacy = next((self.work / "builds").iterdir())
         result = build(self.work)
