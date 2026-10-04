@@ -80,7 +80,7 @@ def load_build(build: Path):
     return manifest, docs
 
 
-SAMPLER_VERSION = 11
+SAMPLER_VERSION = 12
 ANIMATED_TAGS = frozenset({"t", "k", "K", "kf", "ko", "kt", "move", "fad", "fade"})
 MAX_RENDER_FRAMES = 5000
 
@@ -95,7 +95,12 @@ def animated_event(cue, commands) -> bool:
 def sample_plan(doc, all_cues: bool, changed_indices=()) -> list[dict]:
     """Bind each required sample time to the emitted cues whose risks it covers."""
     validation.boolean(all_cues, "render.all_cues")
-    chosen = {0, len(doc.cues) - 1, *(index - 1 for index in changed_indices)}
+    if not doc.cues:
+        raise ValueError("Render sampling requires at least one cue")
+    # ASS overlap components can intentionally retain nonchronological rows.
+    earliest = min(range(len(doc.cues)), key=lambda index: doc.cues[index].start)
+    latest = max(range(len(doc.cues)), key=lambda index: doc.cues[index].start)
+    chosen = {0, len(doc.cues) - 1, earliest, latest, *(index - 1 for index in changed_indices)}
     styles, signatures = set(), set()
     tokens = {}
     for index, cue in enumerate(doc.cues):

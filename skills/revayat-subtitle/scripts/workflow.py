@@ -26,7 +26,7 @@ from markup import clean_empty_lines, paragraph_direction, remap_resets
 from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times,
-                              ass_key, ass_line_start, ass_style_name)
+                              ass_key, ass_line_start, ass_style_name, presentation_order)
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_TOTAL = 256 * 1024 * 1024
@@ -36,16 +36,27 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 10, "normalization": 10, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 11, "normalization": 11, "timing": "floor-centisecond"}
 
 
-def input_candidates(path: Path):
+def input_candidates(path: Path, *, excluded_root: Path | None = None):
+    # Map the owned tree into this root's lexical spelling once. This handles
+    # parent segments and ancestor aliases without rewriting recorded origins.
+    excluded = None
+    if excluded_root is not None:
+        owned, root = excluded_root.resolve(), path.resolve()
+        if root.is_relative_to(owned):
+            return []
+        if owned.is_relative_to(root):
+            excluded = (path / owned.relative_to(root)).absolute()
     if not path.is_dir():
         return [path]
     pending, found, visited = [path], [], 0
     while pending:
         with os.scandir(pending.pop()) as entries:
             for entry in entries:
+                if excluded is not None and Path(entry.path).absolute() == excluded:
+                    continue
                 visited += 1
                 if visited > MAX_ENTRIES:
                     raise ValueError("Input traversal exceeds 100000 directory entries")
@@ -60,14 +71,14 @@ def input_candidates(path: Path):
     return sorted(found)
 
 
-def inputs(paths: list[Path]):
+def inputs(paths: list[Path], *, excluded_root: Path | None = None):
     total, count = 0, 0
     if len(paths) > 1000:
         raise ValueError("Too many input roots")
     for root_index, path in enumerate(paths, 1):
         if path.is_symlink() or getattr(path.lstat(), "st_file_attributes", 0) & 1024:
             raise ValueError("Symbolic-link subtitle inputs are not accepted")
-        candidates = input_candidates(path)
+        candidates = input_candidates(path, excluded_root=excluded_root)
         for candidate in candidates:
             if candidate.is_symlink():
                 continue
@@ -155,7 +166,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
         project = {"version": PROJECT_SCHEMA, "series": series, "season": season, "target_language": target_language,
                    "font_policy": "keep", "sources": [], "episodes": []}
         total_cues = expanded = 0
-        for i, (name, kind, raw, origin) in enumerate(inputs(paths), 1):
+        for i, (name, kind, raw, origin) in enumerate(inputs(paths, excluded_root=Path(temporary)), 1):
             doc = parse(raw.decode(encoding), kind)
             total_cues += len(doc.cues)
             if total_cues > MAX_TOTAL_CUES:
@@ -420,7 +431,8 @@ def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
                                      "timing": {"original": original[cue.id],
                                                 "reviewed": reviewed_times[cue.id], "emitted": emitted,
                                                 "conversion": "floor-centisecond" if emitted != reviewed_times[cue.id] else None}}))
-        paired.sort(key=lambda item: (item[0].start, item[1]["timing"]["reviewed"][0]))
+        order = presentation_order([item[0] for item in paired], base.kind)
+        paired = [paired[index] for index in order]
         merged = [cue for cue, _ in paired]
         provenance = [{"emitted_index": index, **record} for index, (_, record) in enumerate(paired, 1)]
         payload = serialize(base, merged, remove_fonts=project["font_policy"] == "remove").encode("utf-8")

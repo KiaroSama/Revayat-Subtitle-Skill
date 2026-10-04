@@ -112,7 +112,9 @@ disclose an unavailable original or a necessary pivot rather than invent fidelit
 | Decoding or format error | Confirm the encoding or repair/convert a separate copy; no silent dropping. |
 
 Accepted input: ASS, SRT, ZIP, or a directory. Originals are copied byte-for-byte
-and hashed. Read [subtitle-formats.md](references/subtitle-formats.md) for format
+and hashed. Overlapping explicit input roots retain their separate provenance;
+the importer excludes only its own active staging tree, never unrelated folders
+whose names happen to look like staging directories. Read [subtitle-formats.md](references/subtitle-formats.md) for format
 boundaries and [workflow.md](references/workflow.md) for the working files.
 
 Inspect ASS attachment sections for actual embedded font data. If fonts are
@@ -201,8 +203,10 @@ python "SKILL_DIR/scripts/revayat-subtitle.py" build --work "WORK"
 | Incomplete or stale worksheet | Repair original IDs, source text or missing decisions. |
 | Undefined style or incompatible donor settings | Reconcile presentation explicitly; do not flatten the episode. |
 
-The builder sorts by start time with stable ties, renumbers SRT blocks, removes
-unused styles and hidden comments, and adds actual U+200F marks to Persian display
+The builder sorts SRT by start time with stable ties and renumbers its blocks.
+For ASS it sorts disjoint temporal groups while preserving incoming row order
+inside connected overlap groups, so sorting cannot change same-layer compositing.
+It removes unused styles and hidden comments and adds actual U+200F marks to Persian display
 lines. Mixed text also gets balanced directional embedding. It preserves logical
 text and checks its serialization. SRT-only episodes remain SRT; an ASS base stays ASS.
 

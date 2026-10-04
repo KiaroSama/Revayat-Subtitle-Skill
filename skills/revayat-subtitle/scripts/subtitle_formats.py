@@ -270,12 +270,39 @@ def style_references(cue: Cue) -> set[str]:
     return refs
 
 
+def presentation_order(cues: list[Cue], kind: str) -> list[int]:
+    """Order disjoint time components without changing ASS overlap read order.
+
+    A chronological sort changes the compositing order of active same-layer
+    events. Within each connected half-open overlap component retain the input
+    order; only components that cannot be active together may be moved. Use the
+    emitted timestamps, including ASS centisecond quantization. SRT remains
+    chronological. Return indices so cue provenance follows the identical order.
+    """
+    times = [effective_times(cue.start, cue.end, kind) for cue in cues]
+    chronological = sorted(range(len(cues)), key=lambda index: times[index][0])
+    if kind != "ass":
+        return chronological
+    ordered, component = [], []
+    right = 0
+    for index in chronological:
+        start, end = times[index]
+        if component and start >= right:
+            ordered.extend(sorted(component))
+            component.clear()
+        if not component:
+            right = end
+        else:
+            right = max(right, end)
+        component.append(index)
+    ordered.extend(sorted(component))
+    return ordered
+
+
 def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str:
-    cues = sorted(cues, key=lambda cue: cue.start)  # Ties retain their source/layer order.
     if not cues:
         raise ValueError("Refusing an episode with no retained cues")
-    for cue in cues:
-        effective_times(cue.start, cue.end, doc.kind)
+    cues = [cues[index] for index in presentation_order(cues, doc.kind)]
     if doc.kind == "srt":
         return "\n\n".join(f"{i}\n{timecode(c.start, 'srt')} --> {timecode(c.end, 'srt')}\n{c.text}"
                            for i, c in enumerate(cues, 1)) + "\n"

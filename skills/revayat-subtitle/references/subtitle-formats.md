@@ -63,6 +63,20 @@ Source copies and emitted subtitles are byte-verified before publishing their
 workspace or edition. Failed conversion leaves the donor and base objects intact
 so that a corrected retry cannot inherit partly remapped styles.
 
+## ASS row order and overlapping events
+
+ASS read order affects same-layer compositing and collision placement. Sort only
+mutually disjoint temporal components; retain the original incoming row order
+within each connected overlap group. Use emitted half-open intervals after
+centisecond quantization. Touching intervals do not overlap. Do not flatten
+layers, rewrite vector payloads or refuse valid overlap just to obtain a globally
+sorted file. Retained base cues precede retained donor cues in the declared source
+order inside a shared group, with each source's own row order preserved.
+
+Provenance indices refer to physical emitted rows, not a separately sorted copy.
+The sampler explicitly includes chronological boundary cues even when the stored
+ASS rows are intentionally nonchronological. SRT stays stably start-time sorted.
+
 ## Readable text versus effects
 
 Override blocks, vector paths, clips, masks, positioning, animation, colors and
@@ -75,8 +89,8 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation recipe remains 10; render sampler 11 invalidates earlier
-review receipts without changing valid edition identities.
+state. Generation recipe 11 and render sampler 12 require a rebuilt edition
+and fresh review receipts; original sources, decisions and old editions stay intact.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
 space/tab after a tag backslash and signed-positive drawing scales stay supported.
