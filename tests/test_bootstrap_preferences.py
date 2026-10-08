@@ -32,7 +32,7 @@ class BootstrapPreferenceTests(WorkspaceCase):
         site.mkdir()
         (site / "sitecustomize.py").write_text("import sys\nif sys.executable.lower().endswith('python.exe'):\n sys.version_info=(3,10,0,'final',0)\n", encoding="utf-8")
         caller = self.root / "caller.ps1"
-        caller.write_text("param($Launcher,$Output)\n$ErrorActionPreference='Stop'\n$PSNativeCommandUseErrorActionPreference=$true\n& $Launcher $Output 'فارسی spaces' 'literal&value'\n", encoding="utf-8")
+        caller.write_text("param($Launcher,$Output)\n$ErrorActionPreference='Stop'\n$PSNativeCommandUseErrorActionPreference=$true\n& $Launcher $Output 'فارسی spaces' 'literal&value'\nexit $LASTEXITCODE\n", encoding="utf-8")
         env = {**os.environ, "PATH": str(bad) + os.pathsep + str(good) + os.pathsep + os.environ.get("PATH", ""),
                "PYTHONHOME": str(Path(sys.base_prefix)), "PYTHONPATH": str(site), "REVAYAT_LOG_DIR": str(self.root / "logs")}
         probe = "import sys;sys.exit(0 if sys.version_info >= (3,11) else 1)"

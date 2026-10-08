@@ -19,6 +19,27 @@ class InstallBackupDiscoveryTests(WorkspaceCase):
         self.assertTrue((backup / "empty").is_dir())
         self.assertEqual(list(target.parent.glob("**/SKILL.md")), [target / "SKILL.md"])
 
+    def test_absent_standard_agent_root_is_created_with_owned_identity(self):
+        module = installer()
+        target = self.root / '.claude/skills/revayat-subtitle'
+        self.assertFalse(target.parent.parent.exists())
+        result = module.install(target, plugin=False, force=False)
+        self.assertIsNone(result)
+        self.assertEqual((target / 'SKILL.md').read_bytes(), (module.SKILL / 'SKILL.md').read_bytes())
+        self.assertTrue((target.parent.parent / 'revayat-recovery').is_dir())
+
+    def test_foreign_agent_ancestor_created_after_plan_is_not_adopted(self):
+        module = installer()
+        target = self.root / '.claude/skills/revayat-subtitle'
+        plan = module.plan_install([target], plugin=False, force=False)
+        target.parent.parent.mkdir()
+        sentinel = target.parent.parent / 'foreign.txt'
+        sentinel.write_bytes(b'keep')
+        with self.assertRaisesRegex(ValueError, 'ancestor changed'):
+            module.execute_plan(plan)
+        self.assertEqual(sentinel.read_bytes(), b'keep')
+        self.assertFalse(target.exists())
+
     def test_custom_root_requires_recovery_and_refuses_discovery_overlap(self):
         module = installer()
         target = self.root / "custom"

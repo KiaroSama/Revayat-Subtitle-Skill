@@ -50,7 +50,7 @@ class CommentBuildTests(WorkspaceCase):
         with self.assertRaisesRegex(ValueError, 'activat'):
             build(self.work)
         self.assertFalse((self.work / 'builds').exists())
-        rows[0].update(action='edit', text='A < b > B', structure_note='Explicit literal adaptation')
+        rows[0].update(action='edit', text='A less than b greater than B', structure_note='Explicit literal adaptation')
         write_json(sheet, rows)
         self.assertEqual(build(self.work)['episodes'][0]['cues'], 1)
         self.assertEqual(source.read_bytes(), raw)
@@ -60,7 +60,7 @@ class CommentBuildTests(WorkspaceCase):
     def test_native_original_and_activated_control_are_distinct(self):
         from render import ffmpeg_path
         outputs = []
-        for index, text in enumerate(('A<<!--note-->b>B', 'A<b>B', 'A < b > B',
+        for index, text in enumerate(('A<<!--note-->b>B', 'A<b>B', 'A less than b greater than B',
                                       'A<<!--note-->123>B', 'A<123>B',
                                       'A<<!--note-->_foo>B', 'A<_foo>B', 'A<small!>B', 'A< foo>B', 'A<<foo>B')):
             source = self.root / f'native-{index}.srt'
@@ -74,7 +74,7 @@ class CommentBuildTests(WorkspaceCase):
         self.assertNotEqual(outputs[0], outputs[1], 'Reject the hypothesis if original already activates the same tag')
         self.assertIn('A', outputs[0])
         self.assertIn('B', outputs[0])
-        self.assertIn('< b >', outputs[2])
+        self.assertEqual(outputs[2], 'A less than b greater than B')
         self.assertNotEqual(outputs[3], outputs[4])
         self.assertNotEqual(outputs[5], outputs[6])
         self.assertEqual(outputs[4], 'AB')

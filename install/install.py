@@ -124,6 +124,8 @@ def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir
             target_parent = target_parent.parent
         if existing.stat().st_dev != target_parent.stat().st_dev:
             raise ValueError("Recovery and installation must be on the same filesystem; no copy-delete fallback")
+        for parent in (root, *root.parents):
+            ancestors.setdefault(parent, identity(parent) if os.path.lexists(parent) else None)
         roots.append(root)
     # All selected targets share one journal; the first standard agent root owns recovery.
     return {"targets": planned, "files": pairs, "ancestors": ancestors, "recovery": roots[0]}
@@ -200,7 +202,9 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
             raise ValueError("Installation target changed after preflight")
         old.append(state.tree_manifest(item["target"]) if current is not None else None)
     recovery = state.safe_path(plan["recovery"])
-    recovery.mkdir(parents=True, exist_ok=True)
+    check_parents(recovery, ancestors)
+    make_parents(recovery, parents, ancestors)
+    check_parents(recovery, ancestors)
     state.safe_path(recovery)
     identifier = uuid.uuid4().hex
     transaction = recovery / ("transaction-" + identifier)
@@ -232,7 +236,7 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
                 output = stage / relative
                 output.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, output)
-                with output.open("rb") as handle:
+                with output.open("r+b") as handle:
                     os.fsync(handle.fileno())
             if not state.matches(stage, record["stage_id"], new):
                 raise ValueError("Installation source changed during staging")

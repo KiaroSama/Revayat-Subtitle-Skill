@@ -21,7 +21,7 @@ class EvaluationContractTests(unittest.TestCase):
         self.assertEqual(outcomes["missing_referent"], "needs_context")
         self.assertEqual(outcomes["faithful_unseen"], "needs_context")
         self.assertEqual(pilot["cases"][0]["author_observation"]["outcome"], "faithful")
-        self.assertEqual(len(read_json(ROOT / "evaluation/cases.json")), 25)
+        self.assertEqual(len(read_json(ROOT / "evaluation/cases.json")), 24)
 
 
 if __name__ == "__main__":

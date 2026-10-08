@@ -65,7 +65,7 @@ class StructuralPropertyTests(unittest.TestCase):
         from unittest.mock import patch
         # Extend the actual removed span by one character: this mutates the
         # boundary rule used by real uncomment, not the result/oracle itself.
-        with patch('markup.block_spans', return_value=iter([(1, 12)])):
+        with patch('markup.block_spans', return_value=iter([(1, 13)])):
             with self.assertRaises(AssertionError):
                 self.assertEqual(uncomment('A<!--note-->Z', 'srt'), expected)
 

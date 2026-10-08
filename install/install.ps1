@@ -7,6 +7,19 @@ $installer = Join-Path $PSScriptRoot 'install.py'
 $script:writer = $null
 $script:threshold = 20
 $levels = @{ DEBUG = 10; INFO = 20; WARNING = 30; ERROR = 40; CRITICAL = 50 }
+function Invoke-NativeStatus([string]$executable, [string[]]$arguments, [bool]$probe) {
+    $previous = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    $previousValue = if ($previous) { $previous.Value } else { $null }
+    $PSNativeCommandUseErrorActionPreference = $false
+    try {
+        if ($probe) { & $executable @arguments 2>$null | Out-Null }
+        else { & $executable @arguments | Out-Host }
+        return $LASTEXITCODE
+    } finally {
+        if ($previous) { Set-Variable -Name LASTEXITCODE -Scope Global -Value $previousValue }
+        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+    }
+}
 function Write-BootstrapLog([string]$level, [string]$message) {
     if ($levels[$level] -lt $script:threshold) { return }
     $stamp = [DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss')
@@ -54,19 +67,11 @@ try {
         $command = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($command) {
             $prefix = if ($candidate -eq 'py') { @('-3') } else { @() }
-            $probe = & {
-                $PSNativeCommandUseErrorActionPreference = $false
-                & $command.Source @prefix -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>$null
-                $LASTEXITCODE
-            }
+            $probe = Invoke-NativeStatus $command.Source (@($prefix) + @('-B', '-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)')) $true
             if ($probe -eq 0) {
                 Write-BootstrapLog 'DEBUG' 'Compatible interpreter found; forwarding arguments without logging their values.'
                 $forwarded = $args
-                $result = & {
-                    $PSNativeCommandUseErrorActionPreference = $false
-                    & $command.Source @prefix -B -X utf8 $installer @forwarded | Out-Host
-                    $LASTEXITCODE
-                }
+                $result = Invoke-NativeStatus $command.Source (@($prefix) + @('-B', '-X', 'utf8', $installer) + @($forwarded)) $false
                 $severity = if ($result -eq 0) { 'INFO' } else { 'ERROR' }
                 Write-BootstrapLog $severity "Installer completed exit=$result."
                 exit $result

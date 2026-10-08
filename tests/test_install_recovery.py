@@ -41,8 +41,8 @@ class InstallRecoveryTests(WorkspaceCase):
         with module.state.ownership() as root:
             lock = root / "owner.lock"
             before = module.state.identity(lock)
-            code = "import sys;sys.path.insert(0,sys.argv[1]);import install_state\nwith install_state.ownership(): pass"
-            result = run_child([sys.executable, "-B", "-c", code, str(ROOT / "install")], timeout=8)
+            code = "import sys;sys.path[:0]=[sys.argv[1],sys.argv[2]];import install_state\nwith install_state.ownership(): pass"
+            result = run_child([sys.executable, "-B", "-c", code, str(ROOT / "install"), str(ROOT / "skills/revayat-subtitle/scripts")], timeout=8)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(b"OS lock", result.stderr)
             self.assertEqual(module.state.identity(lock), before)
