@@ -19,6 +19,7 @@ SCRIPTS = ROOT / 'skills/revayat-subtitle/scripts'
 sys.path.insert(0, str(SCRIPTS))
 import markup
 import runtime
+from process_helpers import run_child
 import workflow
 from subtitle_formats import (ASS_FIELDS, STYLE_FIELDS, DEFAULT_STYLE, Cue, Document,
                               has_drawing, parse, serialize, structure, visible)
@@ -219,8 +220,8 @@ class PreservationTests(unittest.TestCase):
                 'text="{"*50000+"tail";assert markup.uncomment(text,"ass")==text;'
                 'text="<b"+" "*50000;assert markup.uncomment(text,"srt")==text')
         try:
-            result = subprocess.run([sys.executable, '-S', '-c', code, str(SCRIPTS)],
-                                    capture_output=True, timeout=8)
+            result = run_child([sys.executable, '-S', '-c', code, str(SCRIPTS)],
+                                    timeout=8)
         except subprocess.TimeoutExpired:
             self.fail('Unclosed delimiter processing exceeded the bounded regression budget')
         self.assertEqual(result.returncode, 0, 'Delimiter invariant failed')

@@ -40,8 +40,16 @@ def execute(argv=None) -> int:
     package = commands.add_parser("package", help="Deliver only reviewed episode subtitles inside Sub/ in a ZIP")
     package.add_argument("--build", required=True, type=Path)
     package.add_argument("--out", required=True, type=Path)
+    status = commands.add_parser("status", help="Read-only pending/current workspace overview")
+    status.add_argument("--work", required=True, type=Path)
+    handoff = commands.add_parser("handoff", help="Read-only revision-bound editorial proposal validation")
+    handoff.add_argument("--work", required=True, type=Path)
+    handoff.add_argument("--assignment", required=True, action="append", type=Path)
+    handoff.add_argument("--result", required=True, action="append", type=Path)
     args = parser.parse_args(argv)
     try:
+        if sys.version_info < (3, 11):
+            raise ValueError("Python 3.11+ is required; use an upstream-maintained interpreter")
         import render as render_module
         import workflow
         logging.info("Command=%s", args.command)
@@ -57,6 +65,12 @@ def execute(argv=None) -> int:
                                           args.video, args.fonts_dir, args.all_cues)
         elif args.command == "qa":
             result = render_module.qa(args.build.resolve())
+        elif args.command == "status":
+            from status import status
+            result = status(args.work.resolve())
+        elif args.command == "handoff":
+            from handoff import handoff
+            result = handoff(args.work.resolve(), args.assignment, args.result)
         else:
             result = render_module.package(args.build.resolve(), args.out.resolve())
         code = 1 if result.get("ready") is False else 0

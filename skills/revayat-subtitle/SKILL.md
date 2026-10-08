@@ -3,7 +3,7 @@ name: revayat-subtitle
 description: Translate anime subtitles from any source language into fluent spoken Persian, or thoroughly edit Persian subtitles. Review every cue, reconcile competing ASS/SRT releases, preserve Japanese honorifics and series-wide names, repair RTL punctuation, inspect FFmpeg renders, and deliver one file per episode inside Sub.zip. Use for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 
@@ -18,7 +18,7 @@ Resolve three values once:
 - `SKILL_DIR`: the folder containing this file. In a Claude plugin it is
   `${CLAUDE_PLUGIN_ROOT}/skills/revayat-subtitle`.
 - `WORK`: the working directory for this batch or season, separate from originals.
-- `PY`: a verified Python 3.10+ interpreter. Usually `python3` on Linux/macOS;
+- `PY`: a verified Python 3.11+ interpreter. Usually `python3` on Linux/macOS;
   `python` or a working `py -3` launcher on Windows.
 
 Examples use `python` and quoted placeholder paths. Substitute the resolved

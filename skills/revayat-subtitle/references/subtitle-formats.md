@@ -108,8 +108,18 @@ structural change. A hidden override block may still control visible output.
 Meaningful interior direction controls and ZWNJ are preserved; unbalanced direction
 scopes are refused. Output language selects paragraph direction independently of
 embedded names. An explicit worksheet `direction` (`ltr`/`rtl`) needs `direction_note`.
-Intentional blank layout uses `preserve_empty_lines: true` plus `structure_note`;
-soft breaks, drawings and karaoke are not blindly stripped.
+Intentional ASS blank layout uses `preserve_empty_lines: true` plus `structure_note`;
+soft breaks, drawings and karaoke are not blindly stripped. In SRT, a physical
+internal blank/space-tab-only line is a cue-block separator and cannot be preserved:
+the builder gives an early cue-specific refusal. Single newlines remain supported;
+choose an explicit representable edit, never an automatic space or markup substitution.
+
+Comment cleanup refuses when removal joins literal fragments into newly active
+SRT markup, including renderer-consumed unknown tag-like syntax. A structure note
+alone cannot authorize silent activation; adapt the worksheet explicitly. Ordinary
+prose comments still coalesce, unmatched comments remain literal, and ASS drawing
+object boundaries remain intact. Native decoder interpretation is distinct from
+the local hidden-comment model; this is not universal player equivalence.
 
 Prune unused styles using renderer-effective names, retaining exact `\rStyle` references.
 A bare empty `Style:` row can instantiate renderer defaults and requires deliberate

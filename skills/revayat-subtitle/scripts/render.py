@@ -284,15 +284,16 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
         raise
 
 
-def check_delivery(build: Path) -> tuple[dict, list[str], set[str], int]:
+def check_delivery(build: Path, *, require_review: bool = True, episode_ids=None) -> tuple[dict, list[str], set[str], int]:
     manifest, docs = load_build(build)
-    names = [item["file"] for item in manifest["episodes"]]
+    episodes = manifest["episodes"] if episode_ids is None else [item for item in manifest["episodes"] if item["id"] in episode_ids]
+    names = [item["file"] for item in episodes]
     if len(set(names)) != len(names):
         raise ValueError("Duplicate episode filenames")
     backgrounds, paths, physical = set(), set(), set()
     frame_count = 0
     deadline = time.monotonic() + 900
-    for episode in manifest["episodes"]:
+    for episode in episodes:
         where = f"renders/{episode['id']}.json"
         evidence = validation.render_record(read_json(local_path(build, where)), where)
         if (evidence["identity"] != manifest["identity"] or evidence["episode"] != episode["id"]
@@ -355,7 +356,7 @@ def check_delivery(build: Path) -> tuple[dict, list[str], set[str], int]:
                 raise ValueError("Duplicate or aliased render frame path")
             paths.add(key)
             physical.add(inode)
-            if frame["reviewed"] is not True or not frame["note"].strip():
+            if require_review and (frame["reviewed"] is not True or not frame["note"].strip()):
                 raise ValueError("Inspect every rendered frame before packaging")
             raw = read_limited(path, MAX_PNG_BYTES)
             if digest(raw) != frame["sha256"]:

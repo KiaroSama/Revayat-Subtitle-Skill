@@ -31,5 +31,13 @@ Exit 0 means every answer matched this limited catalogue; exit 1 requires review
 exit 2 means malformed input. No overall translation-quality score is fabricated.
 
 A human/agent must still review new faithful variants, context, full-season
-consistency and rendered subtitles. These language cases do not replace the
-structural/FFmpeg checks in `tests/check.py` or the per-cue and per-image workflow.
+consistency and rendered subtitles. Use the [categorical rubric](rubric.md) to
+record participant/referent, negation/aspect/restriction, name/honorific/intensity,
+spoken-register and logical mixed-script/quotation observations. Categories are
+`faithful`, `needs_context`, `meaning_changed` and `register_issue`, not a numeric
+quality score. The [five authored pilot proposals](pilot.json) disclose author and
+reviewer roles, evidence and uncertainty; an absent independent review is pending,
+never manufactured. AI observations are not independent human certification.
+
+These language cases do not replace the structural/FFmpeg checks in
+`tests/check.py` or the per-cue and per-image workflow.

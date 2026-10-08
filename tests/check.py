@@ -65,6 +65,16 @@ class WorkspaceCase(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.addCleanup(self.retain_failure_evidence)
         self.work = self.root / "work with spaces"
+        # Installer tests must never create account state in the real user's home.
+        self.home = self.root / "home"
+        self.home.mkdir()
+        from unittest.mock import patch
+        self.home_patch = patch.object(Path, "home", return_value=self.home)
+        self.home_patch.start()
+        self.addCleanup(self.home_patch.stop)
+        self.home_env = patch.dict(os.environ, {"HOME": str(self.home), "USERPROFILE": str(self.home)})
+        self.home_env.start()
+        self.addCleanup(self.home_env.stop)
         self.old_log = os.environ.get("REVAYAT_LOG_DIR")
         os.environ["REVAYAT_LOG_DIR"] = str(self.root / "logs")
         self.addCleanup(self.restore_log)
@@ -281,7 +291,7 @@ class SubtitleChecks(WorkspaceCase):
             run(command, timeout=15)
         self.assertIn("already exists", caught.exception.stderr.decode("utf-8"))
         plugin = self.root / "plugin copy"
-        run([sys.executable, str(ROOT / "install" / "install.py"), "--plugin", "--destination", str(plugin)], timeout=15)
+        run([sys.executable, str(ROOT / "install" / "install.py"), "--plugin", "--destination", str(plugin), "--recovery-dir", str(self.root / "plugin recovery")], timeout=15)
         self.assertEqual(read_json(plugin / "plugin.json")["name"], "revayat-subtitle")
         self.assertTrue((plugin / ".codex-plugin" / "plugin.json").exists())
         self.assertTrue((plugin / "commands" / "revayat-subtitle-resume.md").is_file())
@@ -299,7 +309,7 @@ class SubtitleChecks(WorkspaceCase):
         module.REPO = plugin.resolve()
         module.SKILL = module.REPO / "skills" / "revayat-subtitle"
         with self.assertRaisesRegex(ValueError, "overlaps"):
-            module.install(plugin / "skills", plugin=False, force=True)
+            module.install(plugin / "skills", plugin=False, force=True, recovery_dir=self.root / "plugin recovery")
         self.assertTrue((plugin / "skills" / "revayat-subtitle" / "SKILL.md").exists())
         # Exercise the OS launcher itself from an unrelated directory with spaces.
         target = self.root / "launcher copy"
@@ -307,10 +317,10 @@ class SubtitleChecks(WorkspaceCase):
             launcher = [shutil.which("pwsh") or "powershell", "-NoProfile", "-File", str(ROOT / "install" / "install.ps1")]
         else:
             launcher = ["bash", str(ROOT / "install" / "install.sh")]
-        run(launcher + ["--agent", "codex", "--destination", str(target)], cwd=self.root, timeout=20)
+        run(launcher + ["--agent", "codex", "--destination", str(target), "--recovery-dir", str(self.root / "launcher recovery")], cwd=self.root, timeout=20)
         self.assertEqual((target / "SKILL.md").read_bytes(), (installed / "SKILL.md").read_bytes())
-        run([sys.executable, str(ROOT / "install" / "install.py"), "--destination", str(target), "--force"], timeout=15)
-        self.assertEqual(len(list(self.root.glob("launcher copy.backup-*"))), 1)
+        run([sys.executable, str(ROOT / "install" / "install.py"), "--destination", str(target), "--force", "--recovery-dir", str(self.root / "launcher recovery")], timeout=15)
+        self.assertEqual(len(list((self.root / "launcher recovery").glob("transaction-*/old-0000"))), 1)
 
     def test_language_evaluation_requires_review_for_unknown_wording(self):
         cases = read_json(ROOT / "evaluation" / "cases.json")
@@ -337,7 +347,7 @@ class SubtitleChecks(WorkspaceCase):
         for relative in ("plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json", ".claude-plugin/plugin.json"):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
-            self.assertEqual(manifest["version"], "1.2.0")
+            self.assertEqual(manifest["version"], "1.3.0")
         documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
                      *ROOT.glob("skills/**/*.md")]
         for document in documents:
@@ -412,6 +422,7 @@ def main():
             print(run([ffmpeg_path(), "-version"], timeout=15).decode("utf-8").splitlines()[0], flush=True)
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(SubtitleChecks)
         suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py"))
+        suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="png_benchmark.py"))
         if args.render:
             suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(RenderCheck))
             suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="render_checks.py"))

@@ -69,7 +69,13 @@ bodies, private reasoning or unperformed checks.
 Before importing a worker result, the coordinator checks source identity and glossary
 revision, exact ID coverage, unchanged source text, valid decisions/fields, and absence
 of overlapping or extra rows. Reject stale, malformed, incomplete or conflicting
-results. The normal build validation remains mandatory after integration.
+results. The normal build validation remains mandatory after integration. Use the read-only
+`handoff --work WORK --assignment FILE --result FILE` command for version-1
+revision/coverage checks; repeat assignment/result options for separate workers.
+See [workflow.md](workflow.md#read-only-status-and-editorial-handoffs) for exact
+fields/caps. Exit 0 is mechanically complete, 1 is valid pending, 2 is invalid/stale.
+`coordinator_review_required: true` always remains: this command never dispatches,
+imports, merges, grants consent or manufactures editorial/image approval.
 
 Resolve new terminology centrally. If a glossary decision changes, notify affected
 workers and re-review affected returned cues against the new revision; do not silently

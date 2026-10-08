@@ -12,6 +12,7 @@ import zipfile
 from unittest.mock import patch
 
 from check import CLI, WorkspaceCase, completed
+from process_helpers import run_child
 from runtime import read_json, write_json
 from workflow import build, load, prepare
 from subtitle_formats import parse, visible
@@ -100,10 +101,9 @@ class ContractTests(WorkspaceCase):
         struct.pack_into("<H", data, data.index(b"PK\x01\x02") + 10, 99)
         path = self.root / "unsupported.zip"
         path.write_bytes(data)
-        result = subprocess.run([sys.executable, "-B", str(CLI), "prepare", str(path), "--work",
+        result = run_child([sys.executable, "-B", str(CLI), "prepare", str(path), "--work",
                                  str(self.work), "--series", "Fixture Series", "--season", "1"],
-                                capture_output=True, text=True, encoding="utf-8", timeout=15,
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                text=True, encoding="utf-8", timeout=15)
         self.assertEqual(result.returncode, 2)
         self.assertIn("Unsupported ZIP compression", result.stderr)
         self.assertNotIn("Traceback", result.stderr)

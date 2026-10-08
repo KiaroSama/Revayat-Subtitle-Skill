@@ -5,7 +5,16 @@ argument-hint: <work directory, default work/>
 
 Resume `revayat-subtitle` at **$ARGUMENTS** (default `work/`).
 
-Load the skill and its translation policy again. Read `project.json`,
+Load the skill and its translation policy again. First run the read-only overview:
+
+```text
+python "SKILL_DIR/scripts/revayat-subtitle.py" status --work "WORK"
+```
+
+Version-1 JSON uses exit 0 for mechanical completion, 1 for valid pending work and
+2 for malformed/stale input. It does not approve meaning or images and does not
+build or edit the workspace. Missing evidence is pending; changed current evidence
+is invalid. Continue by reading `project.json`,
 `glossary.json` and the worksheets. Identify the first incomplete source/cue and
 the latest build matching the current edits; report that state before continuing.
 Use the original series identity, season numbering, locked names and font policy.

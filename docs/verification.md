@@ -6,7 +6,7 @@ The bounded stdlib runner exercises the actual CLI and OS installer, complete cu
 accounting, candidate references, stale source/output/manifest/glossary refusal,
 safe ZIP import, explicit encoding failures, ASS reset styles, opaque embedded
 font blocks, drawing preservation, SRT sorting and OVA names, license inclusion,
-installation source protection and replacement backups. CI covers Python 3.10
+installation source protection and replacement backups. CI covers Python 3.11
 and 3.14 on Linux, and Python 3.14 on Windows and macOS.
 
 The Linux and Windows render tiers additionally check that subsecond samples contain actual
@@ -37,6 +37,24 @@ writes/cleanup failures, legacy Effect phases and ordered duplicate-section refu
 Pixel comparisons require a full nonblank RGB frame before equivalence is accepted.
 Their temporary artifacts stay inside the repository's test scratch directory.
 These are mechanical contracts; rendering equivalence does not establish meaning.
+
+## Improvement contracts, 2026-10-09
+
+New discovered fixtures cover opened fingerprint identity/count/caps, synchronized
+editable JSON acknowledgement and after-effect truth, comment activation/build
+retry, early SRT separator refusal, all five RGB/RGBA PNG filters, explicit child
+environments/status, native installer death/recovery/lock contention, PowerShell
+candidate fallback, read-only status/handoff and the finite AI rubric record.
+Their presence is not a passing result; use exact-revision Actions evidence.
+The final CI also compares pinned repository baseline behavior at the affected
+seams and repeated median PNG cost on identical authored320×180 frames. No local
+red/green, full1920×1080 speedup, power-loss or hostile-filesystem claim follows.
+
+Main push/PR/manual scheduling preserves four platform lanes; topic pushes without
+a PR can be checked manually. Historical3.10 results below/in dated audit documents
+are not rewritten into current support. Optional reports never dispatch workers,
+modify shared editorial state or replace coordinator/image review. AI calibration
+is actual finite disclosed AI review, not blind independent human qualification.
 
 ## Real local media, 2026-09-14
 

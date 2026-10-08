@@ -26,6 +26,7 @@ import validation
 import workflow
 from publication import publish_bytes
 from runtime import digest, operational_log, read_json, run, write_json
+from process_helpers import run_child
 from subtitle_formats import Cue, Document, DEFAULT_STYLE, STYLE_FIELDS, ASS_FIELDS
 from subtitle_formats import parse, serialize, srt_to_ass, timestamp, timecode, visible
 
@@ -83,8 +84,8 @@ class AuditCase(unittest.TestCase):
         except OSError:
             if not directory or os.name != "nt":
                 self.skipTest("Native symbolic-link permission is unavailable")
-            result = subprocess.run(["cmd", "/c", "mklink", "/J", str(path), str(target)],
-                                    capture_output=True, timeout=10)
+            result = run_child(["cmd", "/c", "mklink", "/J", str(path), str(target)],
+                                    timeout=10)
             if result.returncode:
                 self.fail("Windows junction fixture could not be created")
         def remove():
@@ -251,9 +252,9 @@ class AuditCase(unittest.TestCase):
         data[offset] = 7  # Reserved BTYPE=3; the archive directory remains intact.
         source.write_bytes(data)
         work = self.root / "work"
-        result = subprocess.run([sys.executable, "-S", str(CLI), "prepare", str(source), "--work", str(work),
+        result = run_child([sys.executable, "-S", str(CLI), "prepare", str(source), "--work", str(work),
                                  "--series", "Authored fixture", "--season", "1"],
-                                capture_output=True, timeout=15,
+                                timeout=15,
                                 env={**os.environ, "REVAYAT_LOG_DIR": str(self.root / "logs")})
         self.assertEqual(result.returncode, 2)
         self.assertNotIn(b"Traceback", result.stderr)
@@ -287,9 +288,9 @@ class AuditCase(unittest.TestCase):
         work = self.root / "work"
         with self.assertRaisesRegex(ValueError, "compressed stream"):
             workflow.prepare([source], work, "Authored fixture", 1, "utf-8", None, "fa")
-        result = subprocess.run([sys.executable, "-S", str(CLI), "prepare", str(source), "--work", str(work),
+        result = run_child([sys.executable, "-S", str(CLI), "prepare", str(source), "--work", str(work),
                                 "--series", "Authored fixture", "--season", "1"],
-                                capture_output=True, timeout=15,
+                                timeout=15,
                                 env={**os.environ, "REVAYAT_LOG_DIR": str(self.root / "logs")})
         self.assertEqual(result.returncode, 2)
         self.assertNotIn(b"Traceback", result.stderr)

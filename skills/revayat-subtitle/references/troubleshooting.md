@@ -34,6 +34,40 @@ editorial approvals. A failure is a finding, not an instruction to delete data.
 After a render timeout, inspect the failure and any diagnostic images before retrying;
 each FFmpeg child is bounded to 45 seconds and a timeout is not success.
 
+## Installer process interruption
+
+Python 3.11+ is required; prefer a currently upstream-maintained stable runtime.
+New standard-agent backups/journals live in the first selected agent root's
+`revayat-recovery/`, outside its `skills/`. A custom `--destination` requires
+explicit `--recovery-dir` outside all configured skill/plugin discovery roots on
+the same filesystem. Existing older sibling backups are never migrated or pruned.
+
+One stable OS lock in `~/revayat-install-state/owner.lock` serializes all install
+and recovery operations for the same account, including different recovery roots.
+The lock pathname is retained, never unlinked while held; contention is immediate.
+This is cooperative same-account protection, not a cross-account or hostile-writer
+guarantee. Pending transaction records prevent a new overlapping install from
+silently replacing an interrupted one. The account registry independently binds
+exact journal byte revisions; state-save intent retains only the legitimate prior
+and next digests on interruption, never journal-self-declared destructive ownership.
+Recovery exclusively moves a verified new live tree into its recorded quarantine
+before restoring old bytes. Interrupted/failing quarantine cleanup does not block
+old restoration; changed foreign live state is never accepted as a partial owned tree. All previous tree bytes/directories must
+fit the bounded complete inventory (10,000 entries, 16 MiB/file, 256 MiB total),
+or installation refuses before moving old targets. Journal size is at most16 MiB.
+
+```text
+python install/install.py --recover "RECOVERY/transaction-ID/journal.json" --recovery-dir "RECOVERY"
+```
+
+Explicit recovery restores the complete old trees or original absence only for
+an uncommitted owned transaction. A committed journal does not authorize uninstall.
+Changed target/backup/stage/ancestor or unknown journal schema is preserved and
+reported; do not erase evidence to make a retry succeed. No cross-device copy-delete
+fallback exists. JSON intent is synchronized/read back before each live move;
+process interruption recovery is not universal power-loss, cloud or network-filesystem
+certification. Cleanup warnings preserve the actual success/failure/cancellation.
+
 ## CLI execution logs
 
 Every run writes a new UTF-8 file inside the skill's `logs/`, named

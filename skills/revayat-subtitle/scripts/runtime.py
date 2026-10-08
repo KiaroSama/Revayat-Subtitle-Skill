@@ -62,18 +62,30 @@ def read_limited(path: Path, maximum: int) -> bytes:
 
 
 def file_fingerprint(path: Path, maximum: int = 16 * 1024**3) -> dict:
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError("Fingerprint byte limit must be a nonnegative integer")
     before = path.stat()
-    if not path.is_file() or before.st_size > maximum:
+    if not stat.S_ISREG(before.st_mode):
+        raise ValueError("Fingerprint input must be a regular file")
+    if before.st_size > maximum:
         raise ValueError("Fingerprint input exceeds the supported file-size limit")
+    def snapshot(info):
+        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
     hasher, total = hashlib.sha256(), 0
     with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
+        opened = os.fstat(handle.fileno())
+        if not stat.S_ISREG(opened.st_mode) or snapshot(opened) != snapshot(before):
+            raise ValueError("Fingerprint input changed while opening")
+        while chunk := handle.read(min(1024 * 1024, maximum - total + 1)):
             total += len(chunk)
             if total > maximum:
                 raise ValueError("Fingerprint input grew beyond its size limit")
             hasher.update(chunk)
+        finished = os.fstat(handle.fileno())
+        if total != opened.st_size or snapshot(finished) != snapshot(opened):
+            raise ValueError("Fingerprint input changed while reading")
     after = path.stat()
-    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+    if not stat.S_ISREG(after.st_mode) or snapshot(before) != snapshot(after):
         raise ValueError("Fingerprint input changed while reading")
     return {"name": path.name, "bytes": total, "sha256": hasher.hexdigest()}
 
@@ -121,16 +133,61 @@ def write_json(path: Path, value) -> None:
         raise ValueError(f"{path.name}: JSON exceeds its byte limit")
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=".write-", dir=path.parent)
+    stage = Path(temporary)
+    owned, committed = None, False
     try:
+        info = os.fstat(fd)
+        owned = (info.st_dev, info.st_ino)
         with os.fdopen(fd, "wb") as handle:
             if handle.write(data) != len(data):
                 raise OSError("JSON write was incomplete")
-        os.replace(temporary, path)
+            handle.flush()
+            os.fsync(handle.fileno())
+        info = stage.lstat()
+        if (not stat.S_ISREG(info.st_mode) or stage.is_symlink()
+                or getattr(info, "st_file_attributes", 0) & 1024
+                or (info.st_dev, info.st_ino) != owned or read_limited(stage, len(data)) != data):
+            raise OSError("Staged JSON bytes or identity changed")
+        os.replace(stage, path)
+        committed = True
+        if read_limited(path, len(data)) != data:
+            raise OSError("Published JSON bytes changed; verify the saved state before retrying")
+        if os.name == "posix":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    except BaseException:
+        if owned is not None and not committed:
+            try:
+                info = path.lstat()
+                if (stat.S_ISREG(info.st_mode) and not path.is_symlink()
+                        and not getattr(info, "st_file_attributes", 0) & 1024
+                        and (info.st_dev, info.st_ino) == owned):
+                    committed = True  # Replacement happened, even if another writer changed its bytes.
+                elif not stage.exists():
+                    committed = None
+            except FileNotFoundError:
+                committed = False if stage.exists() else None
+            except (OSError, ValueError):
+                committed = None
+        logging.error("JSON save failed committed=%s; verify saved state before retrying", committed)
+        raise
     finally:
-        try:
-            Path(temporary).unlink(missing_ok=True)
-        except OSError:
-            logging.warning("JSON staging cleanup failed; original operation result is preserved")
+        if owned is not None:
+            try:
+                info = stage.lstat()
+                if (stat.S_ISREG(info.st_mode) and not stage.is_symlink()
+                        and not getattr(info, "st_file_attributes", 0) & 1024
+                        and (info.st_dev, info.st_ino) == owned):
+                    stage.unlink()
+                else:
+                    logging.warning("JSON staging identity changed; replacement preserved")
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logging.warning("JSON staging cleanup failed; original operation result is preserved")
 
 
 def local_path(root: Path, relative: str) -> Path:
@@ -183,10 +240,12 @@ def staging_directory(parent: Path, prefix: str):
 
 
 def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
-        idle_timeout: float | None = None, max_output: int = 16 * 1024 * 1024) -> bytes:
+        idle_timeout: float | None = None, max_output: int = 16 * 1024 * 1024,
+        env: dict[str, str] | None = None, check: bool = True) -> bytes | subprocess.CompletedProcess:
     from process_control import ToolFailure, run as run_owned
     try:
-        return run_owned(command, cwd=cwd, timeout=timeout, idle_timeout=idle_timeout, max_output=max_output)
+        return run_owned(command, cwd=cwd, timeout=timeout, idle_timeout=idle_timeout, max_output=max_output,
+                         env=env, check=check)
     except ToolFailure as error:
         script = None
         if Path(command[0]).resolve() == Path(sys.executable).resolve():

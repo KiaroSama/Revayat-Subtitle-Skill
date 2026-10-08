@@ -293,6 +293,8 @@ def reviewed_cues(doc, sheet: list, target_language: str = "fa") -> tuple[list[C
         preserve_lines = row.get("preserve_empty_lines", False)
         if preserve_lines and not row.get("structure_note", "").strip():
             raise ValueError(f"Cue {cue.id}: preserving empty display lines needs a structure_note")
+        if doc.kind == "srt" and preserve_lines and re.search(r"\n[ \t]*\n", text):
+            raise ValueError(f"Cue {cue.id}: SRT cannot preserve a physical cue-block separator; choose a representable layout")
         text = clean_empty_lines(text, doc.kind, preserve_lines)
         direction = row.get("direction", "auto")
         if direction != "auto" and not row.get("direction_note", "").strip():

@@ -17,6 +17,10 @@ SKILL = REPO / "skills" / "revayat-subtitle"
 sys.path.insert(0, str(SKILL / "scripts"))
 from runtime import file_fingerprint, operational_log, output_directory, LogConfigurationError
 from publication import rename_noreplace
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import install_state as state
+from install_recovery import restore, recover
+from runtime import write_json
 
 NAME = "revayat-subtitle"
 AGENTS = ("claude", "codex", "cursor", "kiro", "cline", "hermes", "opencode", "antigravity", "antigravity-cli")
@@ -65,7 +69,7 @@ def payload(plugin: bool):
     return pairs
 
 
-def plan_install(targets: list[Path], *, plugin: bool, force: bool) -> dict:
+def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir: Path | None = None) -> dict:
     if type(plugin) is not bool or type(force) is not bool:
         raise ValueError("Installation flags must be booleans")
     pairs = payload(plugin)
@@ -98,7 +102,31 @@ def plan_install(targets: list[Path], *, plugin: bool, force: bool) -> dict:
         planned.append({"target": target, "previous": identity(target) if target.exists() else None})
     if not planned:
         raise ValueError("No installation targets selected")
-    return {"targets": planned, "files": pairs, "ancestors": ancestors}
+    roots = []
+    for item in planned:
+        target = item["target"]
+        if recovery_dir is None:
+            if target.name != NAME or target.parent.name != "skills":
+                raise ValueError("Custom installation needs explicit --recovery-dir outside skill/plugin discovery")
+            root = target.parent.parent / "revayat-recovery"
+        else:
+            root = recovery_dir
+        root = state.safe_path(root)
+        if (root == REPO or REPO.is_relative_to(root) or any(root.is_relative_to(p) or p.is_relative_to(root) for p in protected)
+                or any(root.is_relative_to(p["target"]) or p["target"].is_relative_to(root) for p in planned)
+                or any(part in {"skills", "plugins"} for part in root.parts)):
+            raise ValueError("Recovery root overlaps source or skill/plugin discovery")
+        existing = root
+        while not existing.exists():
+            existing = existing.parent
+        target_parent = target.parent
+        while not target_parent.exists():
+            target_parent = target_parent.parent
+        if existing.stat().st_dev != target_parent.stat().st_dev:
+            raise ValueError("Recovery and installation must be on the same filesystem; no copy-delete fallback")
+        roots.append(root)
+    # All selected targets share one journal; the first standard agent root owns recovery.
+    return {"targets": planned, "files": pairs, "ancestors": ancestors, "recovery": roots[0]}
 
 
 def check_parents(parent: Path, expected: dict):
@@ -150,94 +178,133 @@ def tree_matches(root: Path, expected: dict) -> bool:
 
 
 def execute_plan(plan: dict) -> list[Path | None]:
-    records, parents, failures = [], [], []
+    with state.ownership() as owner:
+        return _execute_owned(plan, owner)
+
+
+def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
+    state.refuse_pending(owner, [item["target"] for item in plan["targets"]])
     expected = {}
     for source, relative in plan["files"]:
-        fingerprint = file_fingerprint(source, 16 * 1024 * 1024)
-        expected[relative.as_posix()] = (fingerprint["bytes"], fingerprint["sha256"])
-    ancestors = dict(plan["ancestors"])
+        fingerprint = file_fingerprint(source, state.MAX_FILE)
+        expected[relative.as_posix()] = [fingerprint["bytes"], fingerprint["sha256"]]
+    directories = sorted({parent.as_posix() for name in expected for parent in Path(name).parents if parent != Path(".")})
+    new = {"files": expected, "directories": directories}
+    state.validate_manifest(new)
+    ancestors, parents = dict(plan["ancestors"]), []
+    old = []
+    for item in plan["targets"]:
+        check_parents(item["target"].parent, ancestors)
+        current = identity(item["target"]) if os.path.lexists(item["target"]) else None
+        if current != item["previous"]:
+            raise ValueError("Installation target changed after preflight")
+        old.append(state.tree_manifest(item["target"]) if current is not None else None)
+    recovery = state.safe_path(plan["recovery"])
+    recovery.mkdir(parents=True, exist_ok=True)
+    state.safe_path(recovery)
+    identifier = uuid.uuid4().hex
+    transaction = recovery / ("transaction-" + identifier)
+    transaction.mkdir()
+    journal = transaction / "journal.json"
+    records = [{"target": str(item["target"]), "stage": str(transaction / f"new-{index:04}"),
+                "backup": str(transaction / f"old-{index:04}"), "disposal": str(transaction / f"dispose-{index:04}"),
+                "previous_id": state.identity(item["target"]) if item["previous"] is not None else None,
+                "stage_id": None, "old": old[index], "new": new, "phase": "staging"}
+               for index, item in enumerate(plan["targets"])]
+    data = {"version": 1, "id": identifier, "owner": str(state.safe_path(Path.home())),
+            "recovery": str(recovery), "state": "staging", "records": records,
+            "ancestors": {str(path): state.identity(path) for path in ancestors if os.path.lexists(path)}}
+    for path in (transaction, *transaction.parents):
+        data["ancestors"][str(path)] = state.identity(path)
+    write_json(journal, data)
+    state.register(owner, journal)
     try:
-        for item in plan["targets"]:
-            target = item["target"]
-            check_parents(target.parent, ancestors)
+        for record in records:
+            target, stage = Path(record["target"]), Path(record["stage"])
             make_parents(target.parent, parents, ancestors)
-            check_parents(target.parent, ancestors)
-            stage = output_directory(target.parent, ".revayat-install-")
-            record = {**item, "stage": stage, "stage_id": identity(stage), "backup": None}
-            records.append(record)
+            for path in (target.parent, *target.parent.parents):
+                data["ancestors"][str(path)] = state.identity(path)
+            state.save_journal(owner, journal, data)
+            stage.mkdir()
+            record["stage_id"] = state.identity(stage)
+            state.save_journal(owner, journal, data)
             for source, relative in plan["files"]:
                 output = stage / relative
                 output.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, output)
-            if not tree_matches(stage, expected):
+                with output.open("rb") as handle:
+                    os.fsync(handle.fileno())
+            if not state.matches(stage, record["stage_id"], new):
                 raise ValueError("Installation source changed during staging")
+            record["phase"] = "staged"
+            state.save_journal(owner, journal, data)
+        data["state"] = "staged"
+        state.save_journal(owner, journal, data)
         for record in records:
-            target, stage = record["target"], record["stage"]
+            target, stage, backup = (Path(record[key]) for key in ("target", "stage", "backup"))
             check_parents(target.parent, ancestors)
-            current = identity(target) if os.path.lexists(target) else None
-            if current != record["previous"]:
-                raise ValueError("Installation target changed after preflight")
-            if current is not None:
-                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-                backup = target.with_name(target.name + ".backup-" + stamp + "-" + uuid.uuid4().hex[:8])
-                record["backup"] = backup
-                check_parents(target.parent, ancestors)
-                rename_noreplace(target, backup)
+            if record["previous_id"] is not None:
+                if not state.matches(target, record["previous_id"], record["old"]):
+                    raise ValueError("Previous installation changed before backup")
+                record["phase"] = "old-intent"
+                state.save_journal(owner, journal, data)
+                state.move(target, backup, rename_noreplace)
+                record["phase"] = "old-moved"
+                state.save_journal(owner, journal, data)
+            elif os.path.lexists(target):
+                raise ValueError("Installation target became occupied")
+            record["phase"] = "new-intent"
+            state.save_journal(owner, journal, data)
             check_parents(target.parent, ancestors)
-            rename_noreplace(stage, target)
-        logging.info("Installed targets=%d", len(records))
-        return [record["backup"] for record in records]
+            state.move(stage, target, rename_noreplace)
+            if not state.matches(target, record["stage_id"], new):
+                raise ValueError("Published installation bytes changed")
+            record["phase"] = "published"
+            state.save_journal(owner, journal, data)
+        data["state"] = "committed"
+        state.save_journal(owner, journal, data)
+        state.unregister(owner, journal)
+        logging.info("Installed targets=%d journal=%s", len(records), journal)
+        return [Path(record["backup"]) if record["previous_id"] is not None else None for record in records]
     except BaseException as original:
-        for record in reversed(records):
-            target, backup = record["target"], record["backup"]
-            try:
-                check_parents(target.parent, ancestors)
-                if os.path.lexists(target) and identity(target) == record["stage_id"]:
-                    if not tree_matches(target, expected):
-                        raise ValueError("Published installation changed; preserve it for recovery")
-                    shutil.rmtree(target)
-                if backup and os.path.lexists(backup):
-                    if linked(backup) or not backup.is_dir() or identity(backup) != record["previous"]:
-                        raise ValueError("Backup identity changed")
-                    rename_noreplace(backup, target)
-            except (OSError, ValueError):
-                failures.append(f"target={target}; backup={backup}")
-        if failures:
-            raise ValueError("Installation rollback incomplete; preserve recovery paths: " + " | ".join(failures)) from original
+        try:
+            committed = state.load_journal(journal)["state"] == "committed"
+            if not committed:
+                restore(journal, owner, rename_noreplace, explicit=False)
+        except (OSError, ValueError):
+            raise ValueError("Installation rollback incomplete; preserve recovery paths: " + str(journal)
+                             + " | backups=" + ", ".join(record["backup"] for record in records
+                                                         if record["previous_id"] is not None)) from original
         raise
     finally:
         for record in records:
-            stage = record["stage"]
+            stage = Path(record["stage"])
             try:
-                check_parents(stage.parent, ancestors)
-            except ValueError:
-                logging.error("Installation stage ancestor changed; preserve recovery path: %s", stage)
-                continue
-            if os.path.lexists(stage):
-                if not linked(stage) and identity(stage) == record["stage_id"]:
-                    try:
-                        shutil.rmtree(stage)
-                    except OSError:
-                        logging.error("Installation staging cleanup failed: %s", stage)
-                else:
-                    logging.error("Installation stage identity changed; replacement preserved")
+                state.safe_path(stage)
+                if record["stage_id"] is not None and state.matches(stage, record["stage_id"], record["new"]):
+                    shutil.rmtree(stage)
+            except (OSError, ValueError):
+                logging.error("Installation staging cleanup failed; outcome preserved; recovery path: %s", stage)
         for path, expected_id in reversed(parents):
             try:
                 check_parents(path.parent, ancestors)
                 if path.exists() and not linked(path) and identity(path) == expected_id:
                     path.rmdir()
-            except OSError as error:
-                if error.errno not in (errno.ENOTEMPTY, errno.EEXIST):
-                    logging.warning("Installation parent cleanup failed: %s", path)
-            except ValueError:
-                logging.warning("Installation parent changed; recovery path preserved: %s", path)
+            except (OSError, ValueError):
+                logging.debug("Installation parent retained: %s", path)
 
 
-def install(target: Path, *, plugin: bool, force: bool) -> Path | None:
-    return execute_plan(plan_install([target], plugin=plugin, force=force))[0]
+def install(target: Path, *, plugin: bool, force: bool, recovery_dir: Path | None = None) -> Path | None:
+    with state.ownership() as owner:
+        return _execute_owned(plan_install([target], plugin=plugin, force=force, recovery_dir=recovery_dir), owner)[0]
 
 
 def execute(argv=None) -> int:
+    with state.ownership() as owner:
+        return _execute_cli(argv, owner)
+
+
+def _execute_cli(argv, owner) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", choices=(*AGENTS, "all"), default="all")
     parser.add_argument("--scope", choices=("user", "project"), default="user")
@@ -246,8 +313,24 @@ def execute(argv=None) -> int:
     parser.add_argument("--plugin", action="store_true", help="Copy the complete plugin to --destination")
     parser.add_argument("--force", action="store_true", help="Back up an existing installation before replacing it")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--recovery-dir", type=Path, help="Same-filesystem recovery root outside skill/plugin discovery")
+    parser.add_argument("--recover", type=Path, help="Explicitly restore old trees from a noncommitted journal")
     args = parser.parse_args(argv)
     try:
+        if sys.version_info < (3, 11):
+            raise ValueError("Python 3.11+ is required; use an upstream-maintained interpreter")
+        if args.recover:
+            if not args.recovery_dir or args.destination or args.plugin or args.force or args.dry_run:
+                raise ValueError("--recover needs --recovery-dir and cannot combine installation flags")
+            journal = state.safe_path(args.recover, directory=False)
+            data = state.load_journal(journal)
+            if state.safe_path(args.recovery_dir) != Path(data["recovery"]):
+                raise ValueError("--recovery-dir differs from the journal root")
+            restore(journal, owner, rename_noreplace)
+            print("Previous installation restored")
+            return 0
+        if args.destination and not args.recovery_dir:
+            raise ValueError("Custom --destination requires explicit --recovery-dir")
         if args.plugin and not args.destination:
             raise ValueError("Plugin installation needs an explicit --destination")
         targets = [args.destination] if args.destination else []
@@ -268,12 +351,12 @@ def execute(argv=None) -> int:
                     targets.append(target)
         if not targets:
             raise ValueError("No installed agents found; select --agent or --destination explicitly")
-        plan = plan_install(targets, plugin=args.plugin, force=args.force)
+        plan = plan_install(targets, plugin=args.plugin, force=args.force, recovery_dir=args.recovery_dir)
         if args.dry_run:
             for item in plan["targets"]:
                 print(f"Would install: {item['target']}")
         else:
-            backups = execute_plan(plan)
+            backups = _execute_owned(plan, owner)
             for item, backup in zip(plan["targets"], backups):
                 print(f"Installed: {item['target']}")
                 if backup:
@@ -290,7 +373,7 @@ def main(argv=None) -> int:
     try:
         with operational_log("install"):
             return execute(argv)
-    except LogConfigurationError as error:
+    except (LogConfigurationError, OSError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

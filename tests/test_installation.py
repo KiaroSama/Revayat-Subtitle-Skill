@@ -37,11 +37,11 @@ class InstallationTests(WorkspaceCase):
         self.assertNotEqual(handle, ctypes.c_void_p(-1).value)
         try:
             with self.assertRaises(OSError):
-                module.install(target, plugin=False, force=True)
+                module.install(target, plugin=False, force=True, recovery_dir=self.root / "recovery")
             self.assertEqual((target / "previous.txt").read_text(encoding="utf-8"), "keep")
         finally:
             self.assertTrue(api.CloseHandle(handle))
-        backup = module.install(target, plugin=False, force=True)
+        backup = module.install(target, plugin=False, force=True, recovery_dir=self.root / "recovery")
         self.assertEqual((backup / "previous.txt").read_text(encoding="utf-8"), "keep")
         self.assertTrue((target / "SKILL.md").is_file())
 
@@ -57,7 +57,7 @@ class InstallationTests(WorkspaceCase):
                           "New-Item -ItemType Junction -Path $Link -Target $Target | Out-Null\n", encoding="utf-8")
         run([shutil.which("pwsh") or "powershell.exe", "-NoProfile", "-File", str(script), str(junction), str(real)], timeout=10)
         with self.assertRaisesRegex(ValueError, "links or junctions"):
-            installer().plan_install([junction / "skill"], plugin=False, force=False)
+            installer().plan_install([junction / "skill"], plugin=False, force=False, recovery_dir=self.root / "recovery")
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep")
 
     def test_changed_ancestor_is_refused_before_staging(self):
@@ -65,7 +65,7 @@ class InstallationTests(WorkspaceCase):
         parent = self.root / "parent"
         parent.mkdir()
         target = parent / "target"
-        plan = module.plan_install([target], plugin=False, force=False)
+        plan = module.plan_install([target], plugin=False, force=False, recovery_dir=self.root / "recovery")
         parent.rename(self.root / "original-parent")
         parent.mkdir()
         with self.assertRaisesRegex(ValueError, "ancestor changed"):
@@ -75,7 +75,7 @@ class InstallationTests(WorkspaceCase):
     def test_rollback_preserves_unrelated_empty_directory(self):
         module = installer()
         first, second = self.root / "first", self.root / "second"
-        plan = module.plan_install([first, second], plugin=False, force=False)
+        plan = module.plan_install([first, second], plugin=False, force=False, recovery_dir=self.root / "recovery")
         real = module.rename_noreplace
         def interfere(source, destination):
             if destination == second:
@@ -93,7 +93,7 @@ class InstallationTests(WorkspaceCase):
         for index, target in enumerate(targets):
             target.mkdir()
             (target / "previous.txt").write_text(str(index), encoding="utf-8")
-        plan = module.plan_install(targets, plugin=False, force=True)
+        plan = module.plan_install(targets, plugin=False, force=True, recovery_dir=self.root / "recovery")
         real, fired = module.rename_noreplace, False
         def fail_once(source, destination):
             nonlocal fired
@@ -113,16 +113,16 @@ class InstallationTests(WorkspaceCase):
         first, second = self.root / "first", self.root / "second"
         first.mkdir()
         (first / "previous.txt").write_text("keep", encoding="utf-8")
-        plan = module.plan_install([first, second], plugin=False, force=True)
+        plan = module.plan_install([first, second], plugin=False, force=True, recovery_dir=self.root / "recovery")
         real = module.rename_noreplace
         def fail_commit_and_restore(source, destination):
-            if destination == second or (destination == first and ".backup-" in source.name):
+            if destination == second or (destination == first and source.name.startswith("old-")):
                 raise OSError("Injected recovery failure")
             return real(source, destination)
         with patch.object(module, "rename_noreplace", fail_commit_and_restore):
             with self.assertRaisesRegex(ValueError, "rollback incomplete") as caught:
                 module.execute_plan(plan)
-        backups = list(self.root.glob("first.backup-*"))
+        backups = list((self.root / "recovery").glob("transaction-*/old-0000"))
         self.assertEqual(len(backups), 1)
         self.assertEqual((backups[0] / "previous.txt").read_text(encoding="utf-8"), "keep")
         self.assertIn(str(backups[0]), str(caught.exception))
@@ -132,7 +132,7 @@ class InstallationTests(WorkspaceCase):
         target = self.root / "exact destination"
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             result = module.main(["--scope", "project", "--path", str(self.root / "missing"),
-                                  "--destination", str(target)])
+                                  "--destination", str(target), "--recovery-dir", str(self.root / "recovery")])
             refused = module.main(["--destination", str(module.SKILL), "--dry-run", "--force"])
         self.assertEqual(result, 0)
         self.assertTrue((target / "SKILL.md").is_file())
@@ -141,7 +141,7 @@ class InstallationTests(WorkspaceCase):
     def test_equivalent_targets_are_deduplicated(self):
         module = installer()
         target = self.root / "destination"
-        plan = module.plan_install([target, target / "."], plugin=False, force=False)
+        plan = module.plan_install([target, target / "."], plugin=False, force=False, recovery_dir=self.root / "recovery")
         self.assertEqual(len(plan["targets"]), 1)
 
     def test_invalid_late_target_does_not_install_earlier_agents(self):

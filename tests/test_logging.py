@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from check import ROOT, WorkspaceCase
 from runtime import operational_log
+from process_helpers import run_child
 from runtime import LogConfigurationError
 
 
@@ -76,11 +77,10 @@ class LoggingTests(WorkspaceCase):
             command = [shutil.which("pwsh") or "powershell", "-NoProfile", "-File", str(ROOT / "install/install.ps1")]
         else:
             command = [shutil.which("bash"), str(ROOT / "install/install.sh")]
-        result = subprocess.run(command, env=environment, cwd=self.root, capture_output=True,
-                                text=True, encoding="utf-8", timeout=15,
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        result = run_child(command, env=environment, cwd=self.root,
+                                text=True, encoding="utf-8", timeout=15)
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("Python 3.10+ is required", result.stderr)
+        self.assertIn("Python 3.11+ is required", result.stderr)
         files = list((self.root / "logs").glob("install-bootstrap_*.log"))
         self.assertEqual(len(files), 1)
         self.assertIn("[ERROR] [install-bootstrap]", files[0].read_text(encoding="utf-8"))

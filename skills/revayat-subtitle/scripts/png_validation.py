@@ -82,31 +82,10 @@ def decode_png(data: bytes) -> tuple[int, int]:
         invalid("invalid compressed image data")
     if len(pixels) != expected or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
         invalid("truncated, oversized or concatenated image stream")
-    previous = bytearray(stride)
     deadline = time.monotonic() + 20
-    for row_index in range(height):
+    for offset in range(0, expected, stride + 1):
         if time.monotonic() > deadline:
             invalid("decode exceeded its time budget")
-        offset = row_index * (stride + 1)
-        filter_ = pixels[offset]
-        row = bytearray(pixels[offset + 1:offset + 1 + stride])
-        if filter_ == 2:
-            row = bytearray((value + above) & 255 for value, above in zip(row, previous))
-        elif filter_ in (1, 3, 4):
-            for index in range(stride):
-                left = row[index - channels] if index >= channels else 0
-                above = previous[index]
-                upper_left = previous[index - channels] if index >= channels else 0
-                if filter_ == 1:
-                    predictor = left
-                elif filter_ == 3:
-                    predictor = (left + above) // 2
-                else:
-                    base = left + above - upper_left
-                    a, b, c = abs(base - left), abs(base - above), abs(base - upper_left)
-                    predictor = left if a <= b and a <= c else above if b <= c else upper_left
-                row[index] = (row[index] + predictor) & 255
-        elif filter_ != 0:
+        if pixels[offset] > 4:
             invalid("unknown scanline filter")
-        previous = row
     return width, height

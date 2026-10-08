@@ -1,6 +1,6 @@
 # Working files and commands
 
-The runtime requires Python 3.10+ and FFmpeg with libass. Python uses only the
+The runtime requires Python 3.11+ and FFmpeg with libass. Python uses only the
 standard library. All text output is UTF-8; ASS uses logical Unicode, SRT numbering
 is regenerated, and source timestamps stay unchanged unless explicitly reviewed.
 ASS output has 10 ms precision: SRT donor times are floored, original/reviewed/emitted
@@ -33,6 +33,44 @@ every Dialogue/SRT cue, including empty cues; hidden ASS Comment events are coun
 in the inventory and removed without translation. Strict parsing fails on malformed
 input instead of silently dropping unknown rows. Fix a separately preserved copy
 and import again when a file needs a structural repair.
+
+## Read-only status and editorial handoffs
+
+```text
+python "SKILL_DIR/scripts/revayat-subtitle.py" status --work "WORK"
+python "SKILL_DIR/scripts/revayat-subtitle.py" handoff --work "WORK" --assignment "assignment.json" --result "proposal.json"
+```
+
+Both return version-1 JSON without subtitle bodies: exit 0 means mechanically
+complete, 1 means valid pending work, and 2 means malformed or stale input.
+`status` validates immutable sources and exact worksheet coverage, reports the
+first pending source/cue, glossary and assignment gaps, and checks the edition
+matching canonical current input. Missing renders/reviews are pending; changed
+current evidence is invalid. Older edition identities are listed stale, not
+rewritten or treated as approval. Source revision drift is an error, not a stale
+edition to select. At most 1,000 edition directories and 1 MiB report output.
+
+`handoff` accepts repeatable assignment/result files matched by assignment ID,
+never positional order. Assignment fields: `version: 1`, ASCII `id` (1–80 chars),
+`source`, optional current `episode`, `source_sha256`, exact raw-byte
+`glossary_sha256`, `assigned_ids`, and `context_ids`. Result fields: `version: 1`,
+`assignment_id`, matching hashes, worksheet-shaped `rows`, `status` (`complete`
+or `pending`), optional canonical relative `activity_log` reference (data only,
+not opened or executed). Every assigned ID occurs exactly once; context-only,
+extra, duplicate, overlapping and stale proposals refuse. Unknown envelope or
+proposal fields refuse. Files are capped at 16 MiB, 1,000 files per kind,
+100,000 rows per file and 250,000 assigned rows total. Shape-valid unresolved
+rows remain pending. `coordinator_review_required` is always true and
+`linguistic_quality_certified` is always false. No dispatch, import, merge,
+consent change or visual signoff occurs. Project/worksheet/edition bytes stay
+unchanged; ordinary operational logging is the only allowed write.
+
+JSON saves stage complete UTF-8 bytes, flush/fsync, close and exact readback
+before atomic replacement and final readback. Pre-replacement failures retain
+old state; after-effect failures report changed or unknown truthfully. POSIX
+parent-directory sync is attempted, Windows has no universal directory-sync
+promise. These acknowledgements are not multi-file or power-loss certification
+and do not cover external editors' writes.
 
 ## Episode map
 

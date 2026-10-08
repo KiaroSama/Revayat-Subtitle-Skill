@@ -39,7 +39,7 @@ trap 'if ((log_ready)); then exec 3>&-; fi' EXIT
 log_event INFO 20 'Checking Python prerequisite.'
 for interpreter in python3 python; do
     if command -v "$interpreter" >/dev/null 2>&1 &&
-       "$interpreter" -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+       "$interpreter" -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
         log_event DEBUG 10 'Compatible interpreter found; arguments are forwarded without logging values.'
         set +e
         "$interpreter" -B -X utf8 "$script_dir/install.py" "$@"
@@ -50,5 +50,5 @@ for interpreter in python3 python; do
         exit "$result"
     fi
 done
-log_event ERROR 40 'Python 3.10+ is required. Install Python, then run this installer again.'
+log_event ERROR 40 'Python 3.11+ is required. Install Python, then run this installer again.'
 exit 2

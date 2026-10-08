@@ -7,8 +7,8 @@
 [![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
 [![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
-[![Plugin version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-0d6efd?style=flat-square)](plugin.json)
-[![Python: 3.10 or newer](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](docs/platforms.md)
+[![Plugin version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-0d6efd?style=flat-square)](plugin.json)
+[![Python: 3.11 or newer](https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square)](docs/platforms.md)
 [![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
 [![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
 [![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
@@ -53,7 +53,7 @@ Persian/English text that must display correctly in a real subtitle renderer.
 
 ## Install
 
-**Python 3.10 or newer**, FFmpeg built with libass, and a Persian-capable font.
+**Python 3.11 or newer**, FFmpeg built with libass, and a Persian-capable font.
 Python uses only its standard library; the requirements file declares that empty
 Python dependency set. FFmpeg and fonts are installed separately.
 
@@ -79,6 +79,14 @@ By default the installer selects existing user directories. Use `--agent codex`
 for one agent, or `--scope project --path PATH` for a project. `--dry-run` lists
 proposed destinations; `--force` keeps a backup before replacing an installation.
 The Python implementation is shared by the Bash and PowerShell launchers.
+New backups/journals are outside live discovery in the first selected agent root's
+`revayat-recovery/`. Custom destinations require `--recovery-dir` on the same
+filesystem outside all configured discovery roots. One stable same-account OS
+lock in `~/revayat-install-state/` covers install/recovery across destinations;
+no cross-account, hostile-writer or universal power-loss guarantee is claimed.
+Interrupted uncommitted work requires explicit `--recover JOURNAL --recovery-dir DIR`
+to restore the previous complete installation. Changed/foreign state is preserved;
+committed journals do not authorize uninstall. Existing backups are never pruned.
 
 | Agent | User skills | Project skills |
 | --- | --- | --- |
@@ -111,7 +119,7 @@ The bundle includes `translate-subtitles`, `revayat-subtitle-resume` and
 For a local portable plugin bundle:
 
 ```text
-python install/install.py --plugin --destination "PATH/revayat-subtitle"
+python install/install.py --plugin --destination "PATH/revayat-subtitle" --recovery-dir "PATH/recovery"
 ```
 
 The root Agent Plugins manifest and Claude/Codex/Cursor compatibility manifests
@@ -172,6 +180,18 @@ inside `Sub/`, zipped, plus a separate continuity glossary. Files use `S01E01.as
 `S01OVA01.ass`, `S02E01.ass` and equivalent SRT names. SRT-only episodes stay SRT.
 **Target:** Persian unless the user requests another language.
 
+### Read-only resume and proposals
+
+`status --work WORK` reports pending cues, glossary/assignment gaps and the
+canonical current edition/evidence. `handoff --work WORK --assignment FILE
+--result FILE` checks disjoint, revision-bound proposals without dispatch/import.
+Both return version-1 JSON: exit0 complete,1 valid pending,2 malformed/stale.
+No subtitle bodies or automatic editorial/image certification are returned.
+The coordinator still reads and accepts every proposal. See the
+[exact contracts](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs).
+The [categorical rubric](evaluation/rubric.md) and [finite AI pilot](evaluation/pilot.json)
+make unseen wording/context decisions reviewable, not a language-quality score.
+
 ## How it works
 
 ```text
@@ -214,7 +234,8 @@ creates a different build identity and requires matching evidence.
 | `process_control.py` / `process_supervisor.py` | Owned process groups/Windows Jobs with wall, idle and output limits |
 | `publication.py` / `png_validation.py` | Complete-file publication and bounded PNG decoding |
 | `revayat-subtitle.py` | one CLI entry point for every stage |
-| `install/install.py` | shared agent routing and allowlisted skill/plugin installation |
+| `install/install.py` / `install_state.py` / `install_recovery.py` | allowlisted installation, same-account ownership and explicit old-tree recovery |
+| `status.py` / `handoff.py` | bounded read-only resume overview and revision-bound proposal validation |
 
 ## What it is honest about
 
@@ -263,7 +284,9 @@ The stdlib test runner bounds its worker process and exercises the real CLI and
 native installers. Development dependencies add bounded generated cases and native
 process-identity checks; the installed skill still has no pip runtime dependencies.
 CI covers Linux, macOS and Windows, with libass and 10-bit preview lanes on Linux
-and Windows. CodeQL analyzes Python and workflows; actionlint and zizmor block
+and Windows. Main pushes, pull requests and manual dispatch run checks; ordinary
+pre-PR branch pushes do not duplicate PR checks. The finite PNG cost comparison
+uses identical authored 320×180 inputs and baseline source, not a universal speed ratio. CodeQL analyzes Python and workflows; actionlint and zizmor block
 workflow defects. Dependency Review runs on PRs; Dependabot covers Actions, the
 development manifest and the empty runtime manifest. Read exact-commit Actions
 results before claiming a pass.

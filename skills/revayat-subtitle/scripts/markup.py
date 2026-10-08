@@ -165,24 +165,53 @@ def block_spans(text: str, kind: str):
 
 
 def uncomment(text: str, kind: str) -> str:
-    output, cursor, removed, drawing = [], 0, 0, False
+    output, cursor, removed, drawing, active, boundaries, length = [], 0, 0, False, [], [], 0
     for start, end in block_spans(text, kind):
         block = text[start:end]
         output.append(text[cursor:start])
+        length += start - cursor
         hidden = block.startswith("<!--") if kind == "srt" else "\\" not in block
         if hidden:
             removed += 1
+            if kind == "srt":
+                boundaries.append(length)
             if kind == "ass" and drawing:
                 output.append("{}")  # Keep the renderer's separate drawing-object boundary.
         else:
             output.append(block)
+            length += len(block)
+            if kind == "srt":
+                active.append(block)
         if kind == "ass":
             drawing = drawing_mode(block, drawing)
         cursor = end
     output.append(text[cursor:])
+    result = "".join(output)
     if removed:
+        if kind == "srt":
+            # Refuse only tag-like tokens spanning an actually removed boundary.
+            # Unknown FFmpeg tags can be consumed too; do not escape unrelated literals.
+            tags = re.compile(r"</?[^<>]{0,127}>")
+            index = 0
+            for match in tags.finditer(result):
+                while index < len(boundaries) and boundaries[index] <= match.start():
+                    index += 1
+                tag = match[0]
+                closing = tag.startswith("</")
+                body = tag[2 if closing else 1:-1]
+                name = body.lstrip(" ").split(" ", 1)[0]
+                known = name.lower() in {"font", "b", "i", "u", "s", "br", "br/"}
+                likely = (re.fullmatch(r"[A-Za-z0-9_/]*", name) is not None
+                          and not body.startswith(" ")
+                          and (closing or match.start() == 0 or result[match.start() - 1] != "<"))
+                if (index < len(boundaries) and boundaries[index] < match.end() and srt_tag_fits(tag)
+                        and (known or likely)):
+                    raise ValueError("SRT comment cleanup would activate literal markup; adapt the reviewed text explicitly")
+        if kind == "srt" and [result[start:end] for start, end in block_spans(result, kind)
+                              if not result[start:end].startswith("<!--")] != active:
+            raise ValueError("SRT comment cleanup would activate literal markup; adapt the reviewed text explicitly")
         logging.getLogger(__name__).debug("Removed hidden comments format=%s count=%d", kind, removed)
-    return "".join(output)
+    return result
 
 
 def pieces(text: str, kind: str):

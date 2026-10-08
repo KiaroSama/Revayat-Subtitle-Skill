@@ -54,18 +54,26 @@ try {
         $command = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($command) {
             $prefix = if ($candidate -eq 'py') { @('-3') } else { @() }
-            & $command.Source @prefix -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>$null
-            if ($LASTEXITCODE -eq 0) {
+            $probe = & {
+                $PSNativeCommandUseErrorActionPreference = $false
+                & $command.Source @prefix -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>$null
+                $LASTEXITCODE
+            }
+            if ($probe -eq 0) {
                 Write-BootstrapLog 'DEBUG' 'Compatible interpreter found; forwarding arguments without logging their values.'
-                & $command.Source @prefix -B -X utf8 $installer @args
-                $result = $LASTEXITCODE
+                $forwarded = $args
+                $result = & {
+                    $PSNativeCommandUseErrorActionPreference = $false
+                    & $command.Source @prefix -B -X utf8 $installer @forwarded | Out-Host
+                    $LASTEXITCODE
+                }
                 $severity = if ($result -eq 0) { 'INFO' } else { 'ERROR' }
                 Write-BootstrapLog $severity "Installer completed exit=$result."
                 exit $result
             }
         }
     }
-    Write-BootstrapLog 'ERROR' 'Python 3.10+ is required. Install Python, then run this installer again.'
+    Write-BootstrapLog 'ERROR' 'Python 3.11+ is required. Install Python, then run this installer again.'
     exit 2
 } catch {
     Write-BootstrapLog 'ERROR' 'Installer bootstrap failed; check the interpreter and filesystem permissions.'

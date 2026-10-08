@@ -21,4 +21,15 @@ The root manifest follows [Agent Plugins](https://agent-plugins.org/plugin-autho
 its `skills/` location is fixed discovery, not a `skills` field. Compatibility
 manifests use the individual host contracts. Codex metadata was also checked with
 the installed official plugin validator. The installer supports a destination
-override for managed installations and future path changes.
+override for managed installations and future path changes. Python3.11+ is the
+supported floor; use a currently maintained stable Python for new installations.
+Older dated3.10 verification records remain historical, not current support.
+
+Standard agent installations place new recovery state in the first selected
+agent root's `revayat-recovery/`, outside skills/plugin discovery. Custom
+`--destination` requires explicit same-filesystem `--recovery-dir`; configure it
+outside every host scan, not merely a hidden sibling. Existing backups remain
+untouched. One retained native nonblocking lock under
+`~/revayat-install-state/` serializes same-account installs/recovery across all
+destinations/recovery roots. It is not cross-account or network-filesystem
+certification. See [recovery](../skills/revayat-subtitle/references/troubleshooting.md#installer-process-interruption).

@@ -97,17 +97,40 @@ def _positive(value, name):
     return float(value)
 
 
+def checked_environment(env):
+    if env is None:
+        return None
+    if not isinstance(env, dict) or len(env) > 1000:
+        raise ValueError("Tool environment must be a bounded string mapping")
+    if any(not isinstance(key, str) or not key or "=" in key or "\x00" in key
+           or not isinstance(value, str) or "\x00" in value for key, value in env.items()):
+        raise ValueError("Tool environment contains an invalid key or value")
+    try:
+        size = len(json.dumps(env, ensure_ascii=True).encode("utf-8"))
+    except UnicodeError:
+        raise ValueError("Tool environment contains invalid text") from None
+    if size > 1024 * 1024:
+        raise ValueError("Tool environment exceeds its byte budget")
+    return dict(env)
+
+
 def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
-        idle_timeout: float | None = None, max_output: int = 16 * 1024 * 1024) -> bytes:
+        idle_timeout: float | None = None, max_output: int = 16 * 1024 * 1024,
+        env: dict[str, str] | None = None, check: bool = True) -> bytes | subprocess.CompletedProcess:
     timeout = _positive(timeout, "timeout")
     idle = _positive(timeout if idle_timeout is None else idle_timeout, "idle_timeout")
     if type(max_output) is not int or not 1 <= max_output <= 256 * 1024 * 1024:
         raise ValueError("max_output must be an integer from 1 to 268435456 bytes")
     if not isinstance(command, list) or not command or not command[0] or any(not isinstance(v, str) or "\x00" in v for v in command):
         raise ValueError("Tool command must be a nonempty argv list of strings")
-    gate = (json.dumps(command, ensure_ascii=True) + "\n").encode("utf-8")
-    if len(gate) > 65536:
+    if type(check) is not bool:
+        raise ValueError("Tool check must be a boolean")
+    env = checked_environment(env)
+    if len(json.dumps(command, ensure_ascii=True).encode("utf-8")) > 65535:
         raise ValueError("Tool command exceeds the argument budget")
+    gate = (json.dumps({"command": command, "env": env}, ensure_ascii=True) + "\n").encode("utf-8")
+    if len(gate) > 2 * 1024 * 1024:
+        raise ValueError("Tool launch payload exceeds its byte budget")
     job, process = None, None
     readers = []
     events = queue.Queue(maxsize=16)
@@ -160,7 +183,7 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 raise
         else:
             process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL,
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, env=env)
         logging.debug("Tool started pid=%d wall=%s idle=%s output_limit=%d", process.pid, timeout, idle, max_output)
         for kind in ("stdout", "stderr"):
             reader = threading.Thread(target=drain, args=(kind, getattr(process, kind)), daemon=True)
@@ -197,8 +220,10 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 captured[kind].extend(data)
                 last_progress = now
         code = process.wait(timeout=1)
-        if code:
+        if code and check:
             raise ToolFailure(code, bytes(captured["stdout"]), bytes(captured["stderr"]))
+        if not check:
+            return subprocess.CompletedProcess(command, code, bytes(captured["stdout"]), bytes(captured["stderr"]))
         return bytes(captured["stdout"])
     except BaseException as error:
         primary = error

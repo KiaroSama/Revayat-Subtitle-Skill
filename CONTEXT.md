@@ -40,3 +40,13 @@ Editable inspection notes do not redefine that receipt.
 **Parallel editorial assignment**: A user-consented, disjoint episode or cue range
 with immutable source context, glossary revision and separate result/activity log.
 The coordinator integrates every cue and owns the final consistency and visual review.
+
+**Editorial proposal**: A separate worker result bound to exact assignment, source
+and raw glossary revisions. Mechanical validation does not import or approve it.
+
+**Resume status**: A read-only report of valid pending/current/stale workspace and
+edition evidence, not proof of translation comprehension or visual inspection.
+
+**Installation transaction**: A same-account OS-owned, journaled set of complete
+allowlisted replacements with explicit recovery to previous trees or absence;
+ambiguous/foreign state is preserved, and committed work is not an interrupted uninstall.

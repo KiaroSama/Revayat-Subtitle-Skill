@@ -17,6 +17,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import markup
 import runtime
+from process_helpers import run_child
 import validation
 import workflow
 from subtitle_formats import (Cue, Document, ASS_FIELDS, STYLE_FIELDS, DEFAULT_STYLE,
@@ -178,7 +179,7 @@ class BoundaryTests(unittest.TestCase):
                    "from runtime import read_json;\ntry: read_json(Path(sys.argv[2]))\n"
                    "except ValueError: sys.exit(0)\nelse: sys.exit(3)", str(SCRIPTS), str(path)]
         try:
-            result = subprocess.run(command, capture_output=True, timeout=2)
+            result = run_child(command, timeout=2)
         except subprocess.TimeoutExpired:
             self.fail("Artifact reader blocked on a FIFO instead of rejecting it")
         self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
@@ -248,9 +249,9 @@ class BoundaryTests(unittest.TestCase):
         for encoding in ("base64", "rot13", "hex", "bz2", "zlib"):
             with self.subTest(encoding=encoding):
                 work = self.root / encoding
-                result = subprocess.run([sys.executable, "-S", str(SCRIPTS / "revayat-subtitle.py"), "prepare",
+                result = run_child([sys.executable, "-S", str(SCRIPTS / "revayat-subtitle.py"), "prepare",
                                          str(source), "--work", str(work), "--series", "Fixture", "--season", "1",
-                                         "--encoding", encoding], capture_output=True, timeout=10,
+                                         "--encoding", encoding], timeout=10,
                                         env={**os.environ, "REVAYAT_LOG_DIR": str(self.root / "logs")})
                 self.assertEqual(result.returncode, 2)
                 self.assertNotIn(b"Traceback", result.stderr)

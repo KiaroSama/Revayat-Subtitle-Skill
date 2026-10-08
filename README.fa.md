@@ -9,8 +9,8 @@
 [![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
 [![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
-[![Plugin version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-0d6efd?style=flat-square)](plugin.json)
-[![Python: 3.10 or newer](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](docs/platforms.md)
+[![Plugin version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-0d6efd?style=flat-square)](plugin.json)
+[![Python: 3.11 or newer](https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square)](docs/platforms.md)
 [![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
 [![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
 [![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
@@ -56,7 +56,7 @@ Antigravity و هر ایجنتی که `SKILL.md` را می‌خواند. تمر�
 
 ## نصب
 
-**Python 3.10 یا جدیدتر**، FFmpeg دارای libass و یک فونت فارسی لازم است.
+**Python 3.11 یا جدیدتر**، FFmpeg دارای libass و یک فونت فارسی لازم است.
 اجرای Python به بستهٔ اضافی نیاز ندارد؛ فایل requirements همین موضوع را مشخص
 می‌کند. FFmpeg و فونت جداگانه نصب می‌شوند.
 
@@ -90,6 +90,13 @@ bash install/install.sh
 برای یک ایجنت و `--scope project --path PATH` برای نصب در یک پروژه است.
 `--dry-run` مقصدها را نشان می‌دهد؛ `--force` پیش از جایگزینی از نصب قبلی
 پشتیبان نگه می‌دارد. راه‌اندازهای Bash و PowerShell از یک پیاده‌سازی مشترک استفاده می‌کنند.
+پشتیبان و ژورنال جدید بیرون کشف اسکیل، در `revayat-recovery/` اولین مسیر عامل
+انتخاب‌شده نگه داشته می‌شوند. مقصد سفارشی به `--recovery-dir` صریح روی همان
+فایل‌سیستم و بیرون مسیرهای کشف اسکیل/پلاگین نیاز دارد. قفل ثابت سیستم‌عامل در
+`~/revayat-install-state/` نصب و بازیابی همان حساب را سری می‌کند؛ تضمین بین
+حساب‌ها، نویسندهٔ خصمانه یا قطع برق عمومی نیست. بازیابی نصب ناتمام با
+`--recover JOURNAL --recovery-dir DIR` نصب قبلی کامل را برمی‌گرداند؛ دادهٔ
+تغییریافته حفظ و گزارش می‌شود و ژورنال نصب کامل مجوز حذف نصب نیست.
 
 <div dir="ltr">
 
@@ -131,7 +138,7 @@ bash install/install.sh
 <div dir="ltr">
 
 ```text
-python install/install.py --plugin --destination "PATH/revayat-subtitle"
+python install/install.py --plugin --destination "PATH/revayat-subtitle" --recovery-dir "PATH/recovery"
 ```
 
 </div>
@@ -200,6 +207,17 @@ S=skills/revayat-subtitle/scripts
 `Sub` داخل ZIP، به‌همراه واژه‌نامه‌ای جدا. نام‌ها مانند `S01E01.ass`،
 `S01OVA01.ass` و `S02E01.ass` هستند. قسمت‌های صرفاً SRT همان قالب را نگه می‌دارند.
 **زبان مقصد:** فارسی، مگر کاربر زبان دیگری بخواهد.
+
+### ادامهٔ کار و پیشنهادهای فقط‌خواندنی
+
+`status --work WORK` خطوط معطل، واژه‌نامه، تقسیم قسمت‌ها و نسخه/شواهد منطبق را
+گزارش می‌کند. `handoff --work WORK --assignment FILE --result FILE` پیشنهادهای
+بدون تداخل را به هش مبدأ و واژه‌نامه متصل می‌کند؛ کارگر اعزام یا داده وارد نمی‌کند.
+JSON نسخهٔ ۱ است: خروج ۰ کامل مکانیکی، ۱ کار معتبر ناتمام، ۲ دادهٔ نامعتبر/کهنه.
+بدنهٔ زیرنویس یا تأیید خودکار معنا/تصویر گزارش نمی‌شود؛ هماهنگ‌کننده همچنان همهٔ
+پیشنهادها را می‌خواند. [قرارداد دقیق](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs)،
+[روبریک دسته‌ای](evaluation/rubric.md) و [پایلوت محدود AI](evaluation/pilot.json)
+شواهد و عدم‌قطعیت را ثبت می‌کنند، نه گواهی کیفیت زبانی.
 
 ## معماری
 

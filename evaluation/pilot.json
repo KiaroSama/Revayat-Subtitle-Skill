@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "scope": "Five authored calibration proposals; not a representative, blind or human-reviewed translation benchmark.",
+  "linguistic_quality_certified": false,
+  "author": {
+    "role": "AI implementation executor and example author",
+    "model": "Claude Opus 5.5 (1M context)",
+    "date_utc": "2026-10-08"
+  },
+  "independent_review": {
+    "role": "AI coordinator/reviewer, separate from example-author executor",
+    "model": "Claude Opus 5.5 (1M context)",
+    "date_utc": "2026-10-08",
+    "limitations": "Not blind, not independent human review, not a qualified multilingual benchmark. Finite source/context comparisons only; no rendered or scene-level approval.",
+    "cases": [
+      {
+        "id": "faithful_unseen",
+        "outcome": "needs_context",
+        "dimensions": {
+          "participant_referent": "faithful",
+          "negation_aspect_restriction": "needs_context",
+          "names_honorifics_intensity": "not_applicable",
+          "spoken_register": "faithful",
+          "logical_scope": "faithful"
+        },
+        "evidence": "First-person wish and destination are retained, but برگردم adds returning relative to plain go; provided context does not establish a return journey.",
+        "uncertainty": "Could be a faithful contextual variant if the scene establishes returning. This differs from the author's observation; unseen catalogue wording is not automatic failure."
+      },
+      {
+        "id": "participant_reversal",
+        "outcome": "meaning_changed",
+        "dimensions": {
+          "participant_referent": "meaning_changed",
+          "negation_aspect_restriction": "not_applicable",
+          "names_honorifics_intensity": "not_applicable",
+          "spoken_register": "faithful",
+          "logical_scope": "not_applicable"
+        },
+        "evidence": "Teacher acts and Rin receives criticism in source/context; target reverses those roles. Colloquial register cannot repair the reversal.",
+        "uncertainty": "No ambiguous role in the supplied authored context; not a population quality estimate."
+      },
+      {
+        "id": "negative_request",
+        "outcome": "meaning_changed",
+        "dimensions": {
+          "participant_referent": "not_applicable",
+          "negation_aspect_restriction": "meaning_changed",
+          "names_honorifics_intensity": "not_applicable",
+          "spoken_register": "not_applicable",
+          "logical_scope": "not_applicable"
+        },
+        "evidence": "Prohibition becomes a positive imperative. The unknown object is irrelevant to this polarity reversal.",
+        "uncertainty": "Other dimensions were not diagnosed; no broader language qualification claimed."
+      },
+      {
+        "id": "missing_referent",
+        "outcome": "needs_context",
+        "dimensions": {
+          "participant_referent": "needs_context",
+          "negation_aspect_restriction": "faithful",
+          "names_honorifics_intensity": "not_applicable",
+          "spoken_register": "not_applicable",
+          "logical_scope": "not_applicable"
+        },
+        "evidence": "The Japanese omitted subject and not-yet-arrived source do not name Rin; supplied context is null.",
+        "uncertainty": "Potentially correct if the scene established Rin. Not a confirmed mistranslation or a claim of Japanese expert qualification."
+      },
+      {
+        "id": "honorific_quote_scope",
+        "outcome": "faithful",
+        "dimensions": {
+          "participant_referent": "faithful",
+          "negation_aspect_restriction": "not_applicable",
+          "names_honorifics_intensity": "faithful",
+          "spoken_register": "faithful",
+          "logical_scope": "faithful"
+        },
+        "evidence": "Given glossary Rin plus san are retained, only the named object Hope is quoted, and first-person naming is retained. Spoken Persian fits supplied context.",
+        "uncertainty": "Visual rendering and broader scene interpretation remain untested."
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "faithful_unseen",
+      "source_language": "en",
+      "source": "I want to go home.",
+      "context": "A speaker expresses their own wish; no special formality is established.",
+      "answer": "می‌خوام برگردم خونه.",
+      "focus": "A faithful colloquial wording not listed in the known-wording catalogue.",
+      "author_observation": {
+        "outcome": "faithful",
+        "evidence": "The speaker's wish and destination are retained; returning home is a natural contextual rendering.",
+        "uncertainty": "The source alone does not explicitly say returning; broader scene context could prefer going. AI observation, not human approval."
+      }
+    },
+    {
+      "id": "participant_reversal",
+      "source_language": "en",
+      "source": "The teacher criticized Rin.",
+      "context": "Rin receives criticism from the teacher.",
+      "answer": "رین از معلم انتقاد کرد.",
+      "focus": "Participant and recipient must not reverse.",
+      "author_observation": {
+        "outcome": "meaning_changed",
+        "evidence": "The proposal makes Rin the critic and the teacher the recipient, reversing the supplied roles.",
+        "uncertainty": "No ambiguous referent in the supplied authored context; a finite AI comparison, not a population quality estimate."
+      }
+    },
+    {
+      "id": "negative_request",
+      "source_language": "en",
+      "source": "Don't touch it.",
+      "context": "A speaker prohibits touching the referenced object.",
+      "answer": "بهش دست بزن.",
+      "focus": "Negative request versus positive imperative.",
+      "author_observation": {
+        "outcome": "meaning_changed",
+        "evidence": "The proposal instructs touching instead of prohibiting it.",
+        "uncertainty": "The object is unspecified but that does not alter the polarity reversal. AI comparison only."
+      }
+    },
+    {
+      "id": "missing_referent",
+      "source_language": "ja",
+      "source": "まだ来ていない。",
+      "context": null,
+      "answer": "رین هنوز نیومده.",
+      "focus": "An omitted Japanese subject cannot be assigned to Rin without context.",
+      "author_observation": {
+        "outcome": "needs_context",
+        "evidence": "The source gives not-yet-arrived but does not name Rin; preceding referent context is absent.",
+        "uncertainty": "Rin might be correct in a real scene. Do not classify the name as a confirmed error without that scene. AI reviewer is not independently qualified for Japanese."
+      }
+    },
+    {
+      "id": "honorific_quote_scope",
+      "source_language": "en",
+      "source": "Thank you, Rin-san. I named it \"Hope\".",
+      "context": "The locked glossary spells Rin as رین and retains the -san honorific. The name of the object is Hope.",
+      "answer": "مرسی، رین-سان. اسمش رو گذاشتم «امید».",
+      "focus": "Honorific spelling and quotes only around the chosen name.",
+      "author_observation": {
+        "outcome": "faithful",
+        "evidence": "The honorific and locked name are retained; Persian quotation marks enclose only the name Hope.",
+        "uncertainty": "Typography/layout still needs actual rendered inspection and the coordinator's scene/register review. AI observation is not visual approval."
+      }
+    }
+  ]
+}
