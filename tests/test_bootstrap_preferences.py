@@ -5,10 +5,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import unittest
+from unittest.mock import patch
 
 from check import ROOT, WorkspaceCase
 from process_helpers import run_child
+from runtime import operational_log, read_limited
 
 
 @unittest.skipUnless(os.name == "nt", "Windows PowerShell native preference contract")
@@ -65,28 +68,58 @@ class BootstrapPreferenceTests(WorkspaceCase):
         fixture.mkdir()
         (fixture / 'install.py').write_text('import sys;sys.exit(7)', encoding='utf-8')
         caller = self.root / 'scope.ps1'
-        caller.write_text('param($FixtureRoot)\n[Console]::Error.WriteLine("scope-fixture script-start")\nfunction Invoke-ActualLauncher {\n' + body
+        caller.write_text('param($FixtureRoot)\nfunction Write-ScopePhase($Phase) { [Console]::Error.WriteLine("scope-fixture " + [DateTime]::UtcNow.ToString("o") + " " + $Phase) }\nWrite-ScopePhase "script-start"\nfunction Invoke-ActualLauncher {\n' + body
                           + '\n}\nforeach($choice in @($true,$false)) {\n'
-                          + '[Console]::Error.WriteLine("scope-fixture before-choice="+$choice);'
+                          + 'Write-ScopePhase ("before-choice="+$choice);'
                           + '$PSNativeCommandUseErrorActionPreference=$choice;$LASTEXITCODE=91;'
                           + 'Invoke-ActualLauncher;'
-                          + '[Console]::Error.WriteLine("scope-fixture after-choice="+$choice);'
+                          + 'Write-ScopePhase ("after-choice="+$choice);'
                           + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
-                          + '}\n[Console]::Error.WriteLine("scope-fixture script-end")\n', encoding='utf-8')
+                          + '}\nWrite-ScopePhase "script-end"\n', encoding='utf-8')
         for shell in dict.fromkeys(filter(None, [shutil.which('pwsh'), shutil.which('powershell.exe')])):
             name = Path(shell).name
             with self.subTest(shell=name):
+                began = time.monotonic()
+                logs = self.root / 'logs'
+                prior_logs = set(logs.glob('*.log'))
+                stdout, stderr, state = b'', b'', 'incomplete'
                 try:
-                    result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)], timeout=20)
+                    with patch.dict(os.environ, {'REVAYAT_LOG_LEVEL': 'DEBUG'}), operational_log('scope-native-owner'):
+                        result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)], timeout=20)
+                    stdout, stderr, state = result.stdout, result.stderr, 'complete'
+                    self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
                 except subprocess.TimeoutExpired as error:
-                    diagnostics = self.root / 'logs' / ('scope-timeout-' + name + '.log')
-                    text = ('Authored scope fixture timed out shell=' + name + '\n'
-                            + 'stdout=' + (error.output or b'')[:65536].decode('utf-8', errors='replace') + '\n'
-                            + 'stderr=' + (error.stderr or b'')[:65536].decode('utf-8', errors='replace'))
-                    diagnostics.parent.mkdir(exist_ok=True)
-                    diagnostics.write_text(text, encoding='utf-8')
+                    stdout, stderr, state = error.output or b'', error.stderr or b'', 'timeout'
                     raise
-                self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
+                finally:
+                    elapsed = time.monotonic() - began
+                    text = (f'Authored scope fixture shell={name} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10\n'
+                            + 'stdout=' + stdout[:65536].decode('utf-8', errors='replace') + '\n'
+                            + 'stderr=' + stderr[:65536].decode('utf-8', errors='replace'))
+                    diagnostics = self.root / 'logs' / ('scope-capture-' + name + '.log')
+                    try:
+                        diagnostics.parent.mkdir(exist_ok=True)
+                        diagnostics.write_text(text, encoding='utf-8')
+                    except OSError:
+                        print('Native scope capture file unavailable; original outcome preserved', flush=True)
+                    print(f'Native scope shell={name} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10', flush=True)
+                    for line in stderr[:65536].decode('utf-8', errors='replace').splitlines():
+                        if line.startswith('scope-fixture ') and line.isascii():
+                            print(line, flush=True)
+                    if state == 'timeout':
+                        prefixes = ('Tool started ', 'Tool launch gate released ', 'Tool deadline expired ', 'Tool finished ',
+                                    'Supervisor launch gate validated', 'Supervisor target launch starting',
+                                    'Supervisor target started ', 'Supervisor target wait completed ', 'Supervised target exited ')
+                        candidates = sorted(path for path in set(logs.glob('*.log')) - prior_logs
+                                            if path.name.startswith(('scope-native-owner_', 'process-supervisor_')))
+                        for path in candidates[:3]:
+                            try:
+                                for line in read_limited(path, 65536).decode('utf-8').splitlines():
+                                    message = line.split('] ', 3)[-1]
+                                    if message.startswith(prefixes) and message.isascii():
+                                        print('Native lifecycle ' + message, flush=True)
+                            except (OSError, ValueError):
+                                print('Native lifecycle capture unavailable; original timeout preserved', flush=True)
 
 
 if __name__ == "__main__":

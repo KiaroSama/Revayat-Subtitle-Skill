@@ -200,6 +200,9 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
             now = time.monotonic()
             remaining = min(timeout - (now - began), idle - (now - last_progress))
             if remaining <= 0:
+                logging.debug("Tool deadline expired reason=%s elapsed_seconds=%.3f idle_seconds=%.3f gate_released=%s streams_closed=%d leader_exited=%s",
+                              "wall" if now - began >= timeout else "idle", now - began,
+                              now - last_progress, gate_done, len(finished), process.poll() is not None)
                 # Never embed secret-bearing argv or captured private output in the exception.
                 raise subprocess.TimeoutExpired("external tool", timeout,
                                                 output=bytes(captured["stdout"]), stderr=bytes(captured["stderr"]))
@@ -211,6 +214,7 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 finished.add(data)
             elif kind == "gate":
                 gate_done = True
+                logging.debug("Tool launch gate released pid=%d elapsed_seconds=%.3f", process.pid, now - began)
             elif kind in {"capture_error", "gate_error"}:
                 raise OSError("External tool pipe or launch gate failed")
             else:

@@ -27,10 +27,14 @@ def main():
         env = checked_environment(launch["env"])
         if not isinstance(command, list) or not command or any(not isinstance(v, str) or "\x00" in v for v in command):
             raise ValueError("Invalid supervisor argv")
+        logging.debug("Supervisor launch gate validated")
         # The target starts only after the parent's Job assignment and gate release.
+        logging.debug("Supervisor target launch starting")
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, env=env,
                                    creationflags=subprocess.CREATE_NO_WINDOW)
+        logging.debug("Supervisor target started pid=%d; waiting for exit", process.pid)
         code = process.wait()
+        logging.debug("Supervisor target wait completed pid=%d code=%d", process.pid, code)
         logging.log(logging.ERROR if code else logging.DEBUG, "Supervised target exited code=%d", code)
         return code
 
