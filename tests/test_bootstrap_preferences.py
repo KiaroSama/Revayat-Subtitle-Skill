@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import unittest
 
@@ -64,15 +65,28 @@ class BootstrapPreferenceTests(WorkspaceCase):
         fixture.mkdir()
         (fixture / 'install.py').write_text('import sys;sys.exit(7)', encoding='utf-8')
         caller = self.root / 'scope.ps1'
-        caller.write_text('param($FixtureRoot)\nfunction Invoke-ActualLauncher {\n' + body
+        caller.write_text('param($FixtureRoot)\n[Console]::Error.WriteLine("scope-fixture script-start")\nfunction Invoke-ActualLauncher {\n' + body
                           + '\n}\nforeach($choice in @($true,$false)) {\n'
+                          + '[Console]::Error.WriteLine("scope-fixture before-choice="+$choice);'
                           + '$PSNativeCommandUseErrorActionPreference=$choice;$LASTEXITCODE=91;'
                           + 'Invoke-ActualLauncher;'
+                          + '[Console]::Error.WriteLine("scope-fixture after-choice="+$choice);'
                           + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
-                          + '}\n', encoding='utf-8')
+                          + '}\n[Console]::Error.WriteLine("scope-fixture script-end")\n', encoding='utf-8')
         for shell in dict.fromkeys(filter(None, [shutil.which('pwsh'), shutil.which('powershell.exe')])):
-            result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)], timeout=20)
-            self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
+            name = Path(shell).name
+            with self.subTest(shell=name):
+                try:
+                    result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)], timeout=20)
+                except subprocess.TimeoutExpired as error:
+                    diagnostics = self.root / 'logs' / ('scope-timeout-' + name + '.log')
+                    text = ('Authored scope fixture timed out shell=' + name + '\n'
+                            + 'stdout=' + (error.output or b'')[:65536].decode('utf-8', errors='replace') + '\n'
+                            + 'stderr=' + (error.stderr or b'')[:65536].decode('utf-8', errors='replace'))
+                    diagnostics.parent.mkdir(exist_ok=True)
+                    diagnostics.write_text(text, encoding='utf-8')
+                    raise
+                self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
 
 
 if __name__ == "__main__":
