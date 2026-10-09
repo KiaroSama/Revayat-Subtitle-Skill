@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import logging
 import os
-import errno
 import uuid
 from pathlib import Path
 import shutil
@@ -15,7 +13,7 @@ import sys
 REPO = Path(__file__).resolve().parent.parent
 SKILL = REPO / "skills" / "revayat-subtitle"
 sys.path.insert(0, str(SKILL / "scripts"))
-from runtime import file_fingerprint, operational_log, output_directory, LogConfigurationError
+from runtime import file_fingerprint, operational_log, LogConfigurationError
 from publication import rename_noreplace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import install_state as state
@@ -148,35 +146,6 @@ def make_parents(parent: Path, created: list, expected: dict):
         path.mkdir()
         expected[path] = identity(path)
         created.append((path, expected[path]))
-
-
-def tree_matches(root: Path, expected: dict) -> bool:
-    directories = {parent.as_posix() for name in expected for parent in Path(name).parents if parent != Path(".")}
-    pending, found, seen_dirs = [root], set(), set()
-    while pending:
-        with os.scandir(pending.pop()) as entries:
-            for entry in entries:
-                path = Path(entry.path)
-                name = path.relative_to(root).as_posix()
-                if linked(path):
-                    return False
-                if entry.is_dir(follow_symlinks=False):
-                    if name not in directories:
-                        return False
-                    seen_dirs.add(name)
-                    pending.append(path)
-                elif entry.is_file(follow_symlinks=False) and name in expected:
-                    size, sha = expected[name]
-                    if entry.stat(follow_symlinks=False).st_size != size:
-                        return False
-                    if file_fingerprint(path, size)["sha256"] != sha:
-                        return False
-                    found.add(name)
-                else:
-                    return False
-        if len(found) + len(seen_dirs) > len(expected) + len(directories):
-            return False
-    return found == set(expected) and seen_dirs == directories
 
 
 def execute_plan(plan: dict) -> list[Path | None]:

@@ -13,8 +13,6 @@ class InstallCleanupTests(WorkspaceCase):
             with self.subTest(primary=type(primary).__name__):
                 target = self.root / f"target-{index}"
                 recovery = self.root / f"recovery-{index}"
-                real_manifest = module.state.tree_manifest
-                real_copy = module.shutil.copyfile
                 real_rmtree = module.shutil.rmtree
                 def copy(source, destination):
                     raise primary
