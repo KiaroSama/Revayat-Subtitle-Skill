@@ -60,6 +60,44 @@ class BootstrapPreferenceTests(WorkspaceCase):
 
 
     def test_actual_launcher_function_scopes_native_preference_and_caller_status(self):
+        caller, fixture = self.write_scope_fixture()
+        for shell in dict.fromkeys(filter(None, [shutil.which('pwsh'), shutil.which('powershell.exe')])):
+            with self.subTest(shell=Path(shell).name):
+                self.run_scope_fixture(shell, caller, fixture, 'original', None, {})
+
+    def test_native_scope_fresh_and_reused_homes_fixed_sample(self):
+        # Cold is first use of this authored home, not an OS/runtime cache flush.
+        planned, attempted, passed, failed = 12, 0, 0, 0
+        first_failure = 'none'
+        try:
+            shells = [shutil.which('pwsh'), shutil.which('powershell.exe')]
+            for name, shell in zip(('pwsh', 'powershell.exe'), shells):
+                if shell is None:
+                    first_failure = f'prerequisite:{name}'
+                    self.fail(f'Fixed native sample requires {name}')
+            caller, fixture = self.write_scope_fixture()
+            for pair in range(3):
+                for shell in shells:
+                    home = self.root / f'fresh home فارسی {Path(shell).stem}-{pair}'
+                    home.mkdir()
+                    env = {'HOME': str(home), 'USERPROFILE': str(home)}
+                    for phase in ('fresh', 'reused'):
+                        label = f'{Path(shell).stem}-{pair}-{phase}'
+                        observation = {'phase': 'not-observed'}
+                        attempted += 1
+                        try:
+                            self.run_scope_fixture(shell, caller, fixture, label, env, observation)
+                        except BaseException as error:
+                            failed += 1
+                            first_failure = f'{label}:{type(error).__name__}:{observation["phase"]}'
+                            raise
+                        passed += 1
+        finally:
+            print(f'Native fixed sample planned={planned} attempted={attempted} passed={passed} '
+                  f'failed={failed} not_run={planned-attempted} first_failure={first_failure}', flush=True)
+        self.assertEqual((attempted, passed, failed), (planned, planned, 0))
+
+    def write_scope_fixture(self):
         source = (ROOT / 'install/install.ps1').read_text(encoding='utf-8')
         # Exercise native preference scopes in the actual body. Only path/terminal
         # exit adapters change so a function can inspect caller state after return.
@@ -76,50 +114,53 @@ class BootstrapPreferenceTests(WorkspaceCase):
                           + 'Write-ScopePhase ("after-choice="+$choice);'
                           + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
                           + '}\nWrite-ScopePhase "script-end"\n', encoding='utf-8')
-        for shell in dict.fromkeys(filter(None, [shutil.which('pwsh'), shutil.which('powershell.exe')])):
-            name = Path(shell).name
-            with self.subTest(shell=name):
-                began = time.monotonic()
-                logs = self.root / 'logs'
-                prior_logs = set(logs.glob('*.log'))
-                stdout, stderr, state = b'', b'', 'incomplete'
-                try:
-                    with patch.dict(os.environ, {'REVAYAT_LOG_LEVEL': 'DEBUG'}), operational_log('scope-native-owner'):
-                        result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)], timeout=20)
-                    stdout, stderr, state = result.stdout, result.stderr, 'complete'
-                    self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
-                except subprocess.TimeoutExpired as error:
-                    stdout, stderr, state = error.output or b'', error.stderr or b'', 'timeout'
-                    raise
-                finally:
-                    elapsed = time.monotonic() - began
-                    text = (f'Authored scope fixture shell={name} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10\n'
-                            + 'stdout=' + stdout[:65536].decode('utf-8', errors='replace') + '\n'
-                            + 'stderr=' + stderr[:65536].decode('utf-8', errors='replace'))
-                    diagnostics = self.root / 'logs' / ('scope-capture-' + name + '.log')
+        return caller, fixture
+
+    def run_scope_fixture(self, shell, caller, fixture, label, env, observation):
+        name = Path(shell).name
+        began = time.monotonic()
+        logs = self.root / 'logs'
+        prior_logs = set(logs.glob('*.log'))
+        stdout, stderr, state = b'', b'', 'incomplete'
+        try:
+            with patch.dict(os.environ, {'REVAYAT_LOG_LEVEL': 'DEBUG'}), operational_log('scope-native-owner'):
+                result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)],
+                                   env=None if env is None else {**os.environ, **env}, timeout=20)
+            stdout, stderr, state = result.stdout, result.stderr, 'complete'
+            self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
+        except subprocess.TimeoutExpired as error:
+            stdout, stderr, state = error.output or b'', error.stderr or b'', 'timeout'
+            raise
+        finally:
+            elapsed = time.monotonic() - began
+            text = (f'Authored scope fixture shell={name} sample={label} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10\n'
+                    + 'stdout=' + stdout[:65536].decode('utf-8', errors='replace') + '\n'
+                    + 'stderr=' + stderr[:65536].decode('utf-8', errors='replace'))
+            diagnostics = logs / ('scope-capture-' + name + '-' + label + '.log')
+            try:
+                diagnostics.parent.mkdir(exist_ok=True)
+                diagnostics.write_text(text, encoding='utf-8')
+            except OSError:
+                print('Native scope capture file unavailable; original outcome preserved', flush=True)
+            print(f'Native scope shell={name} sample={label} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10', flush=True)
+            for line in stderr[:65536].decode('utf-8', errors='replace').splitlines():
+                if line.startswith('scope-fixture ') and line.isascii():
+                    observation['phase'] = line.split(' ', 2)[-1]
+                    print(line, flush=True)
+            if state == 'timeout':
+                prefixes = ('Tool started ', 'Tool launch gate released ', 'Tool deadline expired ', 'Tool finished ',
+                            'Supervisor launch gate validated', 'Supervisor target launch starting',
+                            'Supervisor target started ', 'Supervisor target wait completed ', 'Supervised target exited ')
+                candidates = sorted(path for path in set(logs.glob('*.log')) - prior_logs
+                                    if path.name.startswith(('scope-native-owner_', 'process-supervisor_')))
+                for path in candidates[:3]:
                     try:
-                        diagnostics.parent.mkdir(exist_ok=True)
-                        diagnostics.write_text(text, encoding='utf-8')
-                    except OSError:
-                        print('Native scope capture file unavailable; original outcome preserved', flush=True)
-                    print(f'Native scope shell={name} state={state} elapsed_seconds={elapsed:.3f} wall=20 idle=10', flush=True)
-                    for line in stderr[:65536].decode('utf-8', errors='replace').splitlines():
-                        if line.startswith('scope-fixture ') and line.isascii():
-                            print(line, flush=True)
-                    if state == 'timeout':
-                        prefixes = ('Tool started ', 'Tool launch gate released ', 'Tool deadline expired ', 'Tool finished ',
-                                    'Supervisor launch gate validated', 'Supervisor target launch starting',
-                                    'Supervisor target started ', 'Supervisor target wait completed ', 'Supervised target exited ')
-                        candidates = sorted(path for path in set(logs.glob('*.log')) - prior_logs
-                                            if path.name.startswith(('scope-native-owner_', 'process-supervisor_')))
-                        for path in candidates[:3]:
-                            try:
-                                for line in read_limited(path, 65536).decode('utf-8').splitlines():
-                                    message = line.split('] ', 3)[-1]
-                                    if message.startswith(prefixes) and message.isascii():
-                                        print('Native lifecycle ' + message, flush=True)
-                            except (OSError, ValueError):
-                                print('Native lifecycle capture unavailable; original timeout preserved', flush=True)
+                        for line in read_limited(path, 65536).decode('utf-8').splitlines():
+                            message = line.split('] ', 3)[-1]
+                            if message.startswith(prefixes) and message.isascii():
+                                print('Native lifecycle ' + message, flush=True)
+                    except (OSError, ValueError):
+                        print('Native lifecycle capture unavailable; original timeout preserved', flush=True)
 
 
 if __name__ == "__main__":
