@@ -35,6 +35,15 @@ stay independent. The pinned earlier owner must reproduce the named false-idle
 failures under the same authored timelines. This does not establish the cause of
 historical intermittent PowerShell startup timeouts.
 
+Owned deadline exceptions retain their original `TimeoutExpired` fields and add
+`deadline_snapshot`: elapsed/idle seconds, wall-or-idle reason, gate/stream/leader
+state, latched idle-gap state and owner-consumed byte counts. These counts are not
+all bytes already read by capture threads. Native fixtures print only validated
+finite snapshot fields after owner cleanup; no argv, environment, paths or output
+bodies are included. This is deadline-boundary evidence, not an OS wait diagnosis
+or a reconstruction of the historical timeout. Supervisor milestone logging stays
+DEBUG; no new child-output heartbeat is introduced.
+
 Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions)
 for the result on the commit being evaluated; configuration alone is not a pass.
 

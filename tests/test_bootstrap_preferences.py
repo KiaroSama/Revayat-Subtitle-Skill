@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from check import ROOT, WorkspaceCase
-from process_helpers import run_child
+from process_helpers import print_deadline_snapshot, run_child
 from runtime import operational_log, read_limited
 
 
@@ -200,6 +200,7 @@ class BootstrapPreferenceTests(WorkspaceCase):
             self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
         except subprocess.TimeoutExpired as error:
             stdout, stderr, state = error.output or b'', error.stderr or b'', 'timeout'
+            print_deadline_snapshot(error)
             raise
         finally:
             elapsed = time.monotonic() - began

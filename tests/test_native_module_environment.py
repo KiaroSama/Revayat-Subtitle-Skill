@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from check import WorkspaceCase
-from process_helpers import run_child
+from process_helpers import print_deadline_snapshot, run_child
 from runtime import read_limited
 import test_bootstrap_preferences as bootstrap
 
@@ -115,6 +115,8 @@ class NativeModuleEnvironmentTests(WorkspaceCase):
                     failed += 1
                     first_failure = f'{label}:{type(error).__name__}'
                     timed_out = isinstance(error, subprocess.TimeoutExpired)
+                    if timed_out:
+                        print_deadline_snapshot(error)
                     raise
                 finally:
                     print(f'Native module cell={label} elapsed_seconds={time.monotonic()-began:.3f} '
@@ -127,7 +129,6 @@ class NativeModuleEnvironmentTests(WorkspaceCase):
                     except (OSError, ValueError):
                         print(f'Native module cell={label} phase=unavailable', flush=True)
                     if timed_out:
-                        print('Native module deadline reason=unavailable unless existing log reports it', flush=True)
                         prefixes = ('Tool launch gate released ', 'Tool deadline expired ',
                                     'Supervisor launch gate validated', 'Supervisor target launch starting',
                                     'Supervisor target started ', 'Supervisor target wait completed ')

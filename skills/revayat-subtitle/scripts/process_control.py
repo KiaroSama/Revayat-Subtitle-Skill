@@ -212,12 +212,21 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 expired = idle_expired
             remaining = min(timeout - (now - began), idle - idle_elapsed)
             if remaining <= 0 or expired:
+                reason = "wall" if now - began >= timeout else "idle"
+                leader_exited = process.poll() is not None
                 logging.debug("Tool deadline expired reason=%s elapsed_seconds=%.3f idle_seconds=%.3f gate_released=%s streams_closed=%d leader_exited=%s",
-                              "wall" if now - began >= timeout else "idle", now - began,
-                              idle_elapsed, gate_done, len(finished), process.poll() is not None)
-                # Never embed secret-bearing argv or captured private output in the exception.
-                raise subprocess.TimeoutExpired("external tool", timeout,
-                                                output=bytes(captured["stdout"]), stderr=bytes(captured["stderr"]))
+                              reason, now - began, idle_elapsed, gate_done, len(finished), leader_exited)
+                # Never embed secret-bearing argv or captured private output in diagnostics.
+                error = subprocess.TimeoutExpired("external tool", timeout,
+                                                  output=bytes(captured["stdout"]), stderr=bytes(captured["stderr"]))
+                error.deadline_snapshot = {
+                    "elapsed_seconds": now - began, "idle_elapsed_seconds": idle_elapsed,
+                    "reason": reason, "gate_released": gate_done,
+                    "stdout_closed": "stdout" in finished, "stderr_closed": "stderr" in finished,
+                    "leader_exited": leader_exited, "stdout_consumed_bytes": len(captured["stdout"]),
+                    "stderr_consumed_bytes": len(captured["stderr"]), "idle_gap_latched": expired,
+                }
+                raise error
             try:
                 kind, data = events.get(timeout=min(0.1, remaining))
             except queue.Empty:

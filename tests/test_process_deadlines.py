@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from check import ROOT
+from process_helpers import print_deadline_snapshot
 import process_control
 from runtime import run
 
@@ -122,8 +123,9 @@ class DeadlineScenario:
 class TimedGetScenario(DeadlineScenario):
     """Two real drains observe output during the owner's timed queue waits."""
 
-    def __init__(self):
+    def __init__(self, first_resume=19.91):
         super().__init__(finished_at=19.97)
+        self.first_resume = first_resume
         self.now = 0.0
         self.release = [threading.Event(), threading.Event()]
         self.enqueued = [threading.Event(), threading.Event()]
@@ -171,7 +173,7 @@ class TimedGetScenario(DeadlineScenario):
                 item = super().get(block, timeout)
                 if item[0] == 'stdout' and item[1] == b'first':
                     scenario.first_consumed = True
-                    scenario.now = 19.91
+                    scenario.now = scenario.first_resume
                 elif item[0] == 'stdout' and item[1] == b'second':
                     scenario.now = 19.97
                     scenario.finish.set()
@@ -304,6 +306,94 @@ class ProcessDeadlineTests(unittest.TestCase):
         try:
             with self.assertRaises(subprocess.TimeoutExpired):
                 scenario.invoke(process_control)
+        finally:
+            scenario.assert_cleaned(self)
+
+    def test_timeout_snapshot_preserves_exception_and_reports_only_owner_state(self):
+        cases = ((DeadlineScenario(output=b'', finished_at=10.1), 'idle', False, 10.5, 10.5),
+                 (DeadlineScenario(output_at=10.01, finished_at=10.1), 'idle', True, 10.5, 0.49),
+                 (DeadlineScenario(resumed_at=20.01), 'wall', False, 20.01, 11.01))
+        for scenario, reason, latched, elapsed, idle_elapsed in cases:
+            with self.subTest(reason=reason, latched=latched):
+                try:
+                    with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                        scenario.invoke(process_control)
+                    error = caught.exception
+                    original = subprocess.TimeoutExpired('external tool', 20.0, output=b'', stderr=b'')
+                    self.assertEqual(error.args, original.args)
+                    self.assertEqual((error.cmd, error.timeout, error.output, error.stderr),
+                                     ('external tool', 20.0, b'', b''))
+                    snapshot = error.deadline_snapshot
+                    expected = {'elapsed_seconds': float, 'idle_elapsed_seconds': float, 'reason': str,
+                                'gate_released': bool, 'stdout_closed': bool, 'stderr_closed': bool,
+                                'leader_exited': bool, 'stdout_consumed_bytes': int,
+                                'stderr_consumed_bytes': int, 'idle_gap_latched': bool}
+                    self.assertEqual(set(snapshot), set(expected))
+                    for field, kind in expected.items():
+                        self.assertIs(type(snapshot[field]), kind)
+                    self.assertEqual(snapshot['reason'], reason)
+                    self.assertEqual(snapshot['idle_gap_latched'], latched)
+                    self.assertAlmostEqual(snapshot['elapsed_seconds'], elapsed)
+                    self.assertAlmostEqual(snapshot['idle_elapsed_seconds'], idle_elapsed)
+                    self.assertEqual(snapshot['gate_released'], process_control.os.name != 'nt')
+                    self.assertTrue(snapshot['leader_exited'])
+                    self.assertFalse(snapshot['stdout_closed'])
+                    self.assertFalse(snapshot['stderr_closed'])
+                    self.assertEqual(snapshot['stdout_consumed_bytes'], 0)
+                    self.assertEqual(snapshot['stderr_consumed_bytes'], 0)
+                    self.assertNotIn('progress', repr(snapshot))
+                    self.assertNotIn('authored-deadline-fixture', repr(snapshot))
+                finally:
+                    scenario.assert_cleaned(self)
+
+    def test_snapshot_counts_only_consumed_output_before_timeout(self):
+        scenario = TimedGetScenario(first_resume=20.01)
+        try:
+            with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                scenario.invoke(process_control)
+            error = caught.exception
+            self.assertEqual(error.output, b'first')
+            self.assertEqual(error.stderr, b'')
+            self.assertEqual(error.deadline_snapshot['reason'], 'wall')
+            self.assertEqual(error.deadline_snapshot['stdout_consumed_bytes'], 5)
+            self.assertEqual(error.deadline_snapshot['stderr_consumed_bytes'], 0)
+        finally:
+            scenario.assert_cleaned(self)
+
+    def test_snapshot_formatter_rejects_private_or_invalid_data_and_preserves_timeout(self):
+        scenario = DeadlineScenario(output=b'', finished_at=10.1)
+        try:
+            with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                scenario.invoke(process_control)
+            error = caught.exception
+            genuine = error.deadline_snapshot
+            with patch('builtins.print') as output:
+                print_deadline_snapshot(error)
+            output.assert_called_once()
+            text = output.call_args.args[0]
+            self.assertTrue(text.startswith('Native deadline '))
+            for key in genuine:
+                self.assertIn(key + '=', text)
+            invalid = ({**genuine, 'private': 'authored-secret'},
+                       {**genuine, 'elapsed_seconds': float('nan')},
+                       {**genuine, 'idle_elapsed_seconds': -1.0},
+                       {**genuine, 'stdout_consumed_bytes': -1},
+                       {**genuine, 'reason': 'authored-secret'},
+                       {**genuine, 'gate_released': 1})
+            for snapshot in invalid:
+                error.deadline_snapshot = snapshot
+                with patch('builtins.print') as output:
+                    print_deadline_snapshot(error)
+                output.assert_not_called()
+            error.deadline_snapshot = genuine
+            with patch('builtins.print', side_effect=OSError('Authored diagnostic failure')):
+                with self.assertRaises(subprocess.TimeoutExpired) as preserved:
+                    try:
+                        raise error
+                    except subprocess.TimeoutExpired as primary:
+                        print_deadline_snapshot(primary)
+                        raise
+            self.assertIs(preserved.exception, error)
         finally:
             scenario.assert_cleaned(self)
 
