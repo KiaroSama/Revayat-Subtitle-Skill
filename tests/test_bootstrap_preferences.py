@@ -1,4 +1,5 @@
 """Real Windows native candidate fallback honors caller preferences and exact status."""
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -60,10 +61,40 @@ class BootstrapPreferenceTests(WorkspaceCase):
 
 
     def test_actual_launcher_function_scopes_native_preference_and_caller_status(self):
-        caller, fixture = self.write_scope_fixture()
-        for shell in dict.fromkeys(filter(None, [shutil.which('pwsh'), shutil.which('powershell.exe')])):
-            with self.subTest(shell=Path(shell).name):
-                self.run_scope_fixture(shell, caller, fixture, 'original', None, {})
+        planned, attempted, passed, failed = 4, 0, 0, 0
+        first_failure = 'none'
+        try:
+            shells = [shutil.which('pwsh'), shutil.which('powershell.exe')]
+            for name, shell in zip(('pwsh', 'powershell.exe'), shells):
+                if shell is None:
+                    first_failure = f'prerequisite:{name}'
+                    self.fail(f'Baseline native comparison requires {name}')
+            caller, fixture = self.write_scope_fixture(marked=False)
+            for instrumented in (False, True):
+                label = 'instrumented' if instrumented else 'baseline'
+                home = self.home if not instrumented else self.root / 'comparison home فارسی'
+                if instrumented:
+                    home.mkdir()
+                # Match parent and target homes; the baseline leaves all ambient state alone.
+                with contextlib.ExitStack() as home_context:
+                    if instrumented:
+                        home_context.enter_context(patch.dict(os.environ, {'HOME': str(home), 'USERPROFILE': str(home)}))
+                        home_context.enter_context(patch.object(Path, 'home', return_value=home))
+                    for shell in shells:
+                        observation = {'phase': 'not-observed'}
+                        attempted += 1
+                        try:
+                            self.run_scope_fixture(shell, caller, fixture, label, None, observation,
+                                                   instrumented=instrumented)
+                        except BaseException as error:
+                            failed += 1
+                            first_failure = f'{label}:{Path(shell).name}:{type(error).__name__}:{observation["phase"]}'
+                            raise
+                        passed += 1
+        finally:
+            print(f'Native baseline comparison planned={planned} attempted={attempted} passed={passed} '
+                  f'failed={failed} not_run={planned-attempted} first_failure={first_failure}', flush=True)
+        self.assertEqual((attempted, passed, failed), (planned, planned, 0))
 
     def test_native_scope_fresh_and_reused_homes_fixed_sample(self):
         # Cold is first use of this authored home, not an OS/runtime cache flush.
@@ -144,22 +175,25 @@ class BootstrapPreferenceTests(WorkspaceCase):
                 + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
                 + '}\n' + (phase('"script-end"') + '\n' if marked else ''))
 
-    def write_scope_fixture(self):
+    def write_scope_fixture(self, marked=True):
         fixture = self.root / 'scope fixture'
         fixture.mkdir()
         (fixture / 'install.py').write_text('import sys;sys.exit(7)', encoding='utf-8')
         caller = self.root / 'scope.ps1'
-        caller.write_text(self.scope_caller_text(), encoding='utf-8')
+        caller.write_text(self.scope_caller_text(marked), encoding='utf-8')
         return caller, fixture
 
-    def run_scope_fixture(self, shell, caller, fixture, label, env, observation):
+    def run_scope_fixture(self, shell, caller, fixture, label, env, observation, *, instrumented=True):
         name = Path(shell).name
         began = time.monotonic()
         logs = self.root / 'logs'
         prior_logs = set(logs.glob('*.log'))
         stdout, stderr, state = b'', b'', 'incomplete'
         try:
-            with patch.dict(os.environ, {'REVAYAT_LOG_LEVEL': 'DEBUG'}), operational_log('scope-native-owner'):
+            with contextlib.ExitStack() as context:
+                if instrumented:
+                    context.enter_context(patch.dict(os.environ, {'REVAYAT_LOG_LEVEL': 'DEBUG'}))
+                    context.enter_context(operational_log('scope-native-owner'))
                 result = run_child([shell, '-NoProfile', '-NonInteractive', '-File', str(caller), str(fixture)],
                                    env=None if env is None else {**os.environ, **env}, timeout=20)
             stdout, stderr, state = result.stdout, result.stderr, 'complete'
