@@ -131,6 +131,8 @@ class TimedGetScenario(DeadlineScenario):
         self.ready = [threading.Event(), threading.Event()]
         self.first_consumed = False
         self.queue_instance = None
+        self.kill_signal = object()
+        self.kill_calls = []
         self.process.stdout = self.TimedStream(self, True)
         self.process.stderr = self.TimedStream(self, False)
 
@@ -194,7 +196,8 @@ class TimedGetScenario(DeadlineScenario):
             actual.start = start
             return actual
 
-        def killed(*args):
+        def killed(pid, sig):
+            self.kill_calls.append((pid, sig))
             self.cleanups.append('killpg')
             for event in (*self.release, self.finish):
                 event.set()
@@ -203,6 +206,7 @@ class TimedGetScenario(DeadlineScenario):
         try:
             with patch.object(module, 'time', types.SimpleNamespace(monotonic=lambda: self.now)), \
                  patch.object(module, 'os', os_proxy), \
+                 patch.object(module, 'signal', types.SimpleNamespace(SIGKILL=self.kill_signal)), \
                  patch.object(module, 'queue', types.SimpleNamespace(Queue=self.make_queue, Empty=queue.Empty, Full=queue.Full)), \
                  patch.object(module.subprocess, 'Popen', return_value=self.process), \
                  patch.object(module.threading, 'Thread', side_effect=thread):
@@ -218,6 +222,7 @@ class TimedGetScenario(DeadlineScenario):
 
     def assert_cleaned(self, test):
         test.assertIn('killpg', self.cleanups)
+        test.assertEqual(self.kill_calls, [(self.process.pid, self.kill_signal)])
         test.assertIn('wait', self.cleanups)
         test.assertTrue(all(not thread.is_alive() for thread in self.threads))
         test.assertTrue(self.process.stdout.closed)
