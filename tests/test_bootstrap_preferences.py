@@ -97,23 +97,59 @@ class BootstrapPreferenceTests(WorkspaceCase):
                   f'failed={failed} not_run={planned-attempted} first_failure={first_failure}', flush=True)
         self.assertEqual((attempted, passed, failed), (planned, planned, 0))
 
-    def write_scope_fixture(self):
+    def test_native_scope_silent_and_marked_fixed_comparison(self):
+        planned, attempted, passed, failed = 4, 0, 0, 0
+        first_failure = 'none'
+        try:
+            shell = shutil.which('powershell.exe')
+            if shell is None:
+                first_failure = 'prerequisite:powershell.exe'
+                self.fail('Fixed silent comparison requires powershell.exe')
+            caller, fixture = self.write_scope_fixture()
+            silent = caller.with_name('scope-silent.ps1')
+            silent.write_text(self.scope_caller_text(False), encoding='utf-8')
+            for index, marked in enumerate((False, True, True, False)):
+                home = self.root / f'comparison home فارسی {index}'
+                home.mkdir()
+                env = {'HOME': str(home), 'USERPROFILE': str(home)}
+                label = f'comparison-{index}-' + ('marked' if marked else 'silent')
+                observation = {'phase': 'not-observed'}
+                attempted += 1
+                try:
+                    self.run_scope_fixture(shell, caller if marked else silent, fixture, label, env, observation)
+                except BaseException as error:
+                    failed += 1
+                    first_failure = f'{label}:{type(error).__name__}:{observation["phase"]}'
+                    raise
+                passed += 1
+        finally:
+            print(f'Native silent comparison planned={planned} attempted={attempted} passed={passed} '
+                  f'failed={failed} not_run={planned-attempted} first_failure={first_failure}', flush=True)
+        self.assertEqual((attempted, passed, failed), (planned, planned, 0))
+
+    def scope_caller_text(self, marked=True):
         source = (ROOT / 'install/install.ps1').read_text(encoding='utf-8')
         # Exercise native preference scopes in the actual body. Only path/terminal
         # exit adapters change so a function can inspect caller state after return.
         body = source.replace('$PSScriptRoot', '$FixtureRoot').replace('exit $result', 'return $result').replace('exit 2', 'return 2')
+        phase = lambda value: f'Write-ScopePhase {value}' if marked else ''
+        definition = ('function Write-ScopePhase($Phase) { [Console]::Error.WriteLine("scope-fixture " + [DateTime]::UtcNow.ToString("o") + " " + $Phase) }\n'
+                      + phase('"script-start"') + '\n') if marked else ''
+        return ('param($FixtureRoot)\n' + definition + 'function Invoke-ActualLauncher {\n' + body
+                + '\n}\nforeach($choice in @($true,$false)) {\n'
+                + phase('("before-choice="+$choice);')
+                + '$PSNativeCommandUseErrorActionPreference=$choice;$LASTEXITCODE=91;'
+                + 'Invoke-ActualLauncher;'
+                + phase('("after-choice="+$choice);')
+                + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
+                + '}\n' + (phase('"script-end"') + '\n' if marked else ''))
+
+    def write_scope_fixture(self):
         fixture = self.root / 'scope fixture'
         fixture.mkdir()
         (fixture / 'install.py').write_text('import sys;sys.exit(7)', encoding='utf-8')
         caller = self.root / 'scope.ps1'
-        caller.write_text('param($FixtureRoot)\nfunction Write-ScopePhase($Phase) { [Console]::Error.WriteLine("scope-fixture " + [DateTime]::UtcNow.ToString("o") + " " + $Phase) }\nWrite-ScopePhase "script-start"\nfunction Invoke-ActualLauncher {\n' + body
-                          + '\n}\nforeach($choice in @($true,$false)) {\n'
-                          + 'Write-ScopePhase ("before-choice="+$choice);'
-                          + '$PSNativeCommandUseErrorActionPreference=$choice;$LASTEXITCODE=91;'
-                          + 'Invoke-ActualLauncher;'
-                          + 'Write-ScopePhase ("after-choice="+$choice);'
-                          + 'if($PSNativeCommandUseErrorActionPreference -ne $choice -or $LASTEXITCODE -ne 91){throw "Caller state changed"}\n'
-                          + '}\nWrite-ScopePhase "script-end"\n', encoding='utf-8')
+        caller.write_text(self.scope_caller_text(), encoding='utf-8')
         return caller, fixture
 
     def run_scope_fixture(self, shell, caller, fixture, label, env, observation):
@@ -161,6 +197,16 @@ class BootstrapPreferenceTests(WorkspaceCase):
                                 print('Native lifecycle ' + message, flush=True)
                     except (OSError, ValueError):
                         print('Native lifecycle capture unavailable; original timeout preserved', flush=True)
+                bootstrap = sorted(path for path in set(logs.glob('*.log')) - prior_logs
+                                   if path.name.startswith('install-bootstrap_'))
+                for path in bootstrap[:2]:
+                    try:
+                        for line in read_limited(path, 65536).decode('utf-8').splitlines():
+                            message = line.split('] ', 3)[-1]
+                            if message in ('Checking Python prerequisite.', 'Installer completed exit=7.'):
+                                print('Native bootstrap ' + message, flush=True)
+                    except (OSError, ValueError):
+                        print('Native bootstrap capture unavailable; original timeout preserved', flush=True)
 
 
 if __name__ == "__main__":
