@@ -27,6 +27,14 @@ only in development. Authored failure logs/images are size-limited CI artifacts;
 private real-media work is never uploaded. Native render fixtures bind a selected
 font file and prove visible pixels, not linguistic or shaping correctness by themselves.
 
+Deterministic owner-loop fixtures cover timely captured output waiting in the queue
+and output received during a timed wait. Output-idle progress is recorded by the
+capture readers, not when the owner later consumes it; a genuine expired output
+interval remains expired. Wall deadlines, output caps and process-tree cleanup
+stay independent. The pinned earlier owner must reproduce the named false-idle
+failures under the same authored timelines. This does not establish the cause of
+historical intermittent PowerShell startup timeouts.
+
 Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions)
 for the result on the commit being evaluated; configuration alone is not a pass.
 

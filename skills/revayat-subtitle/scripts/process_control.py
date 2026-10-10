@@ -137,6 +137,8 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
     stopping = threading.Event()
     captured = {"stdout": bytearray(), "stderr": bytearray()}
     began = last_progress = time.monotonic()
+    progress_lock = threading.Lock()
+    idle_expired = False
     primary = None
 
     def emit(kind, data):
@@ -148,11 +150,18 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 continue
 
     def drain(kind, stream):
+        nonlocal last_progress, idle_expired
         try:
             while not stopping.is_set():
                 chunk = stream.read1(65536)
                 if not chunk:
                     break
+                # Credit captured output before queue backpressure or owner scheduling.
+                # A late observation cannot revive a previously expired idle interval.
+                with progress_lock:
+                    observed = time.monotonic()
+                    idle_expired = idle_expired or observed - last_progress >= idle
+                    last_progress = observed
                 emit(kind, chunk)
         except OSError:
             emit("capture_error", kind)
@@ -197,12 +206,15 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
         finished = set()
         size = 0
         while len(finished) != 2 or process.poll() is None or not gate_done:
-            now = time.monotonic()
-            remaining = min(timeout - (now - began), idle - (now - last_progress))
-            if remaining <= 0:
+            with progress_lock:
+                now = time.monotonic()
+                idle_elapsed = now - last_progress
+                expired = idle_expired
+            remaining = min(timeout - (now - began), idle - idle_elapsed)
+            if remaining <= 0 or expired:
                 logging.debug("Tool deadline expired reason=%s elapsed_seconds=%.3f idle_seconds=%.3f gate_released=%s streams_closed=%d leader_exited=%s",
                               "wall" if now - began >= timeout else "idle", now - began,
-                              now - last_progress, gate_done, len(finished), process.poll() is not None)
+                              idle_elapsed, gate_done, len(finished), process.poll() is not None)
                 # Never embed secret-bearing argv or captured private output in the exception.
                 raise subprocess.TimeoutExpired("external tool", timeout,
                                                 output=bytes(captured["stdout"]), stderr=bytes(captured["stderr"]))
@@ -222,7 +234,6 @@ def run(command: list[str], *, cwd: Path | None = None, timeout: float = 45,
                 if size > max_output:
                     raise ValueError("External tool output exceeded its byte limit")
                 captured[kind].extend(data)
-                last_progress = now
         code = process.wait(timeout=1)
         if code and check:
             raise ToolFailure(code, bytes(captured["stdout"]), bytes(captured["stderr"]))

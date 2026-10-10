@@ -33,6 +33,10 @@ the new build path printed by `build`; old reviews belong to old bytes.
 editorial approvals. A failure is a finding, not an instruction to delete data.
 After a render timeout, inspect the failure and any diagnostic images before retrying;
 each FFmpeg child is bounded to 45 seconds and a timeout is not success.
+Output-idle budgets measure the interval between captured stdout/stderr chunks,
+not delayed consumption by the owner. EOF and launch-gate events are not output
+progress; output after an expired interval cannot revive it. The absolute wall
+budget and output cap still apply independently.
 
 ## Installer process interruption
 
