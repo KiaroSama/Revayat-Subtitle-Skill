@@ -13,7 +13,7 @@ class CiPolicyTests(unittest.TestCase):
                 self.assertNotIn("pull_request_target", text)
                 self.assertIn("persist-credentials: false", text)
         ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn("uses: ./.github/workflows/workflow-lint.yml", ci)
+        self.assertIn("uses: $/.github/workflows/workflow-lint.yml", ci)
         self.assertIn("python: '3.11'", ci)
         self.assertNotIn("'3.10'", ci)
         self.assertIn("cf430e030ddbb5b0abf93d22962f4752f3646cd9", ci)

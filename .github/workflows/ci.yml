@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   workflow-lint:
-    uses: ./.github/workflows/workflow-lint.yml
+    uses: $/.github/workflows/workflow-lint.yml
   check:
     name: Check ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
