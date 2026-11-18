@@ -2,7 +2,8 @@
 
 Use this only when the host actually supports subagents and the user has agreed
 to parallel work for this batch. It applies to translation from any language and
-to correction of existing Persian subtitles. The same fidelity and review rules apply.
+to subtitle correction. Every worker follows [voice by output language](target-voice.md)
+using the assigned target. The same fidelity and review rules apply.
 
 ## Ask before dispatch
 

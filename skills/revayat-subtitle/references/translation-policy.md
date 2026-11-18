@@ -25,15 +25,15 @@ Read [source-languages.md](source-languages.md) for mandatory language research,
 read-only context, scene continuity, faithful drafting and a separate fluency pass.
 Do not force an English intermediate translation or silently reuse stale decisions.
 
-## Spoken Persian
+## Dialogue in the target language
 
-Persian is the default output. Translate any source language; thoroughly edit Persian;
-handle a mixed file cue by cue. Another target language needs the user's request.
+Persian is the default output. Use another target only when the user requests it.
+Follow [voice by output language](target-voice.md) for translation and correction,
+and handle mixed sources cue by cue.
 
-Write natural spoken Persian. For ordinary dialogue, `می‌خوام برم خونه` is
-appropriate; `می‌خواهم به منزل بروم` is unnecessarily literary. Preserve a
-character's voice and degree of respect using natural conversation, not stiff
-prose. Fix spelling and conceptual mistakes as well as awkward wording.
+Preserve each character's voice and degree of respect. For casual Persian dialogue,
+`می‌خوام برم خونه` may fit where `می‌خواهم به منزل بروم` sounds too formal.
+Fix spelling, errors in meaning and awkward wording without flattening a character's register.
 
 Keep all story meaning, including profanity, sexual language and slurs, at the
 original intensity. Do not censor, soften, intensify, omit, add explanation or

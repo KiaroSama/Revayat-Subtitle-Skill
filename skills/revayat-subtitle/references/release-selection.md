@@ -20,8 +20,8 @@ configuration still exists in the inventory and blocks the build.
 
 ## Choose the base
 
-Prefer a usable ASS base. Within the same format, compare meaning, spoken Persian,
-missing dialogue, timing, signs, songs, honorifics and presentation. File size,
+Prefer a usable ASS base. Within the same format, compare meaning, natural dialogue
+in the target language, missing dialogue, timing, signs, songs, honorifics and presentation. File size,
 cue count, release label and extension do not measure editorial quality.
 
 Read every candidate, including those not selected. Record the comparison and the

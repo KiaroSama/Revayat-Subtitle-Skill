@@ -347,7 +347,7 @@ class SubtitleChecks(WorkspaceCase):
         for relative in ("plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json", ".claude-plugin/plugin.json"):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
-            self.assertEqual(manifest["version"], "1.3.0")
+            self.assertEqual(manifest["version"], "1.4.0")
         documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
                      *ROOT.glob("skills/**/*.md")]
         for document in documents:

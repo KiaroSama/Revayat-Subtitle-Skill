@@ -10,7 +10,7 @@ the anime title online before translating. Prefer official anime sites, publishe
 distributors and character credits; use reliable secondary references when a
 primary source omits a name. Record actual URLs and what they establish.
 
-Verify original-script names and confirmed readings, then choose consistent Persian spellings for
+Verify the original-script names and readings, then choose consistent target-language spellings for
 characters, places, organizations and recurring terms. User-approved spellings
 take precedence over a new preference. Correct a previously mistaken spelling
 explicitly and update its occurrences instead of silently changing the glossary.
@@ -21,9 +21,11 @@ A new anime starts a separate glossary. The next episode, batch or season of the
 same anime loads its previous glossary before its first cue. Keep locked names,
 nicknames, pronouns, forms of address and character voice; add new entries as needed.
 If the prior glossary is unavailable, request it or previous output and disclose
-that continuity remains unverified until recovered.
+that continuity remains unverified until recovered. Use a glossary for the same
+output language. If the target changes, keep source research and confirm the new
+target spellings before locking them.
 
-Honorifics are retained: `-san` → `-سان`, `-kun` → `-کون`, `-sama` → `-ساما`,
+Keep Japanese honorifics in every target. Persian spellings: `-san` → `-سان`, `-kun` → `-کون`, `-sama` → `-ساما`,
 `-chan` → `-چان`, `onii-chan` → `اونی-چان`. Keep the series' separator convention.
 Distinguish a suffix from an unrelated word with the same letters.
 

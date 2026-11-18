@@ -1,13 +1,13 @@
 ---
 name: revayat-subtitle
-description: Translate anime subtitles from any source language into fluent spoken Persian, or thoroughly edit Persian subtitles. Review every cue, reconcile competing ASS/SRT releases, preserve Japanese honorifics and series-wide names, repair RTL punctuation, inspect FFmpeg renders, and deliver one file per episode inside Sub.zip. Use for subtitle attachments, seasons, sequels and OVAs.
+description: Use when translating or editing anime subtitles, reconciling ASS or SRT releases, or checking subtitle presentation. Persian is the default output. Use the requested target language for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 
-# Revayat Subtitle — subtitles into Persian
+# Revayat Subtitle
 
 Run the nine steps below in order. Each step names its action and the evidence
 needed to continue. On a resumed batch, load this file and the translation policy
@@ -99,8 +99,8 @@ python "SKILL_DIR/scripts/revayat-subtitle.py" prepare "attachments.zip" --work 
 
 For a sequel, also pass `--glossary previous/glossary.json` using the same canonical
 series identity. Persian is the default target; change `--target-language` only
-when the user asks. Translate any source language into Persian, edit Persian,
-and handle mixed sources cue by cue. Identify each source language/variety and
+when the user asks. On resume, use the target saved in `project.json`. Handle
+mixed sources cue by cue. Identify each source language and variety and
 read [source-languages.md](references/source-languages.md), including its mandatory
 per-language research procedure. Prefer direct translation from the original;
 disclose an unavailable original or a necessary pivot rather than invent fidelity.
@@ -131,7 +131,7 @@ Read [glossary-and-voice.md](references/glossary-and-voice.md). Search the anime
 online before editing. Prefer official sites, publishers, distributors and credits;
 record actual source URLs and what they establish in `glossary.json`.
 
-Verify original-script names and their confirmed readings and settle consistent Persian spellings. Keep
+Verify the original-script names and their readings, then agree on consistent spellings in the target language. Keep
 سان، کون، ساما، چان and اونی-چان as Japanese forms of address, not آقا or خانم.
 Preserve locked names from the previous season. If that glossary is missing,
 request it or prior outputs and disclose the continuity gap.
@@ -162,11 +162,11 @@ already answered. Dispatch real subagents only after consent and only when the h
 supports them; otherwise continue sequentially. Shared worksheets and glossary have
 one writer: the coordinator. All existing cue and final-review requirements remain.
 
-Read [translation-policy.md](references/translation-policy.md) and
-[persian-typography.md](references/persian-typography.md). These are mandatory on
-every invocation. Work sequentially in bounded batches with adjacent dialogue
-for context. Fill every worksheet row; mark it reviewed only after reading the
-whole cue, including each physical line.
+Read [translation-policy.md](references/translation-policy.md) and load the
+matching voice skill using [target-voice.md](references/target-voice.md). For
+Persian text, also read [persian-typography.md](references/persian-typography.md).
+Work in bounded batches with adjacent dialogue for context. Fill every worksheet
+row; mark it reviewed only after reading the whole cue, including each physical line.
 
 | Decision | Meaning |
 | --- | --- |
@@ -176,8 +176,8 @@ whole cue, including each physical line.
 | `empty` | Remove an actually empty cue; vector drawings do not qualify. |
 | `alternate` | Omit duplicate candidate content and link to retained cues covering it. |
 
-Write fluent spoken Persian. Correct spelling, conceptual mistakes, punctuation,
-quote scope and misplaced English words without changing the meaning. Keep all
+Write natural dialogue in the target language. Correct spelling, errors in meaning,
+punctuation, quote scope and mixed-language word order without changing what was said. Keep all
 story content and the original intensity of profanity and sexual references.
 Translate readable signs and lyrics while preserving vector paths and controls.
 
@@ -215,9 +215,9 @@ text and checks its serialization. SRT-only episodes remain SRT; an ASS base sta
 ## Step 7 — Check names, meaning and typography
 
 Read each complete resulting episode against its sources and glossary. Check
-all names, honorifics, references, negations, lyrics and signs; check that Persian
-remains natural conversation. Confirm the exact span enclosed by every quote and
-the logical order of English/Persian fragments.
+all names, honorifics, references, negations, lyrics and signs. Check that dialogue
+sounds natural in the target language. Confirm quote scope and the logical order
+of mixed-script fragments.
 
 For example, repair `رو دیدم. OVA من دیروز` to `من دیروز OVA رو دیدم.` before
 adding direction marks. A displayed period on the left may already be correct in
@@ -249,7 +249,7 @@ When matching video/audio is supplied and can be inspected, check spoken content
 just before the first subtitle cue and after the last as well as representative
 middle scenes; a correctly rendered first/last cue cannot reveal missing edge
 dialogue. If the video has embedded, forced or burned-in subtitles, inspect
-playback with the intended external Persian track selected for duplicate visible
+playback with the intended external subtitle track selected for duplicate visible
 text. Preserve intentional ASS dialogue/sign layers. If audio access or a player
 is unavailable, report that coverage or track selection was unverified; FFmpeg
 preview frames alone do not establish either claim.

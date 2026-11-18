@@ -34,12 +34,37 @@ def destination(agent: str, scope: str, base: Path) -> Path:
     return base / folder / "skills" / NAME
 
 
+VOICE_FILES = {
+    "humanizer": ("SKILL.md", "LICENSE"),
+    "great-russian": (
+        "SKILL.md", "LICENSE", "references/ai-detection.md", "references/antipatterns.md",
+        "references/digital-formats.md", "references/grammar.md", "references/parandowski.md",
+        "references/style-matching.md", "references/typography.md",
+    ),
+    "persian": (
+        "SKILL.md", "LICENSE", "NOTICE", "references/ai-tells.md", "references/lexicon.md",
+        "references/pitfalls.md", "references/register-guide.md", "references/review-lenses.md",
+        "references/typography-and-rtl.md", "scripts/lookup.py", "scripts/persian_lint.py",
+        "scripts/test_scripts.py", "scripts/data/glossary.tsv", "scripts/data/idioms.tsv",
+    ),
+}
+
+
 def skill_files() -> list[Path]:
-    files = [SKILL / "SKILL.md", SKILL / "LICENSE", SKILL / "requirements.txt"]
+    files = [SKILL / "SKILL.md", SKILL / "LICENSE", SKILL / "requirements.txt", SKILL / "voice/SOURCES.md"]
     for folder, suffixes in {"scripts": {".py"}, "references": {".md"}, "agents": {".yaml"}}.items():
         files.extend(sorted(path for path in (SKILL / folder).iterdir() if path.suffix in suffixes))
-    if any(not path.is_file() or path.is_symlink() for path in files):
-        raise ValueError("Skill distribution contains a missing file or symlink")
+    files.extend(SKILL / "voice" / name / path for name, paths in VOICE_FILES.items() for path in paths)
+    checked = set()
+    for path in files:
+        if not path.is_file():
+            raise ValueError("Skill distribution contains a missing file")
+        for entry in (path, *path.parents):
+            if entry == REPO:
+                break
+            if entry not in checked and linked(entry):
+                raise ValueError("Skill distribution contains a linked file or directory")
+            checked.add(entry)
     return files
 
 

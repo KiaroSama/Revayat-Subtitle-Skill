@@ -18,6 +18,7 @@ is invalid. Continue by reading `project.json`,
 `glossary.json` and the worksheets. Identify the first incomplete source/cue and
 the latest build matching the current edits; report that state before continuing.
 Use the original series identity, season numbering, locked names and font policy.
+Use the saved `project.json.target_language` to select the bundled voice guide.
 Read the previous activity log and create a new run log beside the translated
 files, identifying the resumed batch and recording subsequent actions as they occur.
 

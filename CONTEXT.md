@@ -1,6 +1,10 @@
 # Revayat Subtitle
 
-A subtitle edition for one anime series, using consistent Persian across seasons.
+A subtitle edition for one anime series, using consistent wording across seasons in the chosen language. Persian is the default.
+
+**Target language**: The language requested for the subtitle edition. It is independent of the source and conversation languages.
+
+**Voice guide**: An editorial reference for natural wording in the target language. It does not override cue meaning, timing or presentation.
 
 **Series**: The anime identity shared by its seasons and OVAs. A sequel retains its
 established names; a different anime gets a separate glossary.

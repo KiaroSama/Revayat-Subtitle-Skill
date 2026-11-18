@@ -1,9 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -14,6 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  workflow-lint:
+    uses: ./.github/workflows/workflow-lint.yml
   check:
     name: Check ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}

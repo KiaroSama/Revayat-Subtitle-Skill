@@ -1,11 +1,12 @@
 ---
-description: Translate anime subtitles from any source language into Persian, or repair Persian subtitles and deliver one reviewed file per episode in Sub.zip.
+description: Translate or edit anime subtitles. Persian is the default; specify another target in the request.
 argument-hint: <ASS, SRT, ZIP or folder> [series and season]
 ---
 
 Use `revayat-subtitle` for **$ARGUMENTS**. Resolve the installed skill's `SKILL.md`
 and follow all nine steps, the translation policy and source-language research.
-Persian is the default target; use the original language directly when understood. Read every cue of every
+Persian is the default target; choose the voice guide by output language. Translate
+directly from the original when understood. Read every cue of every
 candidate, research the anime, reuse the series glossary, keep Japanese honorifics,
 ask about retaining/removing embedded fonts when present unless already decided,
 and inspect the FFmpeg images. Keep the required agent activity log beside the

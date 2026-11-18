@@ -1,12 +1,13 @@
 {
   "name": "revayat-subtitle-marketplace",
   "owner": {"name": "Kiaro Sama"},
+  "description": "Revayat Subtitle and its bundled voice guides.",
   "plugins": [
     {
       "name": "revayat-subtitle",
-      "description": "Translate and repair Persian anime subtitles.",
+      "description": "Translate and edit anime subtitles. Persian is the default.",
       "source": "./",
-      "version": "1.3.0"
+      "version": "1.4.0"
     }
   ]
 }

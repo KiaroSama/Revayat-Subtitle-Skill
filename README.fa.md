@@ -1,29 +1,31 @@
 <div dir="rtl">
 
-# روایت زیرنویس — Revayat Subtitle
+<h1 align="center">روایت زیرنویس — Revayat Subtitle</h1>
 
 <div align="center">
 
-[![Cross-platform CI status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
-[![CodeQL analysis status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/codeql.yml)
-[![Pull request workflow lint status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/workflow-lint.yml)
-[![Pull request dependency review status](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml/badge.svg?event=pull_request)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/dependency-review.yml)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0%2B-2ea44f?style=flat-square)](LICENSE)
-[![Plugin version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-0d6efd?style=flat-square)](plugin.json)
-[![Python: 3.11 or newer](https://img.shields.io/badge/Python-3.11%2B-3776ab?style=flat-square)](docs/platforms.md)
-[![Platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-2563eb?style=flat-square)](docs/platforms.md)
-[![Input formats: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb?style=flat-square)](skills/revayat-subtitle/references/subtitle-formats.md)
-[![Target language: spoken Persian](https://img.shields.io/badge/Target-spoken%20Persian-2563eb?style=flat-square)](skills/revayat-subtitle/references/translation-policy.md)
-[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-2563eb?style=flat-square)](skills/revayat-subtitle/references/persian-typography.md)
-[![Standard: Agent Skills](https://img.shields.io/badge/Standard-Agent%20Skills-008080?style=flat-square)](https://agentskills.io/specification)
-[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1?style=flat-square)](README.fa.md)
-[![GitHub stars](https://img.shields.io/github/stars/KiaroSama/Revayat-Subtitle-Skill?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/stargazers)
-[![Last commit on main](https://img.shields.io/github/last-commit/KiaroSama/Revayat-Subtitle-Skill/main?style=flat-square)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/commits/main)
+[![CI is manually dispatched](https://img.shields.io/badge/CI-manual%20dispatch-217ba3)](.github/workflows/ci.yml)
+[![CodeQL checks Python and Actions](https://img.shields.io/badge/CodeQL-Python%20%7C%20Actions-497e49)](.github/workflows/codeql.yml)
+[![Gitleaks scans Git history](https://img.shields.io/badge/Gitleaks-history%20scans-c26d32)](.github/workflows/gitleaks.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%203.0%2B-2ea44f)](LICENSE)
+[![Plugin version: 1.4.0](https://img.shields.io/badge/Plugin-1.4.0-0d6efd)](plugin.json)
+[![Verified Python tooling: 3.13.15](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
+[![CI platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
+[![Distribution: plugin and standalone skill](https://img.shields.io/badge/Install-plugin%20%7C%20skill-806c46)](install/install.py)
+[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1)](README.fa.md)
+[![Published Git tree at 95ad08b: 1.00 MB](https://img.shields.io/badge/repo%20size-1.00%20MB-ca8a04)](#repository-size)
+[![Subtitle inputs: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-755e99)](skills/revayat-subtitle/references/persian-typography.md)
+[![Bundled voice guides: Persian, Russian and English](https://img.shields.io/badge/Voice-Persian%20%7C%20Russian%20%7C%20English-43535a)](skills/revayat-subtitle/references/target-voice.md)
 [![Support donations](https://img.shields.io/badge/Support-donations-d04a9a)](#donate)
 
 </div>
 
-**زیرنویس انیمه را از هر زبانی به فارسی گفتاری ترجمه کنید یا زیرنویس فارسی را کامل اصلاح کنید؛ خروجی هر قسمت یک فایل بازبینی‌شده داخل `Sub.zip` است.**
+**زیرنویس انیمه را ترجمه یا ویرایش کنید و برای هر قسمت یک فایل بازبینی‌شده در `Sub.zip` بگیرید. زبان پیش‌فرض خروجی فارسی است.**
+
+<a id="repository-size"></a>
+
+حجم فایل‌های منتشرشده در `95ad08b`: ۱٬۰۰۲٬۹۹۸ بایت (۱٫۰۰ مگابایت)، بدون تاریخچهٔ Git و فایل‌های ثبت‌نشده.
 
 اسکیلی برای Claude Code، Codex، Cursor، Kiro، Cline، Hermes، OpenCode،
 Antigravity و هر ایجنتی که `SKILL.md` را می‌خواند. تمرکز آن روی بخش‌هایی است
@@ -172,6 +174,9 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 > و واژه‌نامهٔ به‌روزشده را بده.
 
 فایل‌های ASS/SRT یا ZIP و برای ادامهٔ مجموعه، واژه‌نامهٔ قبلی را ضمیمه کنید.
+زبان پیش‌فرض فارسی است. اگر خروجی روسی یا انگلیسی بخواهید، روایت از
+[راهنمای لحن همان زبان](skills/revayat-subtitle/references/target-voice.md) استفاده می‌کند.
+راهنماها همراه افزونه و نسخهٔ مستقل هستند و نصب جداگانه نمی‌خواهند.
 در Codex از `$revayat-subtitle` استفاده کنید. در پلاگین Claude، شروع کار با
 `/revayat-subtitle:translate-subtitles`، ادامه با
 `/revayat-subtitle:revayat-subtitle-resume` و گزارش QA با
@@ -305,7 +310,8 @@ python evaluation/score.py --answers my-answers.json
 </div>
 
 رانر مبتنی بر کتابخانهٔ استاندارد، زمان اجرای فرایند را محدود و خط فرمان و
-نصب‌کنندهٔ واقعی را بررسی می‌کند. CI روی Linux، macOS و Windows اجرا می‌شود؛
+نصب‌کنندهٔ واقعی را بررسی می‌کند. CI را دستی روی شاخهٔ موردنظر اجرا کنید؛ همان اجرا
+تست‌های Linux، macOS و Windows و بررسی گردش‌کارها را پوشش می‌دهد.
 Linux و Windows رندر libass و پیش‌نمایش ویدئوی ۱۰بیتی را هم بررسی می‌کنند. CodeQL کد Python
 و گردش‌کارها را تحلیل می‌کند؛ Dependency Review برای PRهاست و Dependabot
 اکشن‌ها، وابستگی‌های توسعه و مانیفست خالی اجرای اسکیل را مدیریت می‌کند. actionlint و zizmor خطاهای گردش‌کار را مسدود می‌کنند. نتیجهٔ اجرای همان commit ملاک قبولی است. بسته‌های تست وارد اسکیل نصب‌شده نمی‌شوند.

@@ -1,4 +1,4 @@
-# Source languages into Persian
+# Source-language research for subtitles
 
 Read the common procedure and the relevant language profile before translating.
 Persian remains the default target for every source language. A language profile
@@ -16,15 +16,15 @@ release can help compare omissions or timing, but is not a compulsory intermedia
 translation. If only a pivot translation is available, identify it and disclose
 that fidelity to the unavailable original is unverified. If the agent cannot read
 the source reliably, request a suitable source or qualified review; do not pretend
-an unchanged source line is a finished Persian translation.
+an unchanged source line is a finished translation.
 
-State the actual source language and the spoken-Persian target in each translation
-assignment. A language dropdown, `.fa` filename or previous batch is insufficient.
+State the actual source language and the saved target language in each assignment.
+A language dropdown, `.fa` filename or previous batch is insufficient.
 Every correction or polish pass must repeat structural and source-meaning checks.
 
 For EACH source language encountered, search current primary repositories and
-language references using its name, native name, Persian/Farsi/فارسی and subtitle
-translation. Inspect actual prompts or code, not just a language dropdown. Record
+language references using its name, native name, the target language name and
+subtitle translation. Inspect actual prompts or code, not just a language dropdown. Record
 the relevant source URLs, what was adopted and what remains uncertain. Existing
 research in [research.md](research.md) is a starting point, not a substitute for
 checking a new language, regional usage, proper name or ambiguous expression.
@@ -40,14 +40,14 @@ spoken time. Adjust batch size to scene and complexity, not English word counts.
 Do not split a sentence mechanically at punctuation or count CJK characters as
 English words. A cue boundary alone does not justify adding an ellipsis.
 If one source sentence spans adjacent cues, read the complete sentence across
-their IDs before translating it. Distribute fluent Persian back across those
+their IDs before translating it. Distribute the translated text back across those
 same cue IDs and original display times; check that each part appears when its
 meaning is available, with no repeated or missing phrase. Do not combine or
 drop cues to make the sentence easier. If its meaning cannot be assigned safely
 within those boundaries, keep the affected IDs pending and document the timing
 or source uncertainty for review rather than inventing a complete answer.
 
-Previously approved Persian neighbor cues can also inform voice and the flow of
+Previously approved neighboring cues in the target language can inform the voice and flow of
 a split sentence. Keep them read-only, identify their cue IDs, and check them
 against the source if they conflict. Stale translations and unapproved donors
 are not evidence of meaning.
@@ -59,13 +59,12 @@ Source evidence overrides an earlier mistaken translation or generated summary.
 Glossary consistency fixes meaning and name spelling, not the inflected form of
 every common word. Recheck affected cues when a term or referent changes.
 
-First draft faithful Persian with the source visible; then make it speakable and
+First draft faithfully in the target language with the source visible, then make it speakable and
 check it against that same source again. Preserve agency, negation, tense/aspect,
 certainty, numbers/units, sarcasm, reactions, threats and sexual/profane intensity.
-Keep emphatic or disambiguating pronouns. Do not erase every subject pronoun or
-give every character the same Tehran influencer voice. An intentionally formal
-character can speak naturally with respect, without turning all dialogue literary.
-Avoid invented Iranian accents, memes or explanations for a foreign dialect/joke.
+Keep emphatic or disambiguating pronouns. Preserve differences in formality
+between characters. In Persian, avoid giving everyone the same Tehran register.
+Do not invent a local accent, meme or explanation for a foreign dialect or joke.
 
 On retry, address the failing IDs and actual errors. Reuse a checkpoint only when
 source IDs/text, selected release and applicable glossary decisions still match.
