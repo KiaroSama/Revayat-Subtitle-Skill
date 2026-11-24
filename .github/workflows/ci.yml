@@ -145,7 +145,7 @@ jobs:
       - name: Ensure Rust toolchain with rustfmt and clippy
         shell: bash
         run: |
-          rustup update stable --no-self-update --profile minimal
+          rustup update stable --no-self-update
           rustup default stable
           rustup component add rustfmt clippy
           rustc --version
@@ -183,7 +183,7 @@ jobs:
       - name: Ensure Rust toolchain with rustfmt and clippy
         shell: bash
         run: |
-          rustup update stable --no-self-update --profile minimal
+          rustup update stable --no-self-update
           rustup default stable
           rustup component add rustfmt clippy
           rustc --version

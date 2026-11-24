@@ -380,7 +380,7 @@ def validate_srt_donor_markup(text: str) -> None:
         body = body[1:] if closing else body
         name = body.lstrip(" ").split(" ", 1)[0]
         recognized = (name.lower() in {"b", "i", "s", "u", "font", "br", "br/"}
-                      or (not closing and re.match(r"font\s", body, re.I | re.ASCII) is not None))
+                      or (not closing and re.match(r"font\s+\S", body, re.I | re.ASCII) is not None))
         likely = (re.fullmatch(r"[A-Za-z0-9_/]*", name) is not None
                   and not body.startswith(" ")
                   and (closing or match.start() == 0 or text[match.start() - 1] != "<"))

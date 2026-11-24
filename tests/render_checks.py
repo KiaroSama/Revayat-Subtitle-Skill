@@ -24,7 +24,7 @@ class ControlledFontRender(WorkspaceCase):
         rows = read_json(worksheet)
         rows[0].update(text="x < 5 و y > 2 رو نگه دار.", reviewed=True)
         write_json(worksheet, rows)
-        result = build(self.work)
+        result = build(self.work, output_format="srt")
         edition = Path(result["build"])
         evidence = render(edition, "S01E01", None, None, None, True)
         self.assertIn("x < 5", (edition / "Sub/S01E01.srt").read_text(encoding="utf-8"))
