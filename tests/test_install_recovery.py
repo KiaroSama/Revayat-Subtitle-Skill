@@ -79,8 +79,10 @@ class InstallRecoveryTests(WorkspaceCase):
         self.assertTrue((target / "SKILL.md").is_file())
 
 
-    def interrupted_publication(self, *, old=True, point='new'):
-        target = self.root / ('target-' + point)
+    def interrupted_publication(self, *, old=True, point='new', parent=None):
+        parent = self.root if parent is None else parent
+        parent.mkdir(exist_ok=True)
+        target = parent / ('target-' + point)
         recovery = self.root / ('recovery-' + point)
         if old:
             target.mkdir()
@@ -125,8 +127,264 @@ class InstallRecoveryTests(WorkspaceCase):
         self.assertEqual(result.returncode, 75, result.stderr.decode('utf-8'))
         self.assertEqual((target / 'old.txt').read_bytes(), b'original')
         module = installer()
+        self.registry_pressure(module, journal)
+        module.install(self.root / 'after-cleanup-crash', plugin=False, force=False,
+                       recovery_dir=recovery)
+        with module.state.ownership() as owner:
+            self.assertTrue(module.state.registered(owner, journal)['active'])
         module.recover(journal, recovery, module.rename_noreplace)
         self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+
+    def registry_pressure(self, module, journal, *, inactive=False, count=1000):
+        from runtime import write_json
+        with module.state.ownership() as owner:
+            binding = module.state.registered(owner, journal)
+            if inactive:
+                binding['active'] = False
+            history = [{'path': str(self.root / f'past-{index}' / 'journal.json'),
+                        'transaction_id': ['1', f'{index + 1:x}'],
+                        'digests': ['0' * 64], 'active': False}
+                       for index in range(count - 1)]
+            write_json(owner / 'pending.json', [binding, *history])
+        return owner
+
+    def test_death_after_restored_journal_keeps_cleanup_authorization_under_pressure(self):
+        target, recovery, journal = self.interrupted_publication(point='restored-crash')
+        code = ("import importlib.util,os,sys;from pathlib import Path;"
+                "spec=importlib.util.spec_from_file_location('owned_install',sys.argv[1]);"
+                "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);real=m.state.save_journal\n"
+                "def stop(owner,journal,data):\n real(owner,journal,data)\n"
+                " if data['state']=='restored': os._exit(77)\n"
+                "m.state.save_journal=stop\nm.recover(Path(sys.argv[2]),Path(sys.argv[3]),m.rename_noreplace)")
+        result = run_child([sys.executable, '-B', '-c', code, str(ROOT / 'install/install.py'),
+                            str(journal), str(recovery)], timeout=15)
+        self.assertEqual(result.returncode, 77, result.stderr.decode('utf-8'))
+        module = installer()
+        owner = self.registry_pressure(module, journal)
+        module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+        self.assertTrue(module.state.registered(owner, journal)['active'])
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertFalse(module.state.registered(owner, journal)['active'])
+        self.assertFalse((journal.parent / 'dispose-0000').exists())
+
+    def pending_disposal(self, *, old=True, point='pending', parent=None):
+        from runtime import read_json
+        target, recovery, journal = self.interrupted_publication(old=old, point=point, parent=parent)
+        module = installer()
+        recovery_module = sys.modules['install_recovery']
+        real = recovery_module.shutil.rmtree
+
+        def fail(path, *args, **kwargs):
+            if Path(path).name.startswith('dispose-'):
+                raise PermissionError('Injected disposal cleanup denial')
+            return real(path, *args, **kwargs)
+
+        with patch.object(recovery_module.shutil, 'rmtree', fail):
+            module.recover(journal, recovery, module.rename_noreplace)
+        data = read_json(journal)
+        self.assertEqual(data['state'], 'restored')
+        disposal = Path(data['records'][0]['disposal'])
+        self.assertTrue(disposal.is_dir())
+        return module, target, recovery, journal, disposal
+
+    def test_restored_disposal_survives_capacity_and_a_later_target_install(self):
+        for old in (True, False):
+            for legacy_inactive in (True, False):
+                with self.subTest(old=old, legacy_inactive=legacy_inactive):
+                    module, target, recovery, journal, disposal = self.pending_disposal(
+                        old=old, point=f'pressure-{old}-{legacy_inactive}')
+                    owner = self.registry_pressure(module, journal, inactive=legacy_inactive)
+                    if old:
+                        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+                    else:
+                        self.assertFalse(target.exists())
+                    module.install(target, plugin=False, force=True, recovery_dir=recovery)
+                    self.assertTrue(module.state.registered(owner, journal))
+                    self.assertTrue(disposal.is_dir())
+                    current_id = module.state.identity(target)
+                    current_tree = module.state.tree_manifest(target)
+                    module.recover(journal, recovery, module.rename_noreplace)
+                    module.recover(journal, recovery, module.rename_noreplace)
+                    self.assertFalse(os.path.lexists(disposal))
+                    self.assertFalse(module.state.registered(owner, journal)['active'])
+                    self.assertEqual(module.state.identity(target), current_id)
+                    self.assertEqual(module.state.tree_manifest(target), current_tree)
+                    # Once cleanup succeeds, a later capacity cycle may retire it.
+                    module.install(self.root / f'next-{old}-{legacy_inactive}', plugin=False,
+                                   force=False, recovery_dir=recovery)
+                    with self.assertRaisesRegex(ValueError, 'instructions'):
+                        module.state.registered(owner, journal)
+
+    def test_legacy_overflow_keeps_pending_cleanup_until_owned_retry_finishes(self):
+        module, target, recovery, journal, disposal = self.pending_disposal()
+        owner = self.registry_pressure(module, journal, inactive=True, count=1001)
+        recovery_module = sys.modules['install_recovery']
+        with patch.object(recovery_module.shutil, 'rmtree', side_effect=PermissionError('cleanup denied')):
+            module.recover(journal, recovery, module.rename_noreplace)
+        self.assertTrue(module.state.registered(owner, journal)['active'])
+        self.assertEqual(len(module.state.registry(owner)), 1000)
+        self.assertTrue(disposal.is_dir())
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertFalse(disposal.exists())
+
+    def test_replaced_disposal_is_preserved_and_its_binding_cannot_be_retired(self):
+        module, target, recovery, journal, disposal = self.pending_disposal()
+        original = disposal.with_name('kept-owned-disposal')
+        disposal.rename(original)
+        disposal.mkdir()
+        (disposal / 'foreign.txt').write_bytes(b'foreign bytes')
+        owner = self.registry_pressure(module, journal, inactive=True)
+        module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertTrue(module.state.registered(owner, journal)['active'])
+        self.assertEqual((disposal / 'foreign.txt').read_bytes(), b'foreign bytes')
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+        self.assertTrue(original.is_dir())
+
+    def test_broken_disposal_symlink_is_preserved_with_its_legacy_binding(self):
+        module, target, recovery, journal, disposal = self.pending_disposal()
+        disposal.rename(disposal.with_name('kept-owned-disposal'))
+        try:
+            disposal.symlink_to(self.root / 'absent-foreign-directory', target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest('Host cannot create directory symlinks')
+        owner = self.registry_pressure(module, journal, inactive=True)
+        module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertTrue(module.state.registered(owner, journal)['active'])
+        self.assertTrue(disposal.is_symlink())
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+
+    def test_unreadable_disposal_metadata_keeps_legacy_cleanup_authorization(self):
+        module, target, recovery, journal, disposal = self.pending_disposal()
+        owner = self.registry_pressure(module, journal, inactive=True)
+        real_lstat = Path.lstat
+
+        def denied(path, *args, **kwargs):
+            if path == disposal:
+                raise PermissionError('Injected metadata denial')
+            return real_lstat(path, *args, **kwargs)
+
+        with patch.object(Path, 'lstat', denied):
+            module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+            module.recover(journal, recovery, module.rename_noreplace)
+            self.assertTrue(module.state.registered(owner, journal)['active'])
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertFalse(disposal.exists())
+
+    def test_changed_inactive_journal_is_not_retired_as_completed(self):
+        module, target, recovery, journal, disposal = self.pending_disposal()
+        owner = self.registry_pressure(module, journal, inactive=True)
+        journal.write_bytes(journal.read_bytes() + b'\n')
+        module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+        self.assertIn(str(journal), [entry['path'] for entry in module.state.registry(owner)])
+        with self.assertRaisesRegex(ValueError, 'instructions'):
+            module.recover(journal, recovery, module.rename_noreplace)
+        self.assertTrue(disposal.is_dir())
+        self.assertEqual((target / 'old.txt').read_bytes(), b'original')
+
+    def test_completed_history_can_retire_after_its_target_parent_is_gone(self):
+        module = installer()
+        target, recovery = self.root / 'obsolete-parent' / 'target', self.root / 'recovery'
+        module.install(target, plugin=False, force=False, recovery_dir=recovery)
+        journal = next(recovery.glob('transaction-*/journal.json'))
+        owner = self.registry_pressure(module, journal)
+        module.shutil.rmtree(target.parent)
+        module.install(self.root / 'next-install', plugin=False, force=False, recovery_dir=recovery)
+        self.assertNotIn(str(journal), [entry['path'] for entry in module.state.registry(owner)])
+
+    def test_restored_cleanup_ignores_a_relocated_live_target_parent(self):
+        parent = self.root / 'obsolete-live-parent'
+        module, target, recovery, journal, disposal = self.pending_disposal(parent=parent)
+        moved = self.root / 'preserved-live-parent'
+        parent.rename(moved)
+        old_bytes = (moved / target.name / 'old.txt').read_bytes()
+        module.install(self.root / 'unrelated-install', plugin=False, force=False,
+                       recovery_dir=self.root / 'unrelated-recovery')
+        module.recover(journal, recovery, module.rename_noreplace)
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertFalse(disposal.exists())
+        self.assertFalse(parent.exists())
+        self.assertEqual((moved / target.name / 'old.txt').read_bytes(), old_bytes)
+
+    def test_restored_cleanup_never_follows_a_replaced_live_parent_symlink(self):
+        parent = self.root / 'obsolete-live-parent'
+        module, target, recovery, journal, disposal = self.pending_disposal(parent=parent)
+        parent.rename(self.root / 'preserved-live-parent')
+        foreign = self.root / 'foreign-parent'
+        foreign.mkdir()
+        (foreign / 'keep.txt').write_bytes(b'foreign bytes')
+        try:
+            parent.symlink_to(foreign, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest('Host cannot create directory symlinks')
+        module.install(self.root / 'unrelated-install', plugin=False, force=False,
+                       recovery_dir=self.root / 'unrelated-recovery')
+        module.recover(journal, recovery, module.rename_noreplace)
+        self.assertFalse(disposal.exists())
+        self.assertTrue(parent.is_symlink())
+        self.assertEqual(module.state.tree_manifest(foreign)['files'].keys(), {'keep.txt'})
+        self.assertEqual((foreign / 'keep.txt').read_bytes(), b'foreign bytes')
+
+    def test_committed_reconciliation_ignores_an_obsolete_live_target_parent(self):
+        module = installer()
+        parent, recovery = self.root / 'obsolete-live-parent', self.root / 'recovery'
+        target = parent / 'target'
+        target.mkdir(parents=True)
+        (target / 'old.txt').write_bytes(b'original')
+        with patch.object(module.state, 'unregister', side_effect=OSError('commit unregister interrupted')):
+            with self.assertRaisesRegex(OSError, 'commit unregister interrupted'):
+                module.install(target, plugin=False, force=True, recovery_dir=recovery)
+        journal = next(recovery.glob('transaction-*/journal.json'))
+        moved = self.root / 'preserved-live-parent'
+        parent.rename(moved)
+        expected = module.state.tree_manifest(moved / 'target')
+        module.install(self.root / 'unrelated-install', plugin=False, force=False,
+                       recovery_dir=self.root / 'unrelated-recovery')
+        with module.state.ownership() as owner:
+            self.assertFalse(module.state.registered(owner, journal)['active'])
+        with self.assertRaisesRegex(ValueError, 'Committed'):
+            module.recover(journal, recovery, module.rename_noreplace)
+        self.assertEqual(module.state.tree_manifest(moved / 'target'), expected)
+        self.assertEqual((journal.parent / 'old-0000' / 'old.txt').read_bytes(), b'original')
+
+    def test_terminal_recovery_ancestor_replacement_still_refuses(self):
+        from runtime import write_json
+        for terminal in ('committed', 'restored'):
+            with self.subTest(terminal=terminal):
+                module = installer()
+                with module.state.ownership() as owner:
+                    write_json(owner / 'pending.json', [])
+                if terminal == 'restored':
+                    module, target, recovery, journal, disposal = self.pending_disposal(point=terminal)
+                else:
+                    module = installer()
+                    target, recovery = self.root / 'target-committed', self.root / 'recovery-committed'
+                    module.install(target, plugin=False, force=False, recovery_dir=recovery)
+                    journal = next(recovery.glob('transaction-*/journal.json'))
+                with module.state.ownership() as owner:
+                    binding = module.state.registered(owner, journal)
+                    binding['active'] = True
+                    write_json(owner / 'pending.json', [binding])
+                before = module.state.tree_manifest(target)
+                held = self.root / f'held-recovery-{terminal}'
+                recovery.rename(held)
+                recovery.mkdir()
+                (held / journal.parent.name).rename(journal.parent)
+                self.assertTrue(module.state.registered(owner, journal))
+                with self.assertRaisesRegex(ValueError, 'ancestor changed'):
+                    module.recover(journal, recovery, module.rename_noreplace)
+                unrelated = self.root / f'unrelated-{terminal}'
+                with self.assertRaisesRegex(ValueError, 'ancestor changed'):
+                    module.install(unrelated, plugin=False, force=False,
+                                   recovery_dir=self.root / f'unrelated-recovery-{terminal}')
+                self.assertFalse(unrelated.exists())
+                self.assertEqual(module.state.tree_manifest(target), before)
+                if terminal == 'restored':
+                    self.assertTrue(disposal.is_dir())
 
     def test_all_record_preflight_refuses_changed_backup_before_any_removal(self):
         module = installer()

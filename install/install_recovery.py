@@ -47,15 +47,10 @@ def restore(journal: Path, root: Path, rename, *, explicit=True):
             raise ValueError("Committed installation is not interrupted; --recover does not authorize uninstall")
         return False
     if data["state"] == "restored":
-        for record in data["records"]:
-            target = Path(record["target"])
-            if record["previous_id"] is None:
-                if os.path.lexists(target):
-                    raise ValueError("Restored absent target changed")
-            elif not state.matches(target, record["previous_id"], record["old"]):
-                raise ValueError("Restored previous installation changed")
-        state.unregister(root, journal)
+        # Only the transaction-owned quarantine remains actionable. A later
+        # installation may legitimately have replaced the restored live target.
         cleanup_disposals(data)
+        state.unregister(root, journal)
         return True
     # Validate every old/new position before removing even one owned published tree.
     positions = [classify(record) for record in data["records"]]
@@ -88,8 +83,8 @@ def restore(journal: Path, root: Path, rename, *, explicit=True):
         state.save_journal(root, journal, data)
     data["state"] = "restored"
     state.save_journal(root, journal, data)
-    state.unregister(root, journal)
     cleanup_disposals(data)
+    state.unregister(root, journal)
     logging.info("Installation restored targets=%d journal=%s", len(data["records"]), journal)
     return True
 
@@ -98,10 +93,16 @@ def cleanup_disposals(data):
     for record in data["records"]:
         disposal = Path(record["disposal"])
         try:
+            try:
+                disposal.lstat()
+            except FileNotFoundError:
+                continue
             state.safe_path(disposal)
-            if disposal.exists() and state.identity(disposal) == record["stage_id"]:
-                state.tree_manifest(disposal)
-                shutil.rmtree(disposal)
+            if (record["stage_id"] is None or record["phase"] != "restored"
+                    or state.identity(disposal) != record["stage_id"]):
+                raise ValueError("Recovery disposal identity changed; preserve state")
+            state.tree_manifest(disposal)
+            shutil.rmtree(disposal)
         except (OSError, ValueError):
             logging.warning("Recovered old installation; owned disposal cleanup pending: %s", disposal)
 

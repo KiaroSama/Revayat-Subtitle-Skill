@@ -12,13 +12,13 @@ recovery, sync parsing and complete-file publication, and package symlink refusa
 The baseline was tested from a detached Git worktree at `8f003e5` with full
 history: 490 pytest cases passed, 44 skipped and 698 subtests passed; the separate
 bounded/render runner passed 463 tests with 8 skips. The repaired fallback suite
-passed on Python 3.11.18 and 3.14.10 with 602 tests and 714 subtests per run
-(51 skips); the Python 3.14.10 bounded/render run passed 479 tests (11 skips).
+passed on Python 3.11.18 and 3.14.10 with 614 tests and 720 subtests per run
+(51 skips); the Python 3.14.10 bounded/render run completed 491 tests (11 skips).
 Native results are a separate requirement: missing compiled modules must fail
 when `REVAYAT_REQUIRE_NATIVE=1`. Neither a fallback pass nor an import-only probe
-establishes native compatibility. The final compiled release run passed 607 tests
-and 2,045 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
-Python 3.14.10 passed 645 tests and 2,120 subtests (8 skips). The three accelerator
+establishes native compatibility. The final compiled release run passed 619 tests
+and 2,051 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
+Python 3.14.10 passed 657 tests and 2,126 subtests (8 skips). The three accelerator
 crates passed 33 Rust unit tests in total. The malformed-comment regression also
 checks real Persian normalization after the 400 KB literal prefix; this caught
 and closed a native regex-budget failure during consolidated testing. Use the
@@ -30,6 +30,16 @@ missing or unsupported, so old wrapping, anchoring, Unicode and normalization
 behavior cannot override the updated Python reference. Real baseline binaries
 reproduced these upgrade failures; old-package fallback and current-facade
 rejection were exercised separately, alongside compatible native delegation.
+
+The install-recovery closure also covers disposal cleanup after restoration:
+real process death, permission failure, actual 1,000-row pressure, old inactive
+bindings and the legacy 1,001-row overflow. Cleanup retries preserve a later
+valid installation, reject foreign disposal ownership, and retain unreadable or
+linked cleanup state. Four independent before/after capacity probes and the
+full installer suite passed. Terminal reconciliation and cleanup survive moved
+or symlink-replaced historical live parents while still rejecting changed
+recovery ancestry; completed history remains retireable after its former
+live-target parent is removed.
 
 The sync audit additionally passed 18 Rust tests plus doctests and 31 Python
 sync cases locally, including real-engine FFmpeg tests, with no local skips. It
