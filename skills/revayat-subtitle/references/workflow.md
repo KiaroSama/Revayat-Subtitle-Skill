@@ -166,7 +166,7 @@ mixed direction, changed structure and every animated event's phases, even when
 its override commands match another event. Use `--all-cues` for
 complete cue coverage. Equal pixels at different samples are allowed; reused paths
 or hardlinked image files are not. System fallback fonts still need visual review.
-Generation is 11, text normalization is 10, and sampler is 12; schemas remain 2.
+Generation is 13, text normalization is 12, and sampler is 12; schemas remain 2.
 ASS preserves incoming read order within connected overlap groups and sorts only
 independent groups chronologically. Base cues precede retained donors in declared
 candidate order; provenance follows the physical emitted rows even with repeated

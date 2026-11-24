@@ -48,7 +48,11 @@ _FUNCTION_WORDS = frozenset("و یا که تا از در بر به با را ه�
 
 
 def _native(name: str) -> Callable[..., Any] | None:
-    return None if os.environ.get("REVAYAT_DISABLE_RUST") == "1" else getattr(_subcore_rs, name, None)
+    if os.environ.get("REVAYAT_DISABLE_RUST") == "1":
+        return None
+    if name in {"watermark_reason", "is_watermark_cue"} and getattr(_subcore_rs, "WATERMARK_FORMAT_API", 0) != 1:
+        return None
+    return getattr(_subcore_rs, name, None)
 
 
 def _letters(text: str) -> str:
@@ -110,7 +114,8 @@ _SITE = re.compile(
     r"(?<!\w)(?:addic7ed|opensubtitles|subscene|yify|yts|shine021|farsisubtitle|worldsubtitle|subf2m|"
     r"کانال تلگرام|ساب ?تایتل|فارس ?ساب|موویکو|دیجی ?موویز|زارفیل|سافت ?ساب)(?!\w)"
 )
-_LINK = re.compile(r"(?<![\w@])(?:https?://|www\.|t\.me/)[^\s]+")
+_AD_PATH = r"[^\s<>{}\\]"
+_LINK = re.compile(rf"(?<![\w@])(?:https?://|www\.|t\.me/){_AD_PATH}+")
 _ATTRIBUTION = re.compile(r"[\w@]+(?:[.'’+-][\w@]+)*\.?")
 
 
@@ -127,13 +132,39 @@ def _credit_line(line: str, pattern: re.Pattern) -> bool:
     return not suffix or _LINK.fullmatch(suffix) is not None or _ATTRIBUTION.fullmatch(suffix) is not None
 
 
-def watermark_reason(text: str) -> str:
-    """Remove only whole credit/advertising cues, never a marker inside dialogue."""
+def _watermark_text(text: str, kind: str) -> str:
+    if kind == "ass":
+        output = []
+        for type_, part in pieces(text, kind):
+            if type_ == "drawing":
+                return ""
+            if type_ == "text":
+                output.append(part)
+        plain = re.sub(r"\\[Nn]", "\n", "".join(output)).replace(r"\h", " ")
+        return plain.replace(r"\{", "{").replace(r"\}", "}")
+    output = []
+    for index, part in enumerate(_split_markup(text, _TAGS)):
+        if index % 2:
+            if part.startswith("<!--") or SRT_ALIGNMENT.fullmatch(part):
+                continue
+            if part.startswith("<") and srt_tag_fits(part):
+                if SRT_BREAK.fullmatch(part):
+                    output.append("\n")
+                    continue
+                if SRT_COLOR.fullmatch(part) or _SIMPLE_MARKUP.fullmatch(part):
+                    continue
+        # Keep everything the SRT converter does not implement for its normal validation.
+        output.append(part)
+    return "".join(output)
+
+
+def watermark_reason(text: str, kind: str = "srt") -> str:
+    """Classify whole credit cues using their input format; the legacy default is SRT."""
+    if kind not in {"ass", "srt"}:
+        raise ValueError("Watermark format must be ass or srt")
     if native := _native("watermark_reason"):
-        return native(text)
-    plain = "".join(part if index % 2 == 0 else "\n" if SRT_BREAK.fullmatch(part) else ""
-                    for index, part in enumerate(_split_markup(text, _TAGS)))
-    plain = re.sub(r"\\[Nn]", "\n", plain).replace(r"\h", " ")
+        return native(text, kind=kind)
+    plain = _watermark_text(text, kind)
     plain = _letters(plain.translate(str.maketrans("", "", BIDI)).replace(ZWNJ, " ")).casefold()
     reasons = []
     for line in plain.splitlines():
@@ -144,9 +175,9 @@ def watermark_reason(text: str) -> str:
             reasons.append("studio-credit")
         elif _credit_line(line, _CREDIT):
             reasons.append("fansub-credit")
-        elif re.fullmatch(_SITE.pattern + r"(?:\.[a-z]{2,}(?:/\S*)?)?", line) or line in {"اپلیکیشن", "وب سایت", "وبسایت"}:
+        elif re.fullmatch(_SITE.pattern + rf"(?:\.[a-z]{{2,}}(?:/{_AD_PATH}*)?)?", line) or line in {"اپلیکیشن", "وب سایت", "وبسایت"}:
             reasons.append("site-watermark")
-        elif re.fullmatch(r"[({]?\s*@[a-z0-9_]+\s*[)}]?|(?:https?://)?t\.me/\S+", line):
+        elif re.fullmatch(r"[({]?\s*@[a-z0-9_]+\s*[)}]?|(?:https?://)?t\.me/" + _AD_PATH + "+", line):
             reasons.append("telegram-handle")
         elif _LINK.fullmatch(line):
             reasons.append("url-ad")
@@ -158,10 +189,10 @@ def watermark_reason(text: str) -> str:
     return next((reason for reason in priority if reason in reasons), "")
 
 
-def is_watermark_cue(text: str) -> bool:
+def is_watermark_cue(text: str, kind: str = "srt") -> bool:
     if native := _native("is_watermark_cue"):
-        return native(text)
-    return bool(watermark_reason(text))
+        return native(text, kind=kind)
+    return bool(watermark_reason(text, kind=kind))
 
 
 def convert_srt_markup_to_ass(text: str) -> str:

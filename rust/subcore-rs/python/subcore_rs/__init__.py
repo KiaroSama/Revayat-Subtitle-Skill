@@ -88,6 +88,7 @@ def _method(name, positions, names, json_result):
     return call
 
 normalize_persian_zwnj = _native.normalize_persian_zwnj
+WATERMARK_FORMAT_API = getattr(_native, "WATERMARK_FORMAT_API", 0)
 watermark_reason = _native.watermark_reason
 is_watermark_cue = _native.is_watermark_cue
 convert_srt_markup_to_ass = _native.convert_srt_markup_to_ass
@@ -95,4 +96,4 @@ wrap_subtitle_lines = _native.wrap_subtitle_lines
 anchor_rtl_line = _native.anchor_rtl_line
 process_cue_text = _native.process_cue_text
 
-__all__ = ['normalize_persian_zwnj', 'watermark_reason', 'is_watermark_cue', 'convert_srt_markup_to_ass', 'wrap_subtitle_lines', 'anchor_rtl_line', 'process_cue_text']
+__all__ = ['normalize_persian_zwnj', 'watermark_reason', 'is_watermark_cue', 'convert_srt_markup_to_ass', 'wrap_subtitle_lines', 'anchor_rtl_line', 'process_cue_text', 'WATERMARK_FORMAT_API']

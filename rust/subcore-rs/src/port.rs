@@ -54,6 +54,17 @@ fn srt_tag_fits(tag: &str) -> bool {
     tag.len().saturating_sub(delimiters) <= 127
 }
 
+fn srt_color() -> &'static Regex {
+    pattern!(
+        Regex,
+        r##"\A(?i-u:<font) +(?i-u:color) *= *(?:"#([0-9A-Fa-f]{6})"|'#([0-9A-Fa-f]{6})'|#([0-9A-Fa-f]{6})) *>\z"##
+    )
+}
+
+fn simple_srt_markup() -> &'static Regex {
+    pattern!(Regex, r"\A(?i-u:</?[bisu]>|</font>)\z")
+}
+
 fn py_space(c: char) -> bool {
     c.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&c)
 }
@@ -138,11 +149,19 @@ pub fn python_word_class(classes: &[(char, bool)]) -> Option<String> {
 }
 
 pub fn watermark_reason(text: String) -> Result<String, String> {
-    prose::watermark(&text).map(str::to_owned)
+    watermark_reason_with_kind(text, "srt")
+}
+
+pub fn watermark_reason_with_kind(text: String, kind: &str) -> Result<String, String> {
+    prose::watermark(&text, kind).map(str::to_owned)
 }
 
 pub fn prepare_watermark_text(text: String) -> Result<String, String> {
-    prose::watermark_text(&text)
+    prepare_watermark_text_with_kind(text, "srt")
+}
+
+pub fn prepare_watermark_text_with_kind(text: String, kind: &str) -> Result<String, String> {
+    prose::watermark_text(&text, kind)
 }
 
 pub fn watermark_reason_prepared(
@@ -153,18 +172,19 @@ pub fn watermark_reason_prepared(
 }
 
 pub fn is_watermark_cue(text: String) -> Result<bool, String> {
-    Ok(!prose::watermark(&text)?.is_empty())
+    is_watermark_cue_with_kind(text, "srt")
+}
+
+pub fn is_watermark_cue_with_kind(text: String, kind: &str) -> Result<bool, String> {
+    Ok(!prose::watermark(&text, kind)?.is_empty())
 }
 
 pub fn convert_srt_markup_to_ass(text: String) -> Result<String, String> {
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
     let mut output = String::with_capacity(text.len());
     let mut colors = Vec::new();
-    let color = pattern!(
-        Regex,
-        r##"\A(?i-u:<font) +(?i-u:color) *= *(?:"#([0-9A-Fa-f]{6})"|'#([0-9A-Fa-f]{6})'|#([0-9A-Fa-f]{6})) *>\z"##
-    );
-    let simple = pattern!(Regex, r"\A(?i-u:</?[bisu]>|</font>)\z");
+    let color = srt_color();
+    let simple = simple_srt_markup();
     for segment in segments(&text, tags()) {
         let (prose, tag) = segment?;
         output.push_str(&prose.replace('\n', r"\N"));
@@ -336,6 +356,11 @@ mod tests {
             "Subtitles by John O'Connor",
             "Downloaded from the web",
             "زیرنویس از دو دوست",
+            "<notice>https://example.test</notice>",
+            "https://example.test</notice>",
+            "OpenSubtitles.org/path<notice>",
+            "t.me/channel{literal}",
+            r"{\pos(1,2)}https://example.test",
             "من این کانال تلگرام را نمی‌شناسم.",
             "Save the evidence.\nhttps://example.test",
             "Save the evidence.<br>https://example.test",
@@ -360,6 +385,33 @@ mod tests {
                 Ok("fansub-credit")
             );
         }
+    }
+
+    #[test]
+    fn watermark_visibility_respects_format_and_preserves_literal_syntax() {
+        for (kind, text, expected) in [
+            ("srt", "<i>https://example.test</i>", "url-ad"),
+            ("ass", "<i>https://example.test</i>", ""),
+            ("srt", "<notice>https://example.test</notice>", ""),
+            ("srt", r"{\pos(1,2)}https://example.test", ""),
+            ("srt", "{an8}https://example.test", "url-ad"),
+            ("srt", r"{\an8}https://example.test", "url-ad"),
+            ("ass", r"{\i1}https://example.test{\i0}", "url-ad"),
+            ("ass", r"\{literal\}https://example.test", ""),
+            ("ass", r"{\p1}m 0 0 l 1 1{\p0}https://example.test", ""),
+            ("srt", "<!--hidden-->https://example.test", "url-ad"),
+            ("ass", "<!--literal-->https://example.test", ""),
+        ] {
+            assert_eq!(
+                watermark_reason_with_kind(text.into(), kind).as_deref(),
+                Ok(expected)
+            );
+            assert_eq!(
+                is_watermark_cue_with_kind(text.into(), kind),
+                Ok(!expected.is_empty())
+            );
+        }
+        assert!(watermark_reason_with_kind("text".into(), "vtt").is_err());
     }
 
     #[test]

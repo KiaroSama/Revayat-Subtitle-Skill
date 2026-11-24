@@ -444,7 +444,7 @@ def _process_ass_document(doc: Document, result: Document, style: str, direction
     removed = []
     for source in doc.cues:
         effective_times(source.start, source.end, "ass")
-        if strip_watermarks and not has_drawing(source.text, doc.kind) and (reason := watermark_reason(source.text)):
+        if strip_watermarks and not has_drawing(source.text, doc.kind) and (reason := watermark_reason(source.text, kind=doc.kind)):
             removed.append({"id": source.id, "start_ms": source.start, "end_ms": source.end, "reason": reason,
                             "text": source.text})
             continue
@@ -501,7 +501,7 @@ def build_translator_ass(primary_doc: Document, donor_docs: list[tuple[str, Docu
     for label, doc in donor_docs or []:
         for source in doc.cues:
             start, end = effective_times(source.start, source.end, "ass")
-            if strip_watermarks and not has_drawing(source.text, doc.kind) and watermark_reason(source.text):
+            if strip_watermarks and not has_drawing(source.text, doc.kind) and watermark_reason(source.text, kind=doc.kind):
                 watermark_count += 1
                 continue
             begin, finish = bisect_left(far_ends, start - 150), bisect_right(starts, end + 150)

@@ -125,6 +125,24 @@ class SubcoreNativeParityTests(NativeParityCase):
     def setUpClass(cls):
         cls.native = native_module("subcore_rs")
 
+    def test_format_aware_watermark_contract(self):
+        self.assertEqual(self.native.WATERMARK_FORMAT_API, 1)
+        cases = ("<notice>https://example.test</notice>", "<i>https://example.test</i>",
+                 "<!--hidden-->https://example.test", r"{\pos(1,2)}https://example.test",
+                 "{literal}https://example.test", "{an8}https://example.test",
+                 r"{\an8}https://example.test", r"\{literal\}https://example.test",
+                 r"{\p1}m 0 0 l 1 1{\p0}https://example.test",
+                 "https://example.test</notice>", "OpenSubtitles.org/path<notice>", "t.me/channel{literal}",
+                 "<i title=\"" + "x" * 128 + "\">https://example.test</i>")
+        for text in cases:
+            for kind in ("ass", "srt"):
+                for name in ("watermark_reason", "is_watermark_cue"):
+                    with self.subTest(function=name, kind=kind, text=text):
+                        self.compare(getattr(text_pipeline, name), getattr(self.native, name), text, kind=kind)
+        for name in ("watermark_reason", "is_watermark_cue"):
+            with self.subTest(function=name, kind="invalid"):
+                self.compare(getattr(text_pipeline, name), getattr(self.native, name), "https://example.test", kind="vtt")
+
     def test_all_exported_text_transforms(self):
         cases = ("", "Plain dialogue.", "سلام، اسم من Rin است.", "می رود و خانه ها",
                  "<i>Meaningful words</i>", "<b>سلام</b><br>دنیا!", r"{\i1}سلام!{\i0}",

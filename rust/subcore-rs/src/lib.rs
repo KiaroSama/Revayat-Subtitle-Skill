@@ -84,18 +84,18 @@ fn normalize_persian_zwnj(py: Python<'_>, text: String) -> PyResult<String> {
 
 /// `watermark_reason`.
 #[pyfunction]
-#[pyo3(name = "watermark_reason", signature = (text))]
-fn watermark_reason(py: Python<'_>, text: String) -> PyResult<String> {
-    let plain = port::prepare_watermark_text(text).map_err(error)?;
+#[pyo3(name = "watermark_reason", signature = (text, kind="srt"))]
+fn watermark_reason(py: Python<'_>, text: String, kind: &str) -> PyResult<String> {
+    let plain = port::prepare_watermark_text_with_kind(text, kind).map_err(error)?;
     let word_class = runtime_word_class(py, &plain)?;
     port::watermark_reason_prepared(plain, word_class.as_deref()).map_err(error)
 }
 
 /// `is_watermark_cue`.
 #[pyfunction]
-#[pyo3(name = "is_watermark_cue", signature = (text))]
-fn is_watermark_cue(py: Python<'_>, text: String) -> PyResult<bool> {
-    watermark_reason(py, text).map(|reason| !reason.is_empty())
+#[pyo3(name = "is_watermark_cue", signature = (text, kind="srt"))]
+fn is_watermark_cue(py: Python<'_>, text: String, kind: &str) -> PyResult<bool> {
+    watermark_reason(py, text, kind).map(|reason| !reason.is_empty())
 }
 
 fn convert_srt_markup_to_ass_inner(text: String) -> Result<String, String> {
@@ -200,6 +200,7 @@ fn process_cue_text(
 #[pymodule]
 #[pyo3(name = "_native")]
 fn native_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("WATERMARK_FORMAT_API", 1u8)?;
     m.add_function(wrap_pyfunction!(normalize_persian_zwnj, m)?)?;
     m.add_function(wrap_pyfunction!(watermark_reason, m)?)?;
     m.add_function(wrap_pyfunction!(is_watermark_cue, m)?)?;

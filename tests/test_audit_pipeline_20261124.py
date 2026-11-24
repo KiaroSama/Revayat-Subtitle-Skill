@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import sys
 import unittest
+from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -183,6 +185,140 @@ def test_unambiguous_standalone_watermarks_still_have_a_reason(text, reason):
     assert pipeline.watermark_reason(text) == reason
 
 
+AD_LINKS = (
+    ("https://example.test", "url-ad"),
+    ("OpenSubtitles.org/path", "site-watermark"),
+    ("t.me/channel", "telegram-handle"),
+)
+
+
+@pytest.mark.parametrize("link,reason", AD_LINKS)
+@pytest.mark.parametrize("suffix", ("<notice>", "</notice>", "{literal}"))
+def test_srt_literal_markup_is_never_part_of_an_automatic_ad(link, reason, suffix):
+    assert pipeline.watermark_reason(link + suffix) == ""
+    assert not pipeline.is_watermark_cue(link + suffix)
+
+
+@pytest.mark.parametrize("kind,text,reason", [
+    ("srt", "<notice>https://example.test</notice>", ""),
+    ("srt", '<i class="literal">https://example.test</i>', ""),
+    ("srt", r"{\pos(1,2)}https://example.test", ""),
+    ("srt", "{literal}https://example.test", ""),
+    ("srt", "<i>https://example.test</i>", "url-ad"),
+    ("srt", "{an8}https://example.test", "url-ad"),
+    ("srt", r"{\an8}https://example.test", "url-ad"),
+    ("srt", "<!--hidden-->https://example.test", "url-ad"),
+    ("ass", "<i>https://example.test</i>", ""),
+    ("ass", "<!--literal-->https://example.test", ""),
+    ("ass", r"\{literal\}https://example.test", ""),
+    ("ass", r"{\i1}https://example.test{\i0}", "url-ad"),
+    ("ass", "{hidden}https://example.test", "url-ad"),
+    ("ass", r"{\p1}m 0 0 l 1 1{\p0}https://example.test", ""),
+])
+def test_watermark_detection_obeys_the_actual_format(kind, text, reason):
+    assert pipeline.watermark_reason(text, kind=kind) == reason
+    assert pipeline.is_watermark_cue(text, kind=kind) == bool(reason)
+
+
+@pytest.mark.parametrize("link,reason", AD_LINKS)
+def test_ass_literal_markup_and_genuine_ad_controls(link, reason):
+    for text in (f"<notice>{link}</notice>", link + "<notice>", link + "</notice>", link + r"\{literal\}"):
+        assert pipeline.watermark_reason(text, kind="ass") == ""
+    assert pipeline.watermark_reason(link, kind="ass") == reason
+    assert pipeline.watermark_reason(link, kind="srt") == reason
+
+
+def test_old_native_watermark_signature_is_not_used_for_format_classification(monkeypatch):
+    called = []
+    def old_reason(text):
+        called.append(text)
+        return "url-ad"
+    unrelated_native = lambda text: text
+    old = SimpleNamespace(watermark_reason=old_reason, is_watermark_cue=old_reason,
+                          normalize_persian_zwnj=unrelated_native)
+    monkeypatch.setattr(pipeline, "_subcore_rs", old)
+    monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
+    assert pipeline.watermark_reason("<i>https://example.test</i>", kind="ass") == ""
+    assert not pipeline.is_watermark_cue("<notice>https://example.test</notice>")
+    assert pipeline.watermark_reason("<i>https://example.test</i>") == "url-ad"
+    assert pipeline._native("normalize_persian_zwnj") is unrelated_native
+    assert not called
+
+
+def test_current_native_internal_type_error_is_not_hidden(monkeypatch):
+    def broken(text, kind="srt"):
+        raise TypeError("Authored native implementation failure")
+    monkeypatch.setattr(pipeline, "_subcore_rs", SimpleNamespace(WATERMARK_FORMAT_API=1, watermark_reason=broken))
+    monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
+    with pytest.raises(TypeError, match="Authored native implementation failure"):
+        pipeline.watermark_reason("https://example.test", kind="ass")
+
+
+@pytest.mark.parametrize("text", [
+    "<notice>https://example.test</notice>",
+    '<i class="literal">https://example.test</i>',
+    r"{\pos(1,2)}https://example.test",
+    "{literal}https://example.test",
+    "https://example.test</notice>",
+    "OpenSubtitles.org/path<notice>",
+    "t.me/channel{literal}",
+])
+def test_public_srt_conversion_refuses_unsupported_markup_before_deletion(tmp_path, text):
+    path, output = tmp_path / "source.srt", tmp_path / "converted.ass"
+    original = f"1\n00:00:01,000 --> 00:00:02,000\n{text}\n\n2\n00:00:03,000 --> 00:00:04,000\nRetained dialogue\n".encode()
+    path.write_bytes(original)
+    result = runtime.run([sys.executable, "-X", "utf8", str(SCRIPTS / "revayat-subtitle.py"),
+                          "convert", str(path), "--out", str(output), "--direction", "ltr"], check=False)
+    assert result.returncode == 2
+    assert b"unsupported decoder markup" in result.stderr or b"ASS control syntax" in result.stderr
+    assert not output.exists()
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("link,reason", AD_LINKS)
+def test_public_ass_conversion_preserves_literal_html_and_escaped_braces(tmp_path, link, reason):
+    path, output = tmp_path / "source.ass", tmp_path / "converted.ass"
+    texts = (f"<i>{link}</i>", f"<notice>{link}</notice>", link + r"\{literal\}")
+    doc = formats.parse(source(text=texts[0]), "ass")
+    doc.cues = [replace(doc.cues[0], id=f"c{index:06d}", start=2000 * index, end=2000 * index + 1000, text=text)
+                for index, text in enumerate((*texts, link), 1)]
+    original = formats.serialize(doc, doc.cues).encode()
+    path.write_bytes(original)
+    report = json.loads(runtime.run([sys.executable, "-X", "utf8", str(SCRIPTS / "revayat-subtitle.py"),
+        "convert", str(path), "--out", str(output), "--direction", "ltr", "--no-zwnj", "--max-chars", "500"]))
+    converted = formats.parse(output.read_text(encoding="utf-8"), "ass")
+    assert [cue.text for cue in converted.cues] == list(texts)
+    assert report["watermarks_removed"] == 1
+    assert path.read_bytes() == original
+
+
+def test_translator_ass_donor_literal_html_is_retained_for_a_placeholder():
+    primary = formats.Document("srt", [formats.Cue("p", 1000, 2000, "Retained dialogue")])
+    donor = formats.parse(source(text="<i>https://example.test</i>"), "ass")
+    donor.cues[0].start, donor.cues[0].end = 4000, 5000
+    _, report = formats.build_translator_ass(primary, [("donor", donor)], direction="ltr", wrap_lines=False)
+    assert report["placeholder_slots"] == 1
+    assert report["watermarks_removed"] == 0
+
+
+def test_srt_tag_beyond_decoder_limit_remains_literal_in_public_conversion(tmp_path):
+    text = '<i title="' + "x" * 128 + '">https://example.test</i>'
+    assert pipeline.watermark_reason(text, kind="srt") == ""
+    path, output = tmp_path / "source.srt", tmp_path / "converted.ass"
+    path.write_text(f"1\n00:00:01,000 --> 00:00:02,000\n{text}\n", encoding="utf-8")
+    report = json.loads(runtime.run([sys.executable, "-X", "utf8", str(SCRIPTS / "revayat-subtitle.py"),
+        "convert", str(path), "--out", str(output), "--direction", "ltr", "--no-zwnj", "--max-chars", "500"]))
+    converted = formats.parse(output.read_text(encoding="utf-8"), "ass")
+    assert report["watermarks_removed"] == 0
+    assert formats.visible(converted.cues[0].text, "ass") == formats.visible(text, "srt")
+
+
+@pytest.mark.parametrize("name", ("watermark_reason", "is_watermark_cue"))
+def test_watermark_format_rejects_an_unknown_kind(name):
+    with pytest.raises(ValueError, match="Watermark format must be ass or srt"):
+        getattr(pipeline, name)("https://example.test", kind="vtt")
+
+
 def _review_workspace(tmp_path: Path, texts: list[str]):
     paths = []
     for index, text in enumerate(texts, 1):
@@ -206,6 +342,14 @@ def _review_workspace(tmp_path: Path, texts: list[str]):
             row.update(action="preserve", reviewed=True)
         runtime.write_json(path, rows)
     return work
+
+
+@pytest.mark.parametrize("text", ("<notice>https://example.test</notice>", r"{\pos(1,2)}https://example.test"))
+def test_srt_workspace_upgrade_does_not_delete_invalid_markup_before_validation(tmp_path, text):
+    work = _review_workspace(tmp_path, [f"1\n00:00:01,000 --> 00:00:02,000\n{text}\n\n2\n00:00:03,000 --> 00:00:04,000\nRetained dialogue\n"])
+    with pytest.raises(ValueError, match="unsupported decoder markup|ASS control syntax"):
+        workflow.build(work)
+    assert not (work / "builds").exists()
 
 
 def test_build_keeps_reviewed_dialogue_containing_a_url(tmp_path):

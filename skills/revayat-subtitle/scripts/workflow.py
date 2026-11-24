@@ -444,7 +444,7 @@ def assemble(work: Path, *, output_format: str | None = None) -> tuple[dict, dic
             for cue in cues:
                 cue.start, cue.end = effective_times(cue.start, cue.end, base.kind)
                 if upgrade_srt:
-                    if reason := watermark_reason(cue.text):
+                    if reason := watermark_reason(cue.text, kind=docs[key].kind):
                         episode_watermarks.append({"source": key, "cue": cue.id, "reason": reason})
                         continue
                     cue = srt_to_ass(cue)

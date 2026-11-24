@@ -2,12 +2,13 @@ use fancy_regex::{Captures, RegexInput};
 use std::borrow::Cow;
 
 use super::{
-    ASS, BIDI, FancyRegex, HTML, Regex, WORD, ZWNJ, py_space, regex_error, segments, srt_break,
-    tags,
+    ASS, BIDI, FancyRegex, HTML, Regex, WORD, ZWNJ, alignment, drawing::drawing_mode, py_space,
+    regex_error, segments, simple_srt_markup, srt_break, srt_color, srt_tag_fits, tags, tokens,
 };
 
 const FA: &str = "[ء-غف-يٮ-ۓە]";
 const PROSE_WORD: &str = r"\p{L}\p{N}_\u{200c}";
+const AD_PATH: &str = r"[^ <>{}\\]";
 const STEMS: &str = concat!(
     "رو|روند|آی|آو|آور|بر|بد|باش|شو|ش|کن|تون|توان|دان|دون|گو|گ|گیر|نگیر|بین|شن|شنو|خند|گری|گریه|خور|نوش|",
     "خواه|خواهم|خوای|خورد|خواب|خوان|خون|کش|فروش|خر|گذار|ذار|ساز|سوز|مان|مون|مر|میر|دار|ده|د|دونیم|",
@@ -182,25 +183,55 @@ fn credit_line(line: &str, pattern: &FancyRegex, attribution: &Regex) -> Result<
         return Ok(false);
     }
     let suffix = suffix.trim_matches([' ', ':']);
-    let link = pattern!(Regex, r"\A(?:https?://|www\.|t\.me/)[^ ]+\z");
+    let link = pattern!(Regex, format!(r"\A(?:https?://|www\.|t\.me/){AD_PATH}+\z"));
     Ok(suffix.is_empty() || link.is_match(suffix) || attribution.is_match(suffix))
 }
 
-pub(super) fn watermark(text: &str) -> Result<&'static str, String> {
-    watermark_prepared(&watermark_text(text)?, None)
+pub(super) fn watermark(text: &str, kind: &str) -> Result<&'static str, String> {
+    watermark_prepared(&watermark_text(text, kind)?, None)
 }
 
-pub(super) fn watermark_text(text: &str) -> Result<String, String> {
+pub(super) fn watermark_text(text: &str, kind: &str) -> Result<String, String> {
+    if !matches!(kind, "ass" | "srt") {
+        return Err("ValueError: Watermark format must be ass or srt".into());
+    }
     let mut plain = String::with_capacity(text.len());
-    for segment in segments(text, tags()) {
-        let (prose, markup) = segment?;
-        plain.push_str(prose);
-        if srt_break(markup) {
-            plain.push('\n');
+    if kind == "ass" {
+        let mut drawing = false;
+        for (prose, markup) in tokens::segments(text, kind)? {
+            if drawing && !prose.is_empty() {
+                return Ok(String::new());
+            }
+            plain.push_str(prose);
+            drawing = drawing_mode(markup, drawing)?;
+        }
+        plain = pattern!(Regex, r"\\[Nn]")
+            .replace_all(&plain, "\n")
+            .into_owned();
+        plain = plain
+            .replace(r"\h", " ")
+            .replace(r"\{", "{")
+            .replace(r"\}", "}");
+    } else {
+        for segment in segments(text, tags()) {
+            let (prose, markup) = segment?;
+            plain.push_str(prose);
+            if markup.starts_with("<!--") || alignment().is_match(markup) {
+                continue;
+            }
+            if markup.starts_with('<') && srt_tag_fits(markup) {
+                if srt_break(markup) {
+                    plain.push('\n');
+                    continue;
+                }
+                if srt_color().is_match(markup) || simple_srt_markup().is_match(markup) {
+                    continue;
+                }
+            }
+            // Unimplemented SRT syntax must reach ordinary conversion validation.
+            plain.push_str(markup);
         }
     }
-    let plain = pattern!(Regex, r"\\[Nn]").replace_all(&plain, "\n");
-    let plain = plain.replace(r"\h", " ");
     let plain = letters(&plain.replace(|c| BIDI.contains(c), "").replace(ZWNJ, " "))?;
     Ok(caseless::default_case_fold_str(&plain))
 }
@@ -226,7 +257,7 @@ pub(super) fn watermark_prepared(
     let site = pattern!(
         FancyRegex,
         format!(
-            r"\A(?:addic7ed|opensubtitles|subscene|yify|yts|shine021|farsisubtitle|worldsubtitle|subf2m|کانال تلگرام|ساب ?تایتل|فارس ?ساب|موویکو|دیجی ?موویز|زارفیل|سافت ?ساب)(?![{WORD}])(?:\.[a-z]{{2,}}(?:/\S*)?)?\z"
+            r"\A(?:addic7ed|opensubtitles|subscene|yify|yts|shine021|farsisubtitle|worldsubtitle|subf2m|کانال تلگرام|ساب ?تایتل|فارس ?ساب|موویکو|دیجی ?موویز|زارفیل|سافت ?ساب)(?![{WORD}])(?:\.[a-z]{{2,}}(?:/{AD_PATH}*)?)?\z"
         )
     );
     let site = word_pattern(site, runtime_word_class)?;
@@ -240,9 +271,9 @@ pub(super) fn watermark_prepared(
     };
     let handle = pattern!(
         Regex,
-        r"\A(?:[({]? *@[a-z0-9_]+ *[)}]?|(?:https?://)?t\.me/\S+)\z"
+        format!(r"\A(?:[({{]? *@[a-z0-9_]+ *[)}}]?|(?:https?://)?t\.me/{AD_PATH}+)\z")
     );
-    let link = pattern!(Regex, r"\A(?:https?://|www\.|t\.me/)[^ ]+\z");
+    let link = pattern!(Regex, format!(r"\A(?:https?://|www\.|t\.me/){AD_PATH}+\z"));
     let mut reason = 5;
     for line in plain.split(|c| {
         matches!(

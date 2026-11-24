@@ -12,6 +12,16 @@ Rust port of `skills/revayat-subtitle/scripts/text_pipeline.py`, bridged with Py
 - `anchor_rtl_line` (`skills/revayat-subtitle/scripts/text_pipeline.py:274`)
 - `process_cue_text` (`skills/revayat-subtitle/scripts/text_pipeline.py:323`)
 
+## Watermark format API
+
+The two watermark functions accept an optional `kind="srt"` argument; callers
+processing native ASS must pass `kind="ass"`. The one-argument form remains
+available with SRT semantics. `WATERMARK_FORMAT_API = 1` identifies a compiled
+module implementing format-aware classification; the Python facade exposes `0`
+for an older binary so the subtitle pipeline can use its safe Python classifier
+without guessing compatibility from exceptions. Rust's existing one-argument
+port functions also remain available, with explicit `_with_kind` variants.
+
 ## Loop
 
 ```sh

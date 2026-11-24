@@ -198,6 +198,17 @@ Native ASS prose is never passed through the SRT markup decoder: literal `<i>`,
 `<br>` and `<font>` examples stay visible, and count toward wrapping and bidi
 anchoring. SRT markup is converted once at the format boundary.
 
+Watermark checks also use the input format. `<i>https://example.test</i>` is literal
+ASS text and survives conversion; supported SRT italic markup around the same
+standalone URL can be an advertisement. For SRT, only markup implemented by the
+converter is hidden during classification. Unknown tags such as `<notice>`,
+unsupported attributes, and arbitrary ASS-looking blocks stay visible until the
+ordinary donor validator refuses them. Such a refusal publishes no output; it
+must not be bypassed by deleting the cue as a watermark. Overlong tags outside
+the decoder's recognition limit remain literal under the existing conversion
+contract. URLs, known-site paths and Telegram paths cannot absorb literal angle
+brackets, brace text or backslashes as if those characters were an advertising URL.
+
 Fansub and release watermarks are removed only when the whole cue matches
 standalone advertising or credit forms. After a recognized credit label, automatic
 attribution matching accepts an explicit URL/handle or one name/identifier token,
@@ -208,6 +219,13 @@ Mark a genuine multiword credit explicitly in its worksheet instead. A URL, site
 inside a sentence is not sufficient; mixed dialogue/advertising cues remain for
 editorial review. `--keep-watermarks` disables automatic removal for conversion.
 This detector is a conservative mechanical aid, not a semantic review certificate.
+The Python and native `watermark_reason` / `is_watermark_cue` APIs accept
+`kind="srt"` or `kind="ass"`; their one-argument default is SRT. Conversion,
+Translator Mode donor checks and workspace upgrades pass the actual source kind.
+Native dispatch requires the compiled `WATERMARK_FORMAT_API = 1` capability. An
+older optional binary falls back to the bounded Python classifier for these two
+operations, while other available accelerators remain usable. Mandatory native
+parity checks require the new capability and do not pass through that fallback.
 Workspace review links must still resolve to emitted cues after normalization;
 linking to an automatically removed credit refuses the build until the coordinator
 repairs the editorial decision. A cue cannot link to itself.
