@@ -4,12 +4,13 @@ pub mod align;
 pub mod audio;
 mod error;
 pub mod formats;
+mod publication;
 pub mod vad;
 
 pub use error::SyncError;
 pub use formats::{SubtitleCue, SubtitleDocument, SubtitleFormat};
 use serde::Serialize;
-use std::{fs, io::Write, path::Path};
+use std::{fs, path::Path};
 use vad::{VadResult, extract_speech_activity};
 
 const FRAME_MS: u32 = 10;
@@ -141,6 +142,11 @@ fn validate_vad(vad: &VadResult) -> Result<(), SyncError> {
     if !vad.activity.contains(&1) || vad.segments.is_empty() {
         return Err(SyncError::NoSpeech);
     }
+    if !vad.activity.contains(&0) {
+        return Err(SyncError::Audio(
+            "speech activity is continuous; no silent boundaries can anchor an alignment".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -151,13 +157,26 @@ pub fn sync_file_to_video(
     ffmpeg_bin: &str,
     config: &SyncConfig,
 ) -> Result<SyncReport, SyncError> {
-    let mut report = sync_file(input, output, config, || {
+    sync_file_to_video_with_report(video, input, output, ffmpeg_bin, config, None)
+}
+
+#[doc(hidden)]
+pub fn sync_file_to_video_with_report(
+    video: &Path,
+    input: &Path,
+    output: &Path,
+    ffmpeg_bin: &str,
+    config: &SyncConfig,
+    json_report: Option<&Path>,
+) -> Result<SyncReport, SyncError> {
+    let (bytes, mut report) = prepare_file(input, output, config, || {
         Ok((
             audio::VIDEO_SAMPLE_RATE,
             audio::extract_pcm_via_ffmpeg(video, ffmpeg_bin)?,
         ))
     })?;
     report.video_path = Some(video.to_string_lossy().into_owned());
+    publish_result(output, &bytes, &report, json_report)?;
     Ok(report)
 }
 
@@ -167,17 +186,29 @@ pub fn sync_file_to_wav(
     output: &Path,
     config: &SyncConfig,
 ) -> Result<SyncReport, SyncError> {
-    let mut report = sync_file(input, output, config, || audio::read_wav_pcm16(wav))?;
+    sync_file_to_wav_with_report(wav, input, output, config, None)
+}
+
+#[doc(hidden)]
+pub fn sync_file_to_wav_with_report(
+    wav: &Path,
+    input: &Path,
+    output: &Path,
+    config: &SyncConfig,
+    json_report: Option<&Path>,
+) -> Result<SyncReport, SyncError> {
+    let (bytes, mut report) = prepare_file(input, output, config, || audio::read_wav_pcm16(wav))?;
     report.wav_path = Some(wav.to_string_lossy().into_owned());
+    publish_result(output, &bytes, &report, json_report)?;
     Ok(report)
 }
 
-fn sync_file(
+fn prepare_file(
     input: &Path,
     output: &Path,
     config: &SyncConfig,
     load_audio: impl FnOnce() -> Result<(u32, Vec<i16>), SyncError>,
-) -> Result<SyncReport, SyncError> {
+) -> Result<(Vec<u8>, SyncReport), SyncError> {
     config.validate()?;
     if output
         .try_exists()
@@ -198,17 +229,31 @@ fn sync_file(
     let (rate, pcm) = load_audio()?;
     let vad = extract_speech_activity(&pcm, rate, FRAME_MS);
     let mut report = sync_subtitles_with_vad(&mut doc, &vad, config)?;
-    write_new_file(output, doc.serialize()?.as_bytes())?;
+    let bytes = doc.serialize()?.into_bytes();
     report.subtitle_in = Some(input.to_string_lossy().into_owned());
     report.subtitle_out = Some(output.to_string_lossy().into_owned());
-    Ok(report)
+    Ok((bytes, report))
 }
 
 #[doc(hidden)]
 pub fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), SyncError> {
-    let mut file =
-        fs::File::create_new(path).map_err(|e| SyncError::io("Create new output file", e))?;
-    file.write_all(bytes)
-        .and_then(|()| file.flush())
-        .map_err(|e| SyncError::io("Write output file", e))
+    publication::stage_bytes(path, bytes)?.publish()
+}
+
+fn publish_result(
+    output: &Path,
+    bytes: &[u8],
+    report: &SyncReport,
+    json_report: Option<&Path>,
+) -> Result<(), SyncError> {
+    let subtitle = publication::stage_bytes(output, bytes)?;
+    let receipt = json_report
+        .map(|path| {
+            let mut bytes = serde_json::to_vec_pretty(report).map_err(SyncError::Json)?;
+            bytes.push(b'\n');
+            publication::stage_bytes(path, &bytes)
+        })
+        .transpose()?;
+    // Both payloads are complete before either final name becomes visible.
+    publication::publish_pair(subtitle, receipt)
 }

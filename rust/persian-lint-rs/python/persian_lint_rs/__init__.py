@@ -3,6 +3,13 @@ imported the original module."""
 
 from . import _native
 
+REVAYAT_NATIVE_CONTRACT = getattr(_native, "REVAYAT_NATIVE_CONTRACT", 0)
+if REVAYAT_NATIVE_CONTRACT != 1:
+    raise ImportError(
+        "persian_lint_rs native contract mismatch. Rebuild or reinstall the compiled extension "
+        "from the same checkout as this package; see rust/persian-lint-rs/README.md."
+    )
+
 import json as _json
 import math as _math
 
@@ -91,4 +98,4 @@ normalize = _native.normalize
 suggestions = _native.suggestions
 line_changes = _native.line_changes
 
-__all__ = ['normalize', 'suggestions', 'line_changes']
+__all__ = ['normalize', 'suggestions', 'line_changes', 'REVAYAT_NATIVE_CONTRACT']

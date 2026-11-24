@@ -68,7 +68,7 @@ fn named_reference(body: &str) -> Option<&'static str> {
     Some(table[i].1)
 }
 
-fn attribute_value(value: &str) -> Result<String, String> {
+fn attribute_value(value: &str, legacy_attributes: bool) -> Result<String, String> {
     let refs = pattern!(
         Regex,
         r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*)[;=]?"
@@ -90,6 +90,19 @@ fn attribute_value(value: &str) -> Result<String, String> {
             }
         } else if let Some(decoded) = named_reference(body) {
             output.push_str(decoded);
+        } else if legacy_attributes {
+            // Earlier supported Python interpreters use html.unescape here,
+            // which also accepts the longest legacy name prefix before '=' or
+            // alphanumeric suffixes. New HTMLParser versions preserve those.
+            if let Some((prefix, decoded)) = (2..body.len())
+                .rev()
+                .find_map(|length| named_reference(&body[..length]).map(|value| (length, value)))
+            {
+                output.push_str(decoded);
+                output.push_str(&body[prefix..]);
+            } else {
+                output.push_str(reference.as_str());
+            }
         } else {
             output.push_str(reference.as_str());
         }
@@ -102,6 +115,7 @@ fn start_tag(
     tag: &str,
     cursor: usize,
     names: &mut BTreeSet<String>,
+    legacy_attributes: bool,
 ) -> Result<Option<String>, String> {
     let finder = pattern!(FancyRegex, &format!(r"\A({TAG})(?:{SPACE}|/(?!>))*"));
     let attrs = pattern!(
@@ -134,7 +148,7 @@ fn start_tag(
                 .and_then(|s| s.strip_suffix('"'))
                 .or_else(|| raw.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
                 .unwrap_or(raw);
-            let decoded = attribute_value(raw)?;
+            let decoded = attribute_value(raw, legacy_attributes)?;
             if name == "font" && key.as_str().eq_ignore_ascii_case("face") {
                 let face = decoded.trim_matches(python_space);
                 if !face.is_empty() {
@@ -177,7 +191,7 @@ fn char_ref(input: &str) -> Option<usize> {
     }
 }
 
-pub(super) fn names(mut input: &str) -> Result<BTreeSet<String>, String> {
+pub(super) fn names(mut input: &str, legacy_attributes: bool) -> Result<BTreeSet<String>, String> {
     let comment_close = pattern!(Regex, "--!?>");
     let mut names = BTreeSet::new();
     let mut raw = None::<String>;
@@ -234,7 +248,7 @@ pub(super) fn names(mut input: &str) -> Result<BTreeSet<String>, String> {
             let Some(end) = tag_end(&input[1..])? else {
                 break;
             };
-            if let Some(name) = start_tag(&input[..end + 1], 1, &mut names)? {
+            if let Some(name) = start_tag(&input[..end + 1], 1, &mut names, legacy_attributes)? {
                 match name.as_str() {
                     "plaintext" => break,
                     "script" | "style" | "xmp" | "iframe" | "noembed" | "noframes" | "textarea"

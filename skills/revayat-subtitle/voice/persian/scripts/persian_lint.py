@@ -35,8 +35,13 @@ DESIGN
 """
 import argparse
 import json
+import logging
+import os
 import re
 import sys
+import time
+
+_LOG = logging.getLogger("revayat.persian_lint")
 
 # Windows consoles default to a legacy code page; force UTF-8 on every stream.
 for _stream in (sys.stdout, sys.stderr, sys.stdin):
@@ -82,17 +87,19 @@ HEH_STOPWORDS = {"که", "چه", "نه", "به", "سه", "بله", "آنچه", "
 _PROTECT = re.compile(
     r"```.*?```"
     r"|`[^`\n]*`"
-    r"|^(?: {4,}|\t)\S.*$"
+    r"|^(?: {4,}|\t)\S[^\n]*$"
     r"|(?:https?://|www\.)\S+"
     r"|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
     r"|\bv\d+(?:\.\d+)+\b"
-    r"|\b\d+\.\d+\.\d+\b",
+    r"|\b\d+\.\d+\.\d+\b"
+    r"|\x00",
     re.DOTALL | re.MULTILINE,
 )
 _SENTINEL = "\x00"
 
 
 def _mask(text):
+    # Protect literal sentinels too, so they cannot consume another span on restore.
     spans = []
 
     def repl(m):
@@ -370,7 +377,7 @@ def _read(path):
     return sys.stdin.read()
 
 
-def main(argv=None):
+def _execute(argv=None):
     p = argparse.ArgumentParser(description="Deterministic Persian text mechanics linter/fixer.")
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="report issues only (default)")
@@ -384,8 +391,12 @@ def main(argv=None):
     a = p.parse_args(argv)
 
     text = _read(a.file)
+    _LOG.debug("Read source characters=%d mode=%s", len(text), "fix" if a.fix else "check")
     fixed, stats = normalize(text, digits=a.digits)
     sugg = suggestions(fixed if a.fix else text, style=a.style)
+    _LOG.info("Inspected text changes=%d suggestions=%d", sum(stats.values()), len(sugg))
+    if sugg:
+        _LOG.warning("Ambiguous wording requires editorial review; suggestions=%d", len(sugg))
 
     if a.fix:
         if a.in_place and a.file != "-":
@@ -420,6 +431,36 @@ def main(argv=None):
                 for s in sugg[:30]:
                     print("    ? %s: ...%s...  %s" % (s["type"], s["context"], s["hint"]))
     return 1 if (sum(stats.values()) or sugg) else 0
+
+
+def main(argv=None):
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter("[%(asctime)s UTC] [%(levelname)s] [persian-lint] %(message)s",
+                                  datefmt="%Y-%m-%d %H:%M:%S")
+    formatter.converter = time.gmtime
+    handler.setFormatter(formatter)
+    previous_level, previous_propagate = _LOG.level, _LOG.propagate
+    _LOG.addHandler(handler)
+    _LOG.propagate = False
+    try:
+        level = os.environ.get("REVAYAT_LOG_LEVEL", "INFO").strip().upper()
+        if level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            _LOG.setLevel(logging.ERROR)
+            _LOG.error("Invalid REVAYAT_LOG_LEVEL; use DEBUG, INFO, WARNING, ERROR or CRITICAL")
+            return 2
+        _LOG.setLevel(getattr(logging, level))
+        try:
+            result = _execute(argv)
+        except (OSError, ValueError, UnicodeError) as error:
+            _LOG.error("Persian text operation failed error_type=%s exit=2", type(error).__name__)
+            return 2
+        _LOG.info("Persian text operation completed exit=%d", result)
+        return result
+    finally:
+        _LOG.removeHandler(handler)
+        handler.close()
+        _LOG.setLevel(previous_level)
+        _LOG.propagate = previous_propagate
 
 
 if __name__ == "__main__":

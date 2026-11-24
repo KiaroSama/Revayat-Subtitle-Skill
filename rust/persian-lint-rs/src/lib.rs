@@ -121,6 +121,7 @@ fn line_changes(
 #[pymodule]
 #[pyo3(name = "_native")]
 fn native_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("REVAYAT_NATIVE_CONTRACT", 1u8)?;
     m.add_function(wrap_pyfunction!(normalize, m)?)?;
     m.add_function(wrap_pyfunction!(suggestions, m)?)?;
     m.add_function(wrap_pyfunction!(line_changes, m)?)?;

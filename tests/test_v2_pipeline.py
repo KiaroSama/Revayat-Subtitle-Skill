@@ -48,12 +48,12 @@ def test_zwnj_is_tag_safe_and_idempotent(pipeline, source, expected):
 
 
 @pytest.mark.parametrize('text', [
-    'زیرنویس از دو دوست', 'زيرنويس از مترجم', 'ترجمه و تنظیم', 'تنظیم و ترجمه', 'مترجم: الف',
+    'زیرنویس از دوست', 'زيرنويس از مترجم', 'ترجمه و تنظیم', 'تنظیم و ترجمه', 'مترجم: الف',
     'تقدیم به نگاه شما', 'کانال تلگرام', 'ساب~تایتل', 'فارس~ساب', 'موویکو', 'دیجی~موویز', 'زارفیل',
     'سافت~ساب', 'اپلیکیشن', 'وب~سایت', 'shine021', 'farsisubtitle', 'worldsubtitle', 'subf2m',
     'addic7ed', 'opensubtitles', 'subscene', 'yify', 'yts', 'sync and corrected by A',
     'synced and corrected by A', 'subtitles by A', 'captioned by A', 'encoded by A',
-    'Downloaded from the web', 'Support us and become VIP', 'Advertise your product here',
+    'Downloaded from https://example.test', 'Support us and become VIP', 'Advertise your product here',
     'www.example.test', 'http://example.test', 'https://example.test', 't.me/channel', '@test_channel',
     'Deluxe Media', 'Sous-titres : Alice', 'Sous-titrage : Alice', 'Supervision créative : Alice',
     'Vertaling: Bob', 'Creatief supervisor: Bob', '日本語字幕　山田', RLE + '<i> زیرنویس از ما </i>' + PDF,
@@ -128,7 +128,9 @@ def test_process_honors_flags_and_line_model(pipeline):
 
 
 def test_rust_delegation_can_be_disabled_per_call(pipeline, monkeypatch):
-    monkeypatch.setattr(pipeline, '_subcore_rs', SimpleNamespace(normalize_persian_zwnj=lambda text: 'native:' + text))
+    monkeypatch.setattr(pipeline, '_subcore_rs', SimpleNamespace(
+        REVAYAT_NATIVE_CONTRACT=1,
+        normalize_persian_zwnj=lambda text: 'native:' + text))
     monkeypatch.delenv('REVAYAT_DISABLE_RUST')
     assert pipeline.normalize_persian_zwnj('می روم') == 'native:می روم'
     monkeypatch.setenv('REVAYAT_DISABLE_RUST', '1')

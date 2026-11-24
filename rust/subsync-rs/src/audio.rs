@@ -1,4 +1,4 @@
-use crate::SyncError;
+use crate::{SyncError, publication::stage_file};
 use std::{
     fs,
     io::{BufWriter, Write},
@@ -83,8 +83,8 @@ pub fn write_wav_pcm16(path: &Path, sample_rate: u32, samples: &[i16]) -> Result
         .and_then(|len| len.checked_mul(2))
         .filter(|&len| len <= u32::MAX - 36)
         .ok_or_else(|| SyncError::Audio("samples exceed the RIFF size limit".into()))?;
-    let write = || -> std::io::Result<()> {
-        let mut wav = BufWriter::new(fs::File::create_new(path)?);
+    stage_file(path, |file| {
+        let mut wav = BufWriter::new(file);
         wav.write_all(b"RIFF")?;
         wav.write_all(&(36 + len).to_le_bytes())?;
         wav.write_all(b"WAVEfmt \x10\0\0\0\x01\0\x01\0")?;
@@ -96,8 +96,8 @@ pub fn write_wav_pcm16(path: &Path, sample_rate: u32, samples: &[i16]) -> Result
             wav.write_all(&sample.to_le_bytes())?;
         }
         wav.flush()
-    };
-    write().map_err(|e| SyncError::io("Write new WAV file", e))
+    })?
+    .publish()
 }
 
 fn wav_rate(rate: u32) -> Result<u32, SyncError> {

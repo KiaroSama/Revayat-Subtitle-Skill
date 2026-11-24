@@ -90,8 +90,9 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation recipe 11 adds overlap-safe ASS ordering; text normalization
-remains 10 and render sampler 12 requires fresh evidence for the new edition.
+state. Generation recipe 13 and normalization 12 include format-aware conversion,
+conservative watermark detection and final emitted-link checks. The renderer
+requires fresh evidence for the new edition.
 Original sources, decisions and old editions stay intact; approvals do not transfer.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
@@ -193,9 +194,54 @@ and shadow (`Outline=1.5`, `Shadow=0.8`), preserving italics, bold, underline,
 strikeout, alignment, color and positioning overrides. Pass `--output-format srt`
 only when SRT is explicitly required.
 
-Fansub and release watermarks (site ads, translator credit lines, URLs and Telegram
-handles) are stripped deterministically while leaving real dialogue untouched.
-Translator Mode (`translator-ass` / `--translator-mode`) builds a chronological
-ASS file with primary cues plus empty placeholder `Dialogue:` slots for every
-non-overlapping timing span present in donor releases, with optional `Comment:`
-reference lines for translators.
+Native ASS prose is never passed through the SRT markup decoder: literal `<i>`,
+`<br>` and `<font>` examples stay visible, and count toward wrapping and bidi
+anchoring. SRT markup is converted once at the format boundary.
+
+Watermark checks also use the input format. `<i>https://example.test</i>` is literal
+ASS text and survives conversion; supported SRT italic markup around the same
+standalone URL can be an advertisement. For SRT, only markup implemented by the
+converter is hidden during classification. Unknown tags such as `<notice>`,
+unsupported attributes, and arbitrary ASS-looking blocks stay visible until the
+ordinary donor validator refuses them. Such a refusal publishes no output; it
+must not be bypassed by deleting the cue as a watermark. Overlong tags outside
+the decoder's recognition limit remain literal under the existing conversion
+contract. URLs, known-site paths and Telegram paths cannot absorb literal angle
+brackets, brace text or backslashes as if those characters were an advertising URL.
+
+Fansub and release watermarks are removed only when the whole cue matches
+standalone advertising or credit forms. After a recognized credit label, automatic
+attribution matching accepts an explicit URL/handle or one name/identifier token,
+such as `Alice`, `O'Connor`, or `@team`. Free-form multiword tails remain for
+editorial review, including genuine names such as `John O'Connor`: a short clause
+like `Subtitles by amateurs are unreliable.` is not distinguishable by word count.
+Mark a genuine multiword credit explicitly in its worksheet instead. A URL, site name or Telegram address
+inside a sentence is not sufficient; mixed dialogue/advertising cues remain for
+editorial review. `--keep-watermarks` disables automatic removal for conversion.
+This detector is a conservative mechanical aid, not a semantic review certificate.
+The Python and native `watermark_reason` / `is_watermark_cue` APIs accept
+`kind="srt"` or `kind="ass"`; their one-argument default is SRT. Conversion,
+Translator Mode donor checks and workspace upgrades pass the actual source kind.
+The existing Subcore dispatch requires the exact compiled contract epoch
+`REVAYAT_NATIVE_CONTRACT = 1` for every operation. An entirely old installed
+Subcore package without that epoch uses current Python normalization, conversion,
+wrapping, direction handling and watermark classification instead. Current
+Subcore, markup and Persian-linter facades also reject an absent or mismatched
+compiled epoch with `ImportError`; this adds no new automatic markup/linter
+dispatch. A watermark-only gate would leave old wrapping or Unicode behavior
+active. `WATERMARK_FORMAT_API = 1` remains feature metadata, not compatibility
+authority. Mandatory native parity requires the current epoch on all three
+actual compiled extensions and does not count fallback as native success.
+When an accelerated API or its observable semantics becomes incompatible, advance
+the compiled epoch, facade/dispatcher checks and parity expectations together;
+changing only the wrapper version does not establish compatibility.
+Workspace review links must still resolve to emitted cues after normalization;
+linking to an automatically removed credit refuses the build until the coordinator
+repairs the editorial decision. A cue cannot link to itself.
+
+Translator Mode (`translator-ass` / `--translator-mode`) adds empty placeholder
+`Dialogue:` slots for uncovered donor spans, with optional `Comment:` source
+reference lines. A chronological index supports donor matching; final ASS rows
+retain original primary read order inside overlap components so layered effects
+and collision placement survive. Independent components and non-overlapping
+slots remain chronological.

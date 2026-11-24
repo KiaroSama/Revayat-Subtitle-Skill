@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Preserve literal HTML-looking ASS dialogue, overlapping ASS presentation order, and dialogue that mentions a link or subtitle service. Validate reviewed links against the cues that actually survive normalization. Advance generation/normalization recipes to `13`/`12` so changed editions require fresh review.
+- Bound malformed-comment scanning, preserve Persian linter code spans and literal NUL characters, and match native HTML-entity and Unicode behavior to the running Python interpreter.
+- Recover the install registry's legacy capacity overflow and authenticated terminal transactions without discarding active recovery records or their journals/backups. Retain cleanup authorization for restored transactions until owned disposal is complete, including legacy inactive bindings; cleanup retries leave later valid installations untouched.
+- Parse CR, LF, CRLF and mixed subtitle line endings consistently; refuse ambiguous SRT cue boundaries and audio without timing anchors; stage complete sync outputs before exclusive publication so ordinary write failures remain retryable.
+- Refuse an occupied package destination even when it is a dangling symlink. Add failure, race, native parity and actual FFmpeg regression coverage.
+- Run CI automatically on pull requests, main pushes and merge queues; gate releases on the same validation; require compiled Rust extensions across the supported OS/Python matrix. Keep the README version badge tied to repository tags.
+
 ## 2.0.0 (2026-11-24)
 
 - Added all five plugin manifest formats matching the `cloudflare/skills` layout: Claude Code (`.claude-plugin/`), Cursor (`.cursor-plugin/` with marketplace), Codex (`.codex-plugin/` with `.agents/plugins/marketplace.json`), Antigravity (`.antigravity-plugin/`), and Agent Plugins 1.0.0 (`plugin.json`), with updated atomic multi-skill installation in `install/install.py`.

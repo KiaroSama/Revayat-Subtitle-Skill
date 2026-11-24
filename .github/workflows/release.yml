@@ -16,7 +16,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      validation_id: ${{ github.run_id }}
   build:
+    needs: validate
     permissions:
       contents: read
     runs-on: ${{ matrix.runner }}

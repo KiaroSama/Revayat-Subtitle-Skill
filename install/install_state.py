@@ -15,6 +15,7 @@ import json
 MAX_ENTRIES = 10000
 MAX_BYTES = 256 * 1024 * 1024
 MAX_FILE = 16 * 1024 * 1024
+MAX_REGISTRY = 1000
 
 
 def identity(path: Path):
@@ -158,7 +159,9 @@ def registry(root: Path) -> list[dict]:
         return []
     safe_path(path, directory=False)
     value = read_json(path, MAX_FILE)
-    if not isinstance(value, list) or len(value) > 1000:
+    # Older writers could persist one row beyond the limit before failing.
+    # Admit that bounded schema-valid state so explicit recovery remains usable.
+    if not isinstance(value, list) or len(value) > MAX_REGISTRY + 1:
         raise ValueError("Installation pending registry is invalid; preserve state")
     seen = set()
     for item in value:
@@ -176,6 +179,14 @@ def register(root: Path, journal: Path):
     entries = registry(root)
     if any(item["path"] == str(journal) for item in entries):
         raise ValueError("Installation transaction is already registered")
+    while len(entries) >= MAX_REGISTRY:
+        # Older restorers marked cleanup-pending journals inactive. Their exact
+        # binding must survive capacity pressure until owned disposal is complete.
+        completed = next((i for i, item in enumerate(entries) if retireable(root, item)), None)
+        if completed is None:
+            raise ValueError("Installation pending registry is full; recover active transactions first")
+        entries.pop(completed)
+        logging.info("Retired oldest completed installation registry binding; recovery files retained")
     entries.append({"path": str(journal), "transaction_id": identity(journal.parent),
                     "digests": [digest(read_limited(journal, MAX_FILE))], "active": True})
     write_json(root / "pending.json", entries)
@@ -187,6 +198,51 @@ def registered(root: Path, journal: Path):
             or digest(read_limited(journal, MAX_FILE)) not in entries[0]["digests"]):
         raise ValueError("Unregistered or changed installation transaction instructions; preserve state")
     return entries[0]
+
+
+def disposals_pending(data):
+    for record in data["records"]:
+        try:
+            Path(record["disposal"]).lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return True  # Inaccessible metadata is not proof of completed cleanup.
+        return True  # Includes broken links and replaced, unowned paths.
+    return False
+
+
+def retireable(root: Path, entry: dict) -> bool:
+    if entry["active"]:
+        return False
+    journal = Path(entry["path"])
+    try:
+        journal.lstat()
+    except FileNotFoundError:
+        return True  # Preserve compatibility with already removed inactive history.
+    except OSError:
+        return False
+    try:
+        safe_path(journal, directory=False)
+        registered(root, journal)
+        data = read_json(journal, MAX_FILE)
+        # Inspect authenticated terminal metadata without requiring obsolete
+        # live targets or their parents to retain their old identities.
+        if (not isinstance(data, dict) or type(data.get("version")) is not int
+                or data["version"] != 1):
+            return False
+        if data.get("state") == "committed":
+            return True
+        records = data.get("records")
+        if (data.get("state") != "restored" or not isinstance(records, list)
+                or not 1 <= len(records) <= 1000
+                or any(not isinstance(record, dict)
+                       or record.get("disposal") != str(journal.parent / f"dispose-{index:04}")
+                       for index, record in enumerate(records))):
+            return False
+        return not disposals_pending(data)
+    except (OSError, ValueError):
+        return False  # Changed or unreadable instructions retain their binding.
 
 
 def save_journal(root: Path, journal: Path, data):
@@ -217,8 +273,18 @@ def save_journal(root: Path, journal: Path, data):
 
 def unregister(root: Path, journal: Path):
     registered(root, journal)
+    data = load_journal(journal)
     entries = registry(root)
-    next(item for item in entries if item["path"] == str(journal))["active"] = False
+    completed = (data["state"] == "committed"
+                 or (data["state"] == "restored" and not disposals_pending(data)))
+    next(item for item in entries if item["path"] == str(journal))["active"] = not completed
+    while len(entries) > MAX_REGISTRY:
+        retired = next((i for i, item in enumerate(entries) if retireable(root, item)), None)
+        if retired is None:
+            logging.warning("Legacy registry retained until pending recovery cleanup completes")
+            break
+        entries.pop(retired)
+        logging.info("Retired completed legacy registry binding; recovery files retained")
     write_json(root / "pending.json", entries)
 
 
@@ -230,6 +296,9 @@ def refuse_pending(root: Path, targets: list[Path]):
         registered(root, path)
         data = load_journal(path)
         if data["state"] in {"committed", "restored"}:
+            # Restoration finishes live-target work before quarantine cleanup.
+            # Reconcile the binding without discarding unfinished cleanup.
+            unregister(root, path)
             continue
         previous = [Path(record["target"]) for record in data["records"]]
         if any(a.is_relative_to(b) or b.is_relative_to(a) for a in targets for b in previous):
@@ -273,6 +342,7 @@ def load_journal(path: Path):
     recovery = safe_path(Path(data["recovery"]))
     if path != recovery / ("transaction-" + data["id"]) / "journal.json":
         raise ValueError("Installation journal is outside its declared recovery root")
+    terminal = data["state"] in {"committed", "restored"}
     records = data["records"]
     if not isinstance(records, list) or not 1 <= len(records) <= 1000:
         raise ValueError("Installation journal target limit is invalid")
@@ -283,8 +353,11 @@ def load_journal(path: Path):
         if any(type(record[field]) is not str or not record[field] or "\x00" in record[field]
                for field in ("target", "stage", "backup", "disposal")):
             raise ValueError("Invalid installation journal path field")
-        target = safe_path(Path(record["target"]))
-        if str(target) != record["target"] or any(target.is_relative_to(old) or old.is_relative_to(target) for old in targets):
+        # Terminal journals cannot authorize live-target changes. Their saved
+        # target paths remain schema-checked history, not filesystem authority.
+        target = Path(record["target"]) if terminal else safe_path(Path(record["target"]))
+        if (not target.is_absolute() or ".." in target.parts or str(target) != record["target"]
+                or any(target.is_relative_to(old) or old.is_relative_to(target) for old in targets)):
             raise ValueError("Installation journal targets are noncanonical or overlap")
         targets.append(target)
         if (record["stage"] != str(path.parent / f"new-{index:04}") or record["backup"] != str(path.parent / f"old-{index:04}")
@@ -303,7 +376,19 @@ def load_journal(path: Path):
             raise ValueError("Previous installation identity/manifest mismatch")
     if not isinstance(data["ancestors"], dict) or len(data["ancestors"]) > 10000:
         raise ValueError("Invalid installation ancestor inventory")
+    recovery_ancestors = {str(parent) for parent in (path.parent, *path.parent.parents)}
+    if terminal and not recovery_ancestors.issubset(data["ancestors"]):
+        raise ValueError("Installation recovery ancestor inventory is incomplete; preserve state")
     for name, expected in data["ancestors"].items():
-        if not isinstance(name, str) or not valid_identity(expected) or str(safe_path(Path(name))) != name or identity(Path(name)) != expected:
+        if not isinstance(name, str) or not valid_identity(expected):
+            raise ValueError("Installation recovery ancestor changed; preserve state")
+        ancestor = Path(name)
+        if not ancestor.is_absolute() or ".." in ancestor.parts or str(ancestor) != name:
+            raise ValueError("Installation recovery ancestor changed; preserve state")
+        # Keep the complete journal/recovery chain checked after a durable
+        # terminal state, while obsolete live-target ancestors may change.
+        if terminal and name not in recovery_ancestors:
+            continue
+        if str(safe_path(ancestor)) != name or identity(ancestor) != expected:
             raise ValueError("Installation recovery ancestor changed; preserve state")
     return data

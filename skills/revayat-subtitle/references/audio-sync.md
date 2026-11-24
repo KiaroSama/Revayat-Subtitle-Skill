@@ -8,6 +8,8 @@ python skills/revayat-subtitle/scripts/sync_bridge.py --video "episode.mkv" --in
 
 Video input needs FFmpeg. The binary asks FFmpeg for 16 kHz mono, signed 16-bit little-endian PCM and uses FFmpeg's automatic audio stream selection. To sync to a different track, supply its downmix as a mono 16-bit PCM WAV. Use `--wav` in place of `--video` for this and for offline tests. Choose fresh output paths in existing directories; the tool never overwrites source or destination files.
 
+The engine stages and flushes the complete subtitle and optional JSON report in their destination directories before publishing either path. A staging or write failure leaves those final names available for retry. Publication is exclusive for each individual file. If another writer claims the report name after staging, the subtitle may already have been committed; the error explicitly identifies that complete subtitle and preserves the other writer's report. Two different output paths are not an atomic transaction, so inspect that specific error before choosing a fresh report path.
+
 ## How it estimates timing
 
 - Speech activity: 10 ms hops and a 20 ms Hann window measure RMS relative to the background floor, zero crossings, and energy in the 300 to 3400 Hz band. The detector bridges gaps of at most 200 ms, extends speech by up to 100 ms, and filters bursts shorter than 60 ms.
@@ -34,8 +36,12 @@ The global search follows the [FFsubsync approach](https://github.com/smacke/ffs
 
 The parser accepts UTF-8 with or without an initial BOM and keeps the input's line endings. SRT timing uses millisecond precision; the engine retains cue numbers, multiline text, tags, and timing-line position settings. ASS/SSA timing uses centiseconds, with a minimum retimed span of 10 ms. The ASS reader preserves event order, comments, style fields, override tags, and unmodified sections such as `[Fonts]` and `[Graphics]`. ASS dialogue intervals that originally overlap can continue to overlap; the engine does not introduce overlap between independent groups. Cue-local effect and karaoke parameters are unchanged, so check their rendering after an FPS correction.
 
+CR, LF, CRLF and mixed line separators are preserved. A numbered or unnumbered SRT timing block embedded in the preceding cue without a blank separator is ambiguous and is refused with a line-specific error; repair that separator before retrying. The engine must not silently retime only the first part of such a file.
+
 ## Check the result
 
 The report gives cue and speech segment counts, the FPS ratio, offset and split estimates, snapped cue count, and median and maximum start-time changes. `overlap_score_before` and `overlap_score_after` measure the fraction of cue time the detector marks as speech. They do not measure whether a line belongs to the person speaking.
+
+Silence and continuous detected activity both lack the timing anchors needed for alignment and are refused before output publication. A constant tone must not produce a successful FPS correction merely because every cue overlaps detected activity.
 
 If the report shows a split you do not expect, listen on both sides before adjusting `--split-penalty`. If the estimated FPS ratio is wrong, try `--no-fps-search`. If audio is silent, music masks most speech, or the selected audio track differs from the subtitle release, use the matching dialogue track or retime manually. Verify the beginning, middle, and ending by ear and revisit every reported split. Use playback to check signs, songs, and layers that have little or no spoken audio.

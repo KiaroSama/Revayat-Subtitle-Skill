@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::{error::Error, fmt, io};
 
 #[derive(Debug)]
@@ -12,6 +13,10 @@ pub enum SyncError {
     Config(String),
     NoSpeech,
     Json(serde_json::Error),
+    ReportPublication {
+        subtitle_path: PathBuf,
+        source: Box<SyncError>,
+    },
 }
 
 impl SyncError {
@@ -33,6 +38,14 @@ impl fmt::Display for SyncError {
             Self::Config(message) => write!(f, "Invalid sync configuration: {message}"),
             Self::NoSpeech => f.write_str("No usable speech was detected in the audio"),
             Self::Json(error) => write!(f, "Could not encode the sync report: {error}"),
+            Self::ReportPublication {
+                subtitle_path,
+                source,
+            } => write!(
+                f,
+                "Subtitle output is complete at {}; JSON report publication failed and existing files were preserved: {source}",
+                subtitle_path.display()
+            ),
         }
     }
 }
@@ -42,6 +55,7 @@ impl Error for SyncError {
         match self {
             Self::Io { source, .. } => Some(source),
             Self::Json(error) => Some(error),
+            Self::ReportPublication { source, .. } => Some(source),
             _ => None,
         }
     }

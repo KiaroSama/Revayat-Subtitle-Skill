@@ -70,8 +70,8 @@ fn regex_text(value: &Value) -> Result<&str, String> {
 
 fn mask(text: &str) -> Result<(String, Vec<&str>), String> {
     let protect = regex!(concat!(
-        r"(?sm)```.*?```|`[^`\n]*`|^(?: {4,}|\t)\S.*$|(?:https?://|www\.)\S+",
-        r"|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|\bv\d+(?:\.\d+)+\b|\b\d+\.\d+\.\d+\b",
+        r"(?sm)```.*?```|`[^`\n]*`|^(?: {4,}|\t)\S[^\n]*$|(?:https?://|www\.)\S+",
+        r"|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|\bv\d+(?:\.\d+)+\b|\b\d+\.\d+\.\d+\b|\x00",
     ));
     let mut spans = Vec::new();
     let mut result = String::with_capacity(text.len());
@@ -567,6 +567,27 @@ mod tests {
                 "zwnj_plural_ha": 1,
                 "space_after_punct": 1
             }]}))
+        );
+    }
+
+    #[test]
+    fn indented_code_does_not_hide_later_persian_paragraphs() {
+        assert_eq!(
+            normalize(json!("    code = 1\n\nكتاب ها مي رود"), "keep".into()),
+            Ok(json!({"$tuple": ["    code = 1\n\nکتاب‌ها می‌رود", {
+                "arabic_to_persian_letters": 2,
+                "zwnj_mi_prefix": 1,
+                "zwnj_plural_ha": 1
+            }]}))
+        );
+    }
+
+    #[test]
+    fn literal_sentinel_preserves_every_protected_fragment() {
+        let text = "before\0`one` after `two`";
+        assert_eq!(
+            normalize(json!(text), "keep".into()),
+            Ok(json!({"$tuple": [text, {}]}))
         );
     }
 

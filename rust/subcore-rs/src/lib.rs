@@ -1,9 +1,11 @@
-//! Python bindings for `skills/revayat-subtitle/scripts/text_pipeline.py`: generated from the signatures in `port.rs` by rust-anything.
-//! Regenerate with `rust-anything refresh` after changing them.
+//! Python bindings for `skills/revayat-subtitle/scripts/text_pipeline.py`.
+//! The initial rust-anything scaffold now includes maintained runtime-compatibility adapters.
+//! Regeneration must preserve these adapters and pass the compiled cross-version parity suite.
 
 #![allow(clippy::too_many_arguments)]
 
 use pyo3::prelude::*;
+use std::collections::HashSet;
 
 pub mod port;
 
@@ -59,40 +61,41 @@ fn error(message: String) -> PyErr {
     }
 }
 
-fn normalize_persian_zwnj_inner(text: String) -> Result<String, String> {
-    let out = port::normalize_persian_zwnj(text)?;
-    Ok(out)
+fn runtime_word_class(py: Python<'_>, text: &str) -> PyResult<Option<String>> {
+    let mut classes = Vec::new();
+    for c in text
+        .chars()
+        .filter(|c| !c.is_ascii())
+        .collect::<HashSet<_>>()
+    {
+        let value = pyo3::types::PyString::new(py, &c.to_string());
+        classes.push((c, value.call_method0("isalnum")?.extract::<bool>()?));
+    }
+    Ok(port::python_word_class(&classes))
 }
 
 /// `normalize_persian_zwnj`.
 #[pyfunction]
 #[pyo3(name = "normalize_persian_zwnj", signature = (text))]
-fn normalize_persian_zwnj(text: String) -> PyResult<String> {
-    normalize_persian_zwnj_inner(text).map_err(error)
-}
-
-fn watermark_reason_inner(text: String) -> Result<String, String> {
-    let out = port::watermark_reason(text)?;
-    Ok(out)
+fn normalize_persian_zwnj(py: Python<'_>, text: String) -> PyResult<String> {
+    let word_class = runtime_word_class(py, &text)?;
+    port::normalize_persian_zwnj_with_word_class(text, word_class.as_deref()).map_err(error)
 }
 
 /// `watermark_reason`.
 #[pyfunction]
-#[pyo3(name = "watermark_reason", signature = (text))]
-fn watermark_reason(text: String) -> PyResult<String> {
-    watermark_reason_inner(text).map_err(error)
-}
-
-fn is_watermark_cue_inner(text: String) -> Result<bool, String> {
-    let out = port::is_watermark_cue(text)?;
-    Ok(out)
+#[pyo3(name = "watermark_reason", signature = (text, kind="srt"))]
+fn watermark_reason(py: Python<'_>, text: String, kind: &str) -> PyResult<String> {
+    let plain = port::prepare_watermark_text_with_kind(text, kind).map_err(error)?;
+    let word_class = runtime_word_class(py, &plain)?;
+    port::watermark_reason_prepared(plain, word_class.as_deref()).map_err(error)
 }
 
 /// `is_watermark_cue`.
 #[pyfunction]
-#[pyo3(name = "is_watermark_cue", signature = (text))]
-fn is_watermark_cue(text: String) -> PyResult<bool> {
-    is_watermark_cue_inner(text).map_err(error)
+#[pyo3(name = "is_watermark_cue", signature = (text, kind="srt"))]
+fn is_watermark_cue(py: Python<'_>, text: String, kind: &str) -> PyResult<bool> {
+    watermark_reason(py, text, kind).map(|reason| !reason.is_empty())
 }
 
 fn convert_srt_markup_to_ass_inner(text: String) -> Result<String, String> {
@@ -127,42 +130,47 @@ fn wrap_subtitle_lines(
     wrap_subtitle_lines_inner(text, max_chars, max_lines).map_err(error)
 }
 
-fn anchor_rtl_line_inner(
-    text: String,
-    kind: Option<String>,
-    direction: Option<String>,
-) -> Result<String, String> {
-    let out = port::anchor_rtl_line(text, kind, direction)?;
-    Ok(out)
+fn runtime_rtl_letters(py: Python<'_>, text: &str) -> PyResult<HashSet<char>> {
+    // Use the linked interpreter's Unicode database for the reference contract;
+    // each distinct non-ASCII character is classified only once per cue.
+    let classify = py.import("unicodedata")?.getattr("bidirectional")?;
+    let mut letters = HashSet::new();
+    for c in text
+        .chars()
+        .filter(|c| !c.is_ascii())
+        .collect::<HashSet<_>>()
+    {
+        let value = pyo3::types::PyString::new(py, &c.to_string());
+        if value.call_method0("isalpha")?.extract::<bool>()?
+            && matches!(
+                classify.call1((&value,))?.extract::<String>()?.as_str(),
+                "R" | "AL"
+            )
+        {
+            letters.insert(c);
+        }
+    }
+    Ok(letters)
 }
 
 /// `anchor_rtl_line`.
 #[pyfunction]
 #[pyo3(name = "anchor_rtl_line", signature = (text, kind=String::from("ass"), direction=String::from("rtl")))]
 fn anchor_rtl_line(
+    py: Python<'_>,
     text: String,
     kind: Option<String>,
     direction: Option<String>,
 ) -> PyResult<String> {
-    anchor_rtl_line_inner(text, kind, direction).map_err(error)
-}
-
-fn process_cue_text_inner(
-    text: String,
-    kind: Option<String>,
-    direction: Option<String>,
-    max_chars: Option<i64>,
-    fix_zwnj: Option<bool>,
-    wrap_lines: Option<bool>,
-) -> Result<String, String> {
-    let out = port::process_cue_text(text, kind, direction, max_chars, fix_zwnj, wrap_lines)?;
-    Ok(out)
+    let letters = runtime_rtl_letters(py, &text)?;
+    port::anchor_rtl_line_with_letters(text, kind, direction, Some(&letters)).map_err(error)
 }
 
 /// `process_cue_text`.
 #[pyfunction]
 #[pyo3(name = "process_cue_text", signature = (text, kind=String::from("ass"), direction=String::from("rtl"), max_chars=42, fix_zwnj=true, wrap_lines=true))]
 fn process_cue_text(
+    py: Python<'_>,
     text: String,
     kind: Option<String>,
     direction: Option<String>,
@@ -170,12 +178,30 @@ fn process_cue_text(
     fix_zwnj: Option<bool>,
     wrap_lines: Option<bool>,
 ) -> PyResult<String> {
-    process_cue_text_inner(text, kind, direction, max_chars, fix_zwnj, wrap_lines).map_err(error)
+    let word_class = if direction.as_deref() == Some("rtl") && fix_zwnj.unwrap_or(false) {
+        runtime_word_class(py, &text)?
+    } else {
+        None
+    };
+    let text = port::prepare_cue_text_with_word_class(
+        text,
+        kind.clone(),
+        direction.clone(),
+        max_chars,
+        fix_zwnj,
+        wrap_lines,
+        word_class.as_deref(),
+    )
+    .map_err(error)?;
+    let letters = runtime_rtl_letters(py, &text)?;
+    port::anchor_rtl_line_with_letters(text, kind, direction, Some(&letters)).map_err(error)
 }
 
 #[pymodule]
 #[pyo3(name = "_native")]
 fn native_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("REVAYAT_NATIVE_CONTRACT", 1u8)?;
+    m.add("WATERMARK_FORMAT_API", 1u8)?;
     m.add_function(wrap_pyfunction!(normalize_persian_zwnj, m)?)?;
     m.add_function(wrap_pyfunction!(watermark_reason, m)?)?;
     m.add_function(wrap_pyfunction!(is_watermark_cue, m)?)?;

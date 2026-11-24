@@ -5,6 +5,8 @@
 use fancy_regex::Regex as FancyRegex;
 use regex::Regex;
 use serde_json::{Value, json};
+use std::collections::HashMap;
+use unicode_bidi::BidiClass;
 
 macro_rules! pattern {
     ($engine:ty, $source:expr) => {{
@@ -54,8 +56,23 @@ pub fn has_ltr(text: String) -> Result<bool, String> {
     Ok(bidi::has_ltr(&text))
 }
 
+pub fn has_rtl_with_classes(text: &str, classes: &HashMap<char, BidiClass>) -> bool {
+    bidi::has_rtl_with_classes(text, Some(classes))
+}
+
+pub fn has_ltr_with_classes(text: &str, classes: &HashMap<char, BidiClass>) -> bool {
+    bidi::has_ltr_with_classes(text, Some(classes))
+}
+
 pub fn srt_font_names(tag: String) -> Result<Value, String> {
-    Ok(json!({"$set": font::names(&tag)?}))
+    srt_font_names_with_legacy_attributes(tag, false)
+}
+
+pub fn srt_font_names_with_legacy_attributes(
+    tag: String,
+    legacy_attributes: bool,
+) -> Result<Value, String> {
+    Ok(json!({"$set": font::names(&tag, legacy_attributes)?}))
 }
 
 pub fn drawing_mode(block: String, drawing: bool) -> Result<bool, String> {
@@ -190,7 +207,17 @@ pub fn validate_bidi(text: String, kind: String) -> Result<(), String> {
 
 /// `direction` defaults to `"rtl"` and `force` defaults to `False` in Python.
 pub fn rtl(text: String, kind: String, direction: String, force: bool) -> Result<String, String> {
-    bidi::normalize(&text, &kind, &direction, force)
+    bidi::normalize(&text, &kind, &direction, force, None)
+}
+
+pub fn rtl_with_classes(
+    text: &str,
+    kind: &str,
+    direction: &str,
+    force: bool,
+    classes: &HashMap<char, BidiClass>,
+) -> Result<String, String> {
+    bidi::normalize(text, kind, direction, force, Some(classes))
 }
 
 /// `preserve` defaults to `False` in Python.
@@ -312,6 +339,17 @@ mod tests {
         assert_eq!(
             srt_font_names(r#"<font face="&fjlig; &NotEqualTilde; &amp=">"#.into()),
             Ok(json!({"$set": ["fj \u{2242}\u{338} &amp="]}))
+        );
+    }
+
+    #[test]
+    fn legacy_python_attribute_entities_keep_their_prefix_contract() {
+        assert_eq!(
+            srt_font_names_with_legacy_attributes(
+                r#"<font face="&fjlig; &amp= &notit; &unknown;">"#.into(),
+                true,
+            ),
+            Ok(json!({"$set": ["fj &= ¬it; &unknown;"]}))
         );
     }
 

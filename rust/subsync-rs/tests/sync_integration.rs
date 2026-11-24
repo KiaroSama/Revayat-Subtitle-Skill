@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use subsync_rs::audio::{read_wav_pcm16, write_wav_pcm16};
 use subsync_rs::formats::{SubtitleDocument, SubtitleFormat};
-use subsync_rs::vad::extract_speech_activity;
+use subsync_rs::vad::{TimeSpan, VadResult, extract_speech_activity};
 use subsync_rs::{SyncConfig, SyncError, sync_file_to_wav, sync_subtitles_with_vad};
 
 const RATE: u32 = 16_000;
@@ -247,4 +247,96 @@ fn refuses_invalid_subtitles_and_empty_speech() {
         sync_subtitles_with_vad(&mut doc, &vad, &SyncConfig::default()),
         Err(SyncError::NoSpeech)
     ));
+}
+
+#[test]
+fn refuses_continuous_activity_without_timing_anchors() {
+    let pcm: Vec<_> = (0..10 * RATE)
+        .map(|i| (9000.0 * (TAU * 400.0 * f64::from(i) / f64::from(RATE)).sin()) as i16)
+        .collect();
+    let vad = extract_speech_activity(&pcm, RATE, 10);
+    assert!(vad.activity.iter().all(|&active| active == 1));
+    let original = srt([(1000, 1800), (2700, 3500), (4500, 6100)]);
+    let mut doc = SubtitleDocument::parse(&original, None).unwrap();
+    let result = sync_subtitles_with_vad(&mut doc, &vad, &SyncConfig::default());
+    assert!(
+        result.is_err(),
+        "constant activity produced an alignment: {result:?}"
+    );
+    assert_eq!(doc.serialize().unwrap(), original);
+}
+
+#[test]
+fn refuses_seeded_broadband_noise_without_changing_subtitles() {
+    let mut state = 127_u32;
+    let pcm: Vec<_> = (0..5 * RATE)
+        .map(|_| {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            ((state >> 16) as i16) / 2
+        })
+        .collect();
+    let vad = extract_speech_activity(&pcm, RATE, 10);
+    let original = srt([(1000, 1800), (2700, 3500)]);
+    let mut doc = SubtitleDocument::parse(&original, None).unwrap();
+    assert!(matches!(
+        sync_subtitles_with_vad(&mut doc, &vad, &SyncConfig::default()),
+        Err(SyncError::NoSpeech)
+    ));
+    assert_eq!(doc.serialize().unwrap(), original);
+}
+
+#[test]
+fn aligns_twelve_edited_sections_across_a_twelve_minute_timeline() {
+    let shifts = [
+        0_i64, 5000, -3000, 2000, -5000, 1000, 5000, -1000, 4000, -4000, 0, 3000,
+    ];
+    let mut expected = Vec::new();
+    let mut original = Vec::new();
+    for (block, shift) in shifts.into_iter().enumerate() {
+        for (start, end) in SPEECH {
+            let base = 5000 + block as u64 * 60_000;
+            let (start, end) = (base + start, base + end);
+            expected.push((start, end));
+            original.push((
+                start.saturating_add_signed(shift),
+                end.saturating_add_signed(shift),
+            ));
+        }
+    }
+    let duration_ms = 12 * 60_000;
+    let mut activity = vec![0; (duration_ms / 10) as usize];
+    for &(start, end) in &expected {
+        activity[start as usize / 10..end as usize / 10].fill(1);
+    }
+    let vad = VadResult {
+        frame_ms: 10,
+        duration_ms,
+        probability: activity.iter().map(|&active| f32::from(active)).collect(),
+        activity,
+        segments: expected
+            .iter()
+            .map(|&(start_ms, end_ms)| TimeSpan { start_ms, end_ms })
+            .collect(),
+    };
+    let mut doc = SubtitleDocument::parse(&srt(original), None).unwrap();
+    let config = SyncConfig {
+        fps_search: false,
+        snap_ms: 0,
+        ..SyncConfig::default()
+    };
+    let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
+    assert_times(&doc, &expected, 0);
+    assert_eq!(report.split_segments.len(), shifts.len());
+    assert_eq!(report.split_segments[0].start_cue, 1);
+    assert_eq!(
+        report.split_segments.last().unwrap().end_cue,
+        expected.len()
+    );
+    assert!(
+        report
+            .split_segments
+            .windows(2)
+            .all(|pair| pair[0].end_cue + 1 == pair[1].start_cue)
+    );
+    assert_eq!(report.overlap_score_after, 1.0);
 }
