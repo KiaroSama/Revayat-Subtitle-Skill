@@ -181,7 +181,7 @@ jobs:
           if (!$signtool) { throw 'Windows SDK SignTool was not found.' }
           $openssl = 'C:\Program Files\Git\mingw64\bin\openssl.exe'
           if (!(Test-Path -LiteralPath $openssl -PathType Leaf)) {
-            $openssl = (Get-Command openssl.exe -CommandType Application).Source
+            $openssl = (Get-Command openssl.exe -CommandType Application | Select-Object -First 1).Source
           }
 
           $pfx = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
