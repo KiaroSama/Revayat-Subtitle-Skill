@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 pyo3 = { version = "0.30", features = ["extension-module", "abi3-py39"] }
 serde = "1"
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "unbounded_depth"] }
-fancy-regex = "0.14"
+fancy-regex = "0.20"
 regex = "1"
 unicode-bidi = "0.3.18"
 html-escape = "0.2.15"
