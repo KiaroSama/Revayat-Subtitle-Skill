@@ -200,6 +200,7 @@ fn process_cue_text(
 #[pymodule]
 #[pyo3(name = "_native")]
 fn native_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("REVAYAT_NATIVE_CONTRACT", 1u8)?;
     m.add("WATERMARK_FORMAT_API", 1u8)?;
     m.add_function(wrap_pyfunction!(normalize_persian_zwnj, m)?)?;
     m.add_function(wrap_pyfunction!(watermark_reason, m)?)?;

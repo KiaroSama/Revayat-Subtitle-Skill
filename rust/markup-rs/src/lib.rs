@@ -236,6 +236,7 @@ fn paragraph_direction(language: String) -> PyResult<String> {
 #[pymodule]
 #[pyo3(name = "_native")]
 fn native_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("REVAYAT_NATIVE_CONTRACT", 1u8)?;
     m.add_function(wrap_pyfunction!(srt_tag_fits, m)?)?;
     m.add_function(wrap_pyfunction!(has_rtl, m)?)?;
     m.add_function(wrap_pyfunction!(has_ltr, m)?)?;

@@ -3,6 +3,13 @@ imported the original module."""
 
 from . import _native
 
+REVAYAT_NATIVE_CONTRACT = getattr(_native, "REVAYAT_NATIVE_CONTRACT", 0)
+if REVAYAT_NATIVE_CONTRACT != 1:
+    raise ImportError(
+        "markup_rs native contract mismatch. Rebuild or reinstall the compiled extension "
+        "from the same checkout as this package; see rust/markup-rs/README.md."
+    )
+
 import json as _json
 import math as _math
 
@@ -99,4 +106,4 @@ rtl = _native.rtl
 clean_empty_lines = _native.clean_empty_lines
 paragraph_direction = _native.paragraph_direction
 
-__all__ = ['srt_tag_fits', 'has_rtl', 'has_ltr', 'srt_font_names', 'drawing_mode', 'uncomment', 'remap_resets', 'validate_bidi', 'rtl', 'clean_empty_lines', 'paragraph_direction']
+__all__ = ['srt_tag_fits', 'has_rtl', 'has_ltr', 'srt_font_names', 'drawing_mode', 'uncomment', 'remap_resets', 'validate_bidi', 'rtl', 'clean_empty_lines', 'paragraph_direction', 'REVAYAT_NATIVE_CONTRACT']

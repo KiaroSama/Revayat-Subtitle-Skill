@@ -222,10 +222,19 @@ This detector is a conservative mechanical aid, not a semantic review certificat
 The Python and native `watermark_reason` / `is_watermark_cue` APIs accept
 `kind="srt"` or `kind="ass"`; their one-argument default is SRT. Conversion,
 Translator Mode donor checks and workspace upgrades pass the actual source kind.
-Native dispatch requires the compiled `WATERMARK_FORMAT_API = 1` capability. An
-older optional binary falls back to the bounded Python classifier for these two
-operations, while other available accelerators remain usable. Mandatory native
-parity checks require the new capability and do not pass through that fallback.
+The existing Subcore dispatch requires the exact compiled contract epoch
+`REVAYAT_NATIVE_CONTRACT = 1` for every operation. An entirely old installed
+Subcore package without that epoch uses current Python normalization, conversion,
+wrapping, direction handling and watermark classification instead. Current
+Subcore, markup and Persian-linter facades also reject an absent or mismatched
+compiled epoch with `ImportError`; this adds no new automatic markup/linter
+dispatch. A watermark-only gate would leave old wrapping or Unicode behavior
+active. `WATERMARK_FORMAT_API = 1` remains feature metadata, not compatibility
+authority. Mandatory native parity requires the current epoch on all three
+actual compiled extensions and does not count fallback as native success.
+When an accelerated API or its observable semantics becomes incompatible, advance
+the compiled epoch, facade/dispatcher checks and parity expectations together;
+changing only the wrapper version does not establish compatibility.
 Workspace review links must still resolve to emitted cues after normalization;
 linking to an automatically removed credit refuses the build until the coordinator
 repairs the editorial decision. A cue cannot link to itself.

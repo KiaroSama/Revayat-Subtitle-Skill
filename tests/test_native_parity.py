@@ -1,9 +1,12 @@
 """Compare real compiled extension behavior with the Python reference functions."""
 
 import importlib
+import importlib.util
 import os
 import random
+import sys
 import unittest
+from types import ModuleType
 from unittest.mock import patch
 
 from check import ROOT
@@ -14,11 +17,15 @@ from test_audit_install_native_20261124 import persian_linter
 
 def native_module(name):
     try:
-        return importlib.import_module(name)
+        module = importlib.import_module(name)
     except ImportError as error:
         if os.environ.get("REVAYAT_REQUIRE_NATIVE") == "1":
             raise AssertionError(f"Required compiled extension {name} is unavailable") from error
         raise unittest.SkipTest(f"Optional compiled extension {name} is unavailable") from error
+    if (getattr(module, "REVAYAT_NATIVE_CONTRACT", 0) != 1
+            or getattr(module._native, "REVAYAT_NATIVE_CONTRACT", 0) != 1):
+        raise AssertionError(f"Compiled extension {name} must advertise native contract 1")
+    return module
 
 
 def outcome(function, *args, **kwargs):
@@ -34,6 +41,35 @@ class NativeParityCase(unittest.TestCase):
             expected = outcome(python, *args, **kwargs)
         actual = outcome(native, *args, **kwargs)
         self.assertEqual(actual, expected, f"{python.__name__}: args={args!r}, kwargs={kwargs!r}")
+
+
+class NativeFacadeContractTests(unittest.TestCase):
+    def test_current_facades_reject_missing_old_and_future_compiled_contracts(self):
+        exports = {
+            "markup_rs": ("srt_tag_fits", "has_rtl", "has_ltr", "srt_font_names", "drawing_mode",
+                          "uncomment", "remap_resets", "validate_bidi", "rtl", "clean_empty_lines",
+                          "paragraph_direction"),
+            "persian_lint_rs": ("normalize", "suggestions", "line_changes"),
+            "subcore_rs": ("normalize_persian_zwnj", "watermark_reason", "is_watermark_cue",
+                           "convert_srt_markup_to_ass", "wrap_subtitle_lines", "anchor_rtl_line",
+                           "process_cue_text"),
+        }
+        for package, functions in exports.items():
+            path = ROOT / "rust" / package.replace("_", "-") / "python" / package / "__init__.py"
+            for contract in (None, 0, 2):
+                with self.subTest(package=package, compiled_contract=contract):
+                    name = f"_contract_probe_{package}"
+                    native = ModuleType(name + "._native")
+                    for function in functions:
+                        setattr(native, function, lambda *args, **kwargs: None)
+                    if contract is not None:
+                        native.REVAYAT_NATIVE_CONTRACT = contract
+                    spec = importlib.util.spec_from_file_location(name, path,
+                                                                  submodule_search_locations=[str(path.parent)])
+                    module = importlib.util.module_from_spec(spec)
+                    with patch.dict(sys.modules, {name: module, name + "._native": native}):
+                        with self.assertRaisesRegex(ImportError, "native contract.*Rebuild"):
+                            spec.loader.exec_module(module)
 
 
 class MarkupNativeParityTests(NativeParityCase):

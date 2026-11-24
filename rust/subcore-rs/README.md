@@ -17,10 +17,26 @@ Rust port of `skills/revayat-subtitle/scripts/text_pipeline.py`, bridged with Py
 The two watermark functions accept an optional `kind="srt"` argument; callers
 processing native ASS must pass `kind="ass"`. The one-argument form remains
 available with SRT semantics. `WATERMARK_FORMAT_API = 1` identifies a compiled
-module implementing format-aware classification; the Python facade exposes `0`
-for an older binary so the subtitle pipeline can use its safe Python classifier
-without guessing compatibility from exceptions. Rust's existing one-argument
+module implementing format-aware classification. Rust's existing one-argument
 port functions also remain available, with explicit `_with_kind` variants.
+
+## Native compatibility contract
+
+The compiled module and Python facade advertise `REVAYAT_NATIVE_CONTRACT = 1`.
+The current facade rejects an older or incompatible compiled epoch with a clear
+`ImportError`. The subtitle pipeline also checks that exact epoch before every
+dispatch, covering an entirely old installed package whose facade lacks the
+new import validation; it then uses current Python implementations for the
+whole module. This prevents an older extension from reintroducing repaired
+tokenization, Unicode, normalization or wrapping behavior. A feature marker such
+as `WATERMARK_FORMAT_API` alone is insufficient. The optional markup and
+Persian-linter facades validate the same epoch, without adding new automatic
+dispatch to those modules. Mandatory parity requires actual compatible
+extensions rather than fallback. Compatibility is determined explicitly,
+without catching implementation exceptions.
+When an accelerated API or its observable semantics becomes incompatible, advance
+the compiled epoch, facade/dispatcher checks and parity expectations together;
+changing only the wrapper version does not establish compatibility.
 
 ## Loop
 

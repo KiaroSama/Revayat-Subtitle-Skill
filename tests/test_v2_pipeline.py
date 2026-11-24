@@ -128,7 +128,9 @@ def test_process_honors_flags_and_line_model(pipeline):
 
 
 def test_rust_delegation_can_be_disabled_per_call(pipeline, monkeypatch):
-    monkeypatch.setattr(pipeline, '_subcore_rs', SimpleNamespace(normalize_persian_zwnj=lambda text: 'native:' + text))
+    monkeypatch.setattr(pipeline, '_subcore_rs', SimpleNamespace(
+        REVAYAT_NATIVE_CONTRACT=1,
+        normalize_persian_zwnj=lambda text: 'native:' + text))
     monkeypatch.delenv('REVAYAT_DISABLE_RUST')
     assert pipeline.normalize_persian_zwnj('می روم') == 'native:می روم'
     monkeypatch.setenv('REVAYAT_DISABLE_RUST', '1')

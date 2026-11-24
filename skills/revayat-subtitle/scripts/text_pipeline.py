@@ -50,7 +50,7 @@ _FUNCTION_WORDS = frozenset("و یا که تا از در بر به با را ه�
 def _native(name: str) -> Callable[..., Any] | None:
     if os.environ.get("REVAYAT_DISABLE_RUST") == "1":
         return None
-    if name in {"watermark_reason", "is_watermark_cue"} and getattr(_subcore_rs, "WATERMARK_FORMAT_API", 0) != 1:
+    if getattr(_subcore_rs, "REVAYAT_NATIVE_CONTRACT", 0) != 1:
         return None
     return getattr(_subcore_rs, name, None)
 

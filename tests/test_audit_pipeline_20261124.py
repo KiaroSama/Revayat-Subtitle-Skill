@@ -228,30 +228,79 @@ def test_ass_literal_markup_and_genuine_ad_controls(link, reason):
     assert pipeline.watermark_reason(link, kind="srt") == reason
 
 
-def test_old_native_watermark_signature_is_not_used_for_format_classification(monkeypatch):
+def test_old_native_module_is_not_used_for_current_text_contracts(monkeypatch):
     called = []
     def old_reason(text):
         called.append(text)
         return "url-ad"
-    unrelated_native = lambda text: text
+    old_normalizer = lambda text: text
     old = SimpleNamespace(watermark_reason=old_reason, is_watermark_cue=old_reason,
-                          normalize_persian_zwnj=unrelated_native)
+                          normalize_persian_zwnj=old_normalizer)
     monkeypatch.setattr(pipeline, "_subcore_rs", old)
     monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
     assert pipeline.watermark_reason("<i>https://example.test</i>", kind="ass") == ""
     assert not pipeline.is_watermark_cue("<notice>https://example.test</notice>")
     assert pipeline.watermark_reason("<i>https://example.test</i>") == "url-ad"
-    assert pipeline._native("normalize_persian_zwnj") is unrelated_native
+    assert pipeline.normalize_persian_zwnj("مي روم") == "می‌روم"
+    assert pipeline._native("normalize_persian_zwnj") is None
+    assert not called
+
+
+@pytest.mark.parametrize("epoch", (None, 0, 2))
+def test_incompatible_native_contract_cannot_bypass_text_repairs(monkeypatch, epoch):
+    called = []
+    def stale(text, *args, **kwargs):
+        called.append(text)
+        return text
+    functions = ("normalize_persian_zwnj", "watermark_reason", "is_watermark_cue",
+                 "convert_srt_markup_to_ass", "wrap_subtitle_lines", "anchor_rtl_line", "process_cue_text")
+    old = SimpleNamespace(**dict.fromkeys(functions, stale), WATERMARK_FORMAT_API=1)
+    if epoch is not None:
+        old.REVAYAT_NATIVE_CONTRACT = epoch
+    monkeypatch.setattr(pipeline, "_subcore_rs", old)
+    monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
+    assert pipeline.normalize_persian_zwnj("مي روم") == "می‌روم"
+    assert pipeline.watermark_reason("<notice>https://example.test</notice>") == ""
+    assert not pipeline.is_watermark_cue("<notice>https://example.test</notice>")
+    assert pipeline.convert_srt_markup_to_ass("A<i>B</i>") == r"A{\i1}B{\i0}"
+    literal = "<font color=red>one two three</font> four five"
+    wrapped = pipeline.wrap_subtitle_lines(literal, 24)
+    assert r"\N" in wrapped and wrapped.replace(r"\N", " ") == literal
+    rtl_literal = '<b title="سلام">.</b>'
+    assert pipeline.anchor_rtl_line(rtl_literal, "ass").startswith(markup.RLE)
+    assert pipeline.process_ass_text(rtl_literal).startswith(markup.RLE)
+    assert pipeline.process_cue_text(rtl_literal, fix_zwnj=False, wrap_lines=False).startswith(markup.RLE)
     assert not called
 
 
 def test_current_native_internal_type_error_is_not_hidden(monkeypatch):
     def broken(text, kind="srt"):
         raise TypeError("Authored native implementation failure")
-    monkeypatch.setattr(pipeline, "_subcore_rs", SimpleNamespace(WATERMARK_FORMAT_API=1, watermark_reason=broken))
+    monkeypatch.setattr(pipeline, "_subcore_rs", SimpleNamespace(REVAYAT_NATIVE_CONTRACT=1,
+                        WATERMARK_FORMAT_API=1, watermark_reason=broken))
     monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
     with pytest.raises(TypeError, match="Authored native implementation failure"):
         pipeline.watermark_reason("https://example.test", kind="ass")
+
+
+def test_current_native_contract_delegates_every_existing_export(monkeypatch):
+    called = []
+    functions = ("normalize_persian_zwnj", "watermark_reason", "is_watermark_cue",
+                 "convert_srt_markup_to_ass", "wrap_subtitle_lines", "anchor_rtl_line", "process_cue_text")
+    def implementation(name):
+        def call(text, *args, **kwargs):
+            assert text == "Authored native dispatch control"
+            called.append(name)
+            return True if name == "is_watermark_cue" else name
+        return call
+    module = SimpleNamespace(REVAYAT_NATIVE_CONTRACT=1,
+                             **{name: implementation(name) for name in functions})
+    monkeypatch.setattr(pipeline, "_subcore_rs", module)
+    monkeypatch.setenv("REVAYAT_DISABLE_RUST", "0")
+    for name in functions:
+        expected = True if name == "is_watermark_cue" else name
+        assert getattr(pipeline, name)("Authored native dispatch control") == expected
+    assert called == list(functions)
 
 
 @pytest.mark.parametrize("text", [

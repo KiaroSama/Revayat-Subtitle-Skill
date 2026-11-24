@@ -3,6 +3,13 @@ imported the original module."""
 
 from . import _native
 
+REVAYAT_NATIVE_CONTRACT = getattr(_native, "REVAYAT_NATIVE_CONTRACT", 0)
+if REVAYAT_NATIVE_CONTRACT != 1:
+    raise ImportError(
+        "subcore_rs native contract mismatch. Rebuild or reinstall the compiled extension "
+        "from the same checkout as this package; see rust/subcore-rs/README.md."
+    )
+
 import json as _json
 import math as _math
 
@@ -96,4 +103,4 @@ wrap_subtitle_lines = _native.wrap_subtitle_lines
 anchor_rtl_line = _native.anchor_rtl_line
 process_cue_text = _native.process_cue_text
 
-__all__ = ['normalize_persian_zwnj', 'watermark_reason', 'is_watermark_cue', 'convert_srt_markup_to_ass', 'wrap_subtitle_lines', 'anchor_rtl_line', 'process_cue_text', 'WATERMARK_FORMAT_API']
+__all__ = ['normalize_persian_zwnj', 'watermark_reason', 'is_watermark_cue', 'convert_srt_markup_to_ass', 'wrap_subtitle_lines', 'anchor_rtl_line', 'process_cue_text', 'WATERMARK_FORMAT_API', 'REVAYAT_NATIVE_CONTRACT']

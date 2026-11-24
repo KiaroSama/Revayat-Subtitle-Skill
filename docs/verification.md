@@ -12,17 +12,24 @@ recovery, sync parsing and complete-file publication, and package symlink refusa
 The baseline was tested from a detached Git worktree at `8f003e5` with full
 history: 490 pytest cases passed, 44 skipped and 698 subtests passed; the separate
 bounded/render runner passed 463 tests with 8 skips. The repaired fallback suite
-passed on Python 3.11.18 and 3.14.10 with 597 tests and 705 subtests per run
-(51 skips); the Python 3.14.10 bounded/render run passed 478 tests (11 skips).
+passed on Python 3.11.18 and 3.14.10 with 602 tests and 714 subtests per run
+(51 skips); the Python 3.14.10 bounded/render run passed 479 tests (11 skips).
 Native results are a separate requirement: missing compiled modules must fail
 when `REVAYAT_REQUIRE_NATIVE=1`. Neither a fallback pass nor an import-only probe
-establishes native compatibility. The final compiled release run passed 602 tests
-and 2,036 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
-Python 3.14.10 passed 640 tests and 2,111 subtests (8 skips). The three accelerator
+establishes native compatibility. The final compiled release run passed 607 tests
+and 2,045 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
+Python 3.14.10 passed 645 tests and 2,120 subtests (8 skips). The three accelerator
 crates passed 33 Rust unit tests in total. The malformed-comment regression also
 checks real Persian normalization after the 400 KB literal prefix; this caught
 and closed a native regex-budget failure during consolidated testing. Use the
 exact candidate's Actions results for hosted platform evidence.
+
+All three current native facades verify their compiled contract revision. The
+existing Subcore dispatcher rejects the whole old module when that revision is
+missing or unsupported, so old wrapping, anchoring, Unicode and normalization
+behavior cannot override the updated Python reference. Real baseline binaries
+reproduced these upgrade failures; old-package fallback and current-facade
+rejection were exercised separately, alongside compatible native delegation.
 
 The sync audit additionally passed 18 Rust tests plus doctests and 31 Python
 sync cases locally, including real-engine FFmpeg tests, with no local skips. It
