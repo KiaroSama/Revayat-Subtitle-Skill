@@ -1,9 +1,9 @@
 # Platform references
 
-Discovery paths and plugin formats were checked against current official
-documentation on 2026-09-14. Distribution compatibility is not a claim that every
-host application was installed or exercised. A skill must run with the host's
-filesystem, shell, web and image-viewing permissions.
+Discovery paths and five plugin manifest formats were re-checked against current
+official documentation and `cloudflare/skills` on 2026-11-24. Distribution
+compatibility is not a claim that every host application was installed or exercised.
+A skill must run with the host's filesystem, shell, web and image-viewing permissions.
 
 | Host | Official references |
 | --- | --- |
@@ -17,13 +17,21 @@ filesystem, shell, web and image-viewing permissions.
 | Antigravity IDE | [Skills](https://www.antigravity.google/docs/ide/skills/), [Plugins](https://www.antigravity.google/docs/ide/plugins/) |
 | Antigravity CLI | [CLI plugins and skills](https://www.antigravity.google/docs/cli/plugins/) |
 
-The root manifest follows [Agent Plugins](https://agent-plugins.org/plugin-authors/manifest);
-its `skills/` location is fixed discovery, not a `skills` field. Compatibility
-manifests use the individual host contracts. Codex metadata was also checked with
-the installed official plugin validator. The installer supports a destination
-override for managed installations and future path changes. Python3.11+ is the
-supported floor; use a currently maintained stable Python for new installations.
-Older dated3.10 verification records remain historical, not current support.
+The repository ships all five plugin manifest formats at version `2.0.0`, registering
+both `revayat-subtitle` and `revayat-subtitle-sync`:
+
+- **Claude Code:** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (skills and four Markdown commands).
+- **Cursor:** `.cursor-plugin/plugin.json` and `.cursor-plugin/marketplace.json` (skills and four Markdown commands).
+- **Codex:** `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` (`./skills/` discovery).
+- **Antigravity:** `.antigravity-plugin/plugin.json` (skills and suggested prompts; Antigravity ignores `commands/`).
+- **Agent Plugins 1.0.0:** root `plugin.json` (convention discovery under `skills/`).
+
+The installer supports a destination override for managed installations and future path
+changes. Python 3.11+ (verified on 3.13.15) is the supported Python floor, and Rust
+(verified on 1.99.1; 1.88+ for `rust/subsync-rs`, 1.97+ for PyO3 crates) builds the
+`rust/subsync-rs` audio-to-subtitle synchronization CLI and the optional PyO3
+accelerators (`rust/subcore-rs`, `rust/persian-lint-rs`, and `rust/markup-rs`). Older
+dated 3.10 verification records remain historical, not current support.
 
 Standard agent installations place new recovery state in the first selected
 agent root's `revayat-recovery/`, outside skills/plugin discovery. Custom

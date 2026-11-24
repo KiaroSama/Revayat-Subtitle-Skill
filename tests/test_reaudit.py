@@ -148,7 +148,7 @@ class AuditCase(unittest.TestCase):
     def test_linked_existing_subtitle_is_not_accepted_by_rebuild(self):
         work = self.workspace()
         build = Path(workflow.build(work)["build"])
-        original, external = build / "Sub/S01E01.srt", self.root / "subtitle-external.srt"
+        original, external = build / "Sub/S01E01.ass", self.root / "subtitle-external.ass"
         original.rename(external)
         self.link(original, external)
         with self.assertRaisesRegex(ValueError, "[Ll]ink"):

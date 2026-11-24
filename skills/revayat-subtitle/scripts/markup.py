@@ -323,7 +323,9 @@ def rtl(text: str, kind: str, direction: str = "rtl", *, force: bool = False) ->
                     validate_bidi("".join(value for _, value in line), kind)
                 except ValueError:
                     self_contained = False
-                embedding = (RLE if direction == "rtl" else LRE) if mixed and self_contained else ""
+                tail = line[last][1].rstrip()
+                terminal = direction == "rtl" and tail.endswith((".", "،", "؟", "!", "…", ":", "؛"))
+                embedding = (RLE if direction == "rtl" else LRE) if (mixed or terminal) and self_contained else ""
                 line[first] = ("text", embedding + mark + line[first][1])
                 line[last] = ("text", line[last][1] + mark + (PDF if embedding else ""))
         output.append("".join(value for _, value in line))

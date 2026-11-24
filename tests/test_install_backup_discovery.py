@@ -17,7 +17,8 @@ class InstallBackupDiscoveryTests(WorkspaceCase):
         self.assertFalse(backup.is_relative_to(target.parent))
         self.assertEqual((backup / "SKILL.md").read_bytes(), old)
         self.assertTrue((backup / "empty").is_dir())
-        bundled = {target / "voice" / name / "SKILL.md" for name in ("humanizer", "great-russian", "persian")}
+        bundled = ({target / "voice" / name / "SKILL.md" for name in ("humanizer", "great-russian", "persian")}
+                   | {target / "sync" / "SKILL.md"})
         self.assertEqual(set(target.parent.glob("**/SKILL.md")), {target / "SKILL.md"} | bundled)
 
     def test_absent_standard_agent_root_is_created_with_owned_identity(self):

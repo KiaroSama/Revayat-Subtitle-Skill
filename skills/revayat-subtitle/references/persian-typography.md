@@ -86,3 +86,19 @@ Neutral-background images establish presentation only. Matching-video images
 also show scene contrast, but neither alone certifies audiovisual synchronization.
 Generating images is not the same as looking at them. A missing viewer or renderer
 leaves visual QA incomplete. [workflow.md](workflow.md) defines the review records.
+
+## Default v2.0 font, outline, line wrapping and punctuation anchoring
+
+Default Persian ASS output uses bundled `B Koodak` (`assets/fonts/BKOODB.TTF`),
+passed automatically to FFmpeg/libass through `fontsdir`, with subtle black
+outline (`Outline=1.5`, `OutlineColour=&H00000000`) and subtle black shadow
+(`Shadow=0.8`, `BackColour=&H80000000`) unless overridden by user style options.
+
+To prevent video players (`libass`, VLC, mpv, PotPlayer) from moving trailing
+punctuation (`.`, `،`, `؟`, `!`, `…`, `:`, `؛`) to the first line when a long
+line auto-wraps, the text pipeline balances lines over 42 visible characters into
+explicit `\N` breaks (never splitting inside `{...}` override blocks or ZWNJ
+compounds) and anchors each physical RTL subline with `U+202B`...`U+202C` plus a
+trailing `U+200F` after terminal neutral punctuation. Tag-aware ZWNJ enforcement
+normalizes `می‌`/`نمی‌`, `‌ها`/`‌های`, `‌تر`/`‌ترین`, and heh-final enclitics without
+altering tags or Latin spans.

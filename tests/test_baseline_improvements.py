@@ -15,7 +15,7 @@ class BaselineImprovementTests(WorkspaceCase):
         baseline = self.root / "baseline"
         baseline.mkdir()
         for name in ("runtime.py", "markup.py"):
-            raw = run(["git", "-C", str(ROOT), "show", BASE + ":skills/revayat-subtitle/scripts/" + name], timeout=8, max_output=65536)
+            raw = run(["git", "-c", f"safe.directory={ROOT.as_posix()}", "-C", str(ROOT), "show", BASE + ":skills/revayat-subtitle/scripts/" + name], timeout=8, max_output=65536)
             (baseline / name).write_bytes(raw)
         code = (
             "import importlib.util,sys,unittest;from pathlib import Path;from unittest.mock import patch;"

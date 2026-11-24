@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "path": "skills/revayat-subtitle/assets/fonts/BKOODB.TTF",
+      "encoding": "utf-16be",
+      "reason": "Bundled TrueType Persian subtitle font (B Koodak Bold, Borna Rayaneh) required for ASS rendering with FFmpeg/libass; OpenType name table contains UTF-16BE metadata records.",
+      "verification": "Validated TTF sfnt header, cmap 288 glyphs (100% Persian alphabet, digits, punctuation, ZWNJ U+200C, RLM U+200F), and live FFmpeg/libass fontsdir rendering."
+    }
+  ]
+}

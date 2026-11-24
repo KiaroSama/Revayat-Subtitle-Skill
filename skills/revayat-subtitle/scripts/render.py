@@ -21,6 +21,14 @@ from publication import publish_bytes
 from png_validation import decode_png, MAX_PNG_BYTES
 
 
+def bundled_fonts_dir() -> Path | None:
+    directory = Path(__file__).resolve().parents[1] / "assets" / "fonts"
+    if directory.is_dir() and any(path.is_file() and not path.is_symlink() and path.suffix.lower() in {".ttf", ".otf"}
+                                  for path in directory.iterdir()):
+        return directory
+    return None
+
+
 def ffmpeg_path(override: str | None = None) -> str:
     executable = override or os.environ.get("REVAYAT_FFMPEG") or shutil.which("ffmpeg")
     if not executable or not Path(executable).is_file():
@@ -62,7 +70,7 @@ def load_build(build: Path):
         raise ValueError("manifest.json.version: unsupported build schema")
     from workflow import assemble
     work = build.parent.parent
-    expected, files, glossary = assemble(work)
+    expected, files, glossary = assemble(work, output_format=manifest.get("output_format"))
     current = expected["identity"]
     if not same_json(manifest, expected):
         raise ValueError("Build manifest or workspace modified; rebuild and review the new edition")
@@ -211,6 +219,7 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
     destination = output_directory(root, episode_id + "-")
     frames = []
     rendered_bytes = 0
+    fonts = fonts if fonts is not None else bundled_fonts_dir()
     try:
         with staging_directory(build, ".render-") as stage:
             input_name = "input." + doc.kind
@@ -242,6 +251,7 @@ def render(build: Path, episode_id: str, override: str | None, video: Path | Non
                         recipe["fonts"].append(info)
                 if not recipe["fonts"]:
                     raise ValueError("fonts-dir contains no supported font files")
+                # FFmpeg runs from the snapshot, so drive colons and backslashes never enter the filtergraph.
                 font_option = ":fontsdir=fonts"
             filter_ = (f"ass={input_name}:shaping=complex" if doc.kind == "ass" else f"subtitles={input_name}") + font_option
             for index, sample in enumerate(samples, 1):

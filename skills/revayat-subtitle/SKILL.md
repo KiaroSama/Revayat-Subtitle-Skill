@@ -3,7 +3,7 @@ name: revayat-subtitle
 description: Use when translating or editing anime subtitles, reconciling ASS or SRT releases, or checking subtitle presentation. Persian is the default output. Use the requested target language for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "1.4.0"
+  version: "2.0.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 
@@ -208,9 +208,18 @@ For ASS it sorts disjoint temporal groups while preserving incoming row order
 inside connected overlap groups, preserving active-pair read order for compositing
 and collision placement. Base cues precede retained donors in declared candidate
 order; inspect their combined presentation. Layers and timing are not rewritten.
-It removes unused styles and hidden comments and adds actual U+200F marks to Persian display
-lines. Mixed text also gets balanced directional embedding. It preserves logical
-text and checks its serialization. SRT-only episodes remain SRT; an ASS base stays ASS.
+It removes verified fansub watermarks, unused styles and hidden comments, enforces
+Persian ZWNJ (نیم‌فاصله) without touching override tags, balances long display lines
+with explicit `\N` breaks (up to 42 visible characters per line), and wraps each RTL
+subline with directional embeddings plus trailing `U+200F` after terminal punctuation
+so players never move periods or commas onto the first line. Output defaults to ASS
+using bundled `B Koodak` (`assets/fonts/BKOODB.TTF`) with subtle black outline (`1.5`)
+and shadow (`0.8`) while preserving italics, bold, alignment, colors, positioning,
+animations and vector drawings; pass `--output-format srt` only when SRT is explicitly
+requested. Use `translator-ass` (or `--translator-mode`) to produce chronological
+Translator Mode ASS files with primary cues and missing donor timing slots, and use
+`revayat-subtitle sync` (or `skills/revayat-subtitle/sync/SKILL.md`) to synchronize
+subtitles against video audio via FFmpeg and the Rust `subsync` engine.
 
 ## Step 7 — Check names, meaning and typography
 
@@ -298,4 +307,6 @@ Read each reference when its step or condition applies:
 - [release-selection.md](references/release-selection.md) — candidate comparison, alignment and episode identity.
 - [subtitle-formats.md](references/subtitle-formats.md) — ASS/SRT structure, effects, comments, styles and fonts.
 - [workflow.md](references/workflow.md) — exact worksheet/configuration contracts and command examples.
+- [audio-sync.md](references/audio-sync.md) — FFmpeg audio extraction and Rust `subsync` alignment for shifted, drifted or cut subtitles.
+- [sync/SKILL.md](sync/SKILL.md) — standalone audio-to-subtitle synchronization workflow inside the primary skill tree.
 - [troubleshooting.md](references/troubleshooting.md) — refusals, recovery, missing tools and execution logs.

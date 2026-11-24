@@ -1,4 +1,5 @@
-# Development-only process-lifetime assertions and bounded generated regressions.
+# Development-only process-lifetime assertions, pytest runner, and bounded generated regressions.
 psutil==7.2.2
+pytest==9.1.1
 hypothesis==6.170.15
 sortedcontainers==2.4.0

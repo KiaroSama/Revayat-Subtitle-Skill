@@ -43,3 +43,35 @@ Thumbs.db
 /.specify/
 /specs/
 /plans/
+
+# Local real-media test samples (kept in project folder, excluded from public Git)
+/samples/
+
+# Rust
+/target/
+**/target/
+/debug/
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+rustc-ice-*.txt
+/.cargo/*
+!/.cargo/config.toml
+**/.cargo/credentials*
+/vendor/
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.*
+cobertura.xml
+flamegraph.svg
+perf.data
+perf.data.old
+/criterion/
+*.pyd
+/rust/*/.rust-anything/
+/rust/*/rust-anything.json
+/rust/*/recorded-from.json
+/rust/*/shadow/
+/rust/*/cases.jsonl
+/rust/*/extra-inputs.jsonl

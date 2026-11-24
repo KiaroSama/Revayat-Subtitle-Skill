@@ -3,17 +3,44 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from bisect import bisect_left, bisect_right
+from dataclasses import dataclass, field, replace
+from itertools import accumulate
+from math import isfinite
 
 from markup import SRT_BREAK, ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment, srt_tag_fits
+from text_pipeline import SRT_ALIGNMENT, SRT_COLOR, convert_srt_markup_to_ass, process_cue_text, watermark_reason
 from validation import MAX_TIME_MS
 
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
 STYLE_FIELDS = ("Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
                 "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, "
                 "Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding")
-DEFAULT_STYLE = ("Default,Arial,42,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
-                 "0,0,0,0,100,100,0,0,1,2,1,2,30,30,35,1")
+DEFAULT_FONT_NAME = "B Koodak"
+DEFAULT_OUTLINE = 1.5
+DEFAULT_SHADOW = 0.8
+DEFAULT_OUTLINE_COLOUR = "&H00000000"
+DEFAULT_BACK_COLOUR = "&H80000000"
+DEFAULT_PLAY_RES_X = 1920
+DEFAULT_PLAY_RES_Y = 1080
+
+
+def build_ass_style(name="Default", fontname=DEFAULT_FONT_NAME, fontsize=52, outline=DEFAULT_OUTLINE,
+                    shadow=DEFAULT_SHADOW, outline_colour=DEFAULT_OUTLINE_COLOUR, back_colour=DEFAULT_BACK_COLOUR,
+                    bold=-1, alignment=2, margin_v=24) -> str:
+    if any(not value.strip() or any(c in value for c in ",\r\n\0") for value in (name, fontname)):
+        raise ValueError("ASS style and font names must be nonempty and cannot contain commas or line breaks")
+    if any(not isfinite(value) or value < 0 for value in (fontsize, outline, shadow)) or fontsize == 0:
+        raise ValueError("ASS font size must be positive and outline/shadow must be nonnegative finite numbers")
+    if any(re.fullmatch(r"&H[0-9a-fA-F]{8}", colour) is None for colour in (outline_colour, back_colour)):
+        raise ValueError("ASS outline and shadow colours require &HAABBGGRR")
+    if bold not in (-1, 0) or alignment not in range(1, 10) or type(margin_v) is not int or margin_v < 0:
+        raise ValueError("Invalid ASS bold, alignment or vertical margin")
+    return (f"{name},{fontname},{fontsize:g},&H00FFFFFF,&H000000FF,{outline_colour},{back_colour},"
+            f"{bold},0,0,0,100,100,0,0,1,{outline:g},{shadow:g},{alignment},20,20,{margin_v},1")
+
+
+DEFAULT_STYLE = build_ass_style()
 
 
 _ASS_CASE = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
@@ -79,6 +106,8 @@ class Document:
     style_fields: list[str] = field(default_factory=list)
     styles: dict[str, list[str]] = field(default_factory=dict)
     comments: int = 0
+    source_comments: dict[str, list[str]] = field(default_factory=dict)
+    chronological: bool = False
 
 
 def timestamp(value: str, kind: str) -> int:
@@ -304,7 +333,10 @@ def presentation_order(cues: list[Cue], kind: str) -> list[int]:
 def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str:
     if not cues:
         raise ValueError("Refusing an episode with no retained cues")
-    cues = [cues[index] for index in presentation_order(cues, doc.kind)]
+    if doc.chronological:
+        cues = sorted(cues, key=lambda cue: effective_times(cue.start, cue.end, doc.kind)[0])
+    else:
+        cues = [cues[index] for index in presentation_order(cues, doc.kind)]
     if doc.kind == "srt":
         return "\n\n".join(f"{i}\n{timecode(c.start, 'srt')} --> {timecode(c.end, 'srt')}\n{c.text}"
                            for i, c in enumerate(cues, 1)) + "\n"
@@ -324,6 +356,9 @@ def serialize(doc: Document, cues: list[Cue], remove_fonts: bool = False) -> str
                        "text": cue.text}
                 if "\n" in cue.text or "\r" in cue.text:
                     raise ValueError("ASS cue text must use literal \\N instead of a physical newline")
+                for reference in doc.source_comments.get(cue.id, ()):
+                    output.append("Comment: " + ",".join(reference if field_ == "text" else row.get(field_, "")
+                                                           for field_ in doc.event_fields))
                 output.append("Dialogue: " + ",".join(row.get(field_, "") for field_ in doc.event_fields))
         elif key == "[v4+ styles]":
             output.append("Format: " + ", ".join(doc.style_fields))
@@ -344,12 +379,14 @@ def validate_srt_donor_markup(text: str) -> None:
         closing = body.startswith("/")
         body = body[1:] if closing else body
         name = body.lstrip(" ").split(" ", 1)[0]
-        recognized = name.lower() in {"b", "i", "s", "u", "font", "br", "br/"}
+        recognized = (name.lower() in {"b", "i", "s", "u", "font", "br", "br/"}
+                      or (not closing and re.match(r"font\s", body, re.I | re.ASCII) is not None))
         likely = (re.fullmatch(r"[A-Za-z0-9_/]*", name) is not None
                   and not body.startswith(" ")
                   and (closing or match.start() == 0 or text[match.start() - 1] != "<"))
         supported = (SRT_BREAK.fullmatch(match[0]) is not None
-                     or re.fullmatch(r"</?[bisu]>", match[0], re.I | re.ASCII) is not None)
+                     or SRT_COLOR.fullmatch(match[0]) is not None
+                     or re.fullmatch(r"</?[bisu]>|</font>", match[0], re.I | re.ASCII) is not None)
         if (recognized or likely) and not supported:
             raise ValueError("SRT donor uses unsupported decoder markup; adapt it explicitly before ASS conversion")
 
@@ -357,16 +394,139 @@ def validate_srt_donor_markup(text: str) -> None:
 def srt_to_ass(cue: Cue) -> Cue:
     text = uncomment(cue.text.replace("\r\n", "\n").replace("\r", "\n"), "srt")
     validate_srt_donor_markup(text)
-    if any(char in text for char in ("{", "}", "\\")):
+    if any(char in SRT_ALIGNMENT.sub("", text) for char in ("{", "}", "\\")):
         raise ValueError("SRT donor contains ASS control syntax; adapt it explicitly before ASS conversion")
-    text = SRT_BREAK.sub(lambda match: "\n" if srt_tag_fits(match[0]) else match[0], text)
-    for tag in ("i", "b", "u", "s"):
-        ass_tag = "s" if tag == "s" else tag
-        text = re.sub(f"<{tag}>", lambda _: "{\\" + ass_tag + "1}", text, flags=re.I | re.ASCII)
-        text = re.sub(f"</{tag}>", lambda _: "{\\" + ass_tag + "0}", text, flags=re.I | re.ASCII)
-    if any(type_ == "tag" for type_, _ in pieces(text, "srt")):
+    text = convert_srt_markup_to_ass(text)
+    if any(type_ == "tag" and not SRT_ALIGNMENT.fullmatch(value) for type_, value in pieces(text, "srt")):
         raise ValueError("SRT donor uses markup requiring explicit ASS adaptation")
     fields = dict(zip([f.strip().lower() for f in ASS_FIELDS.split(",")],
                       ["0", "", "", "Default", "", "0", "0", "0", "", ""]))
     start, end = effective_times(cue.start, cue.end, "ass")
-    return Cue(cue.id, start, end, text.replace("\n", r"\N"), fields)
+    return Cue(cue.id, start, end, text, fields)
+
+
+def ass_template(style_line: str | None = None, title: str = "", play_res_x: int = DEFAULT_PLAY_RES_X,
+                 play_res_y: int = DEFAULT_PLAY_RES_Y) -> Document:
+    style_fields = [ass_key(value.strip()) for value in STYLE_FIELDS.split(",")]
+    event_fields = [ass_key(value.strip()) for value in ASS_FIELDS.split(",")]
+    style = (DEFAULT_STYLE if style_line is None else style_line.removeprefix("Style:").lstrip()).split(",")
+    if len(style) != len(style_fields) or not style[0].strip() or any(c in "".join(style) for c in "\r\n\0"):
+        raise ValueError("ASS style must be a single V4+ Style row")
+    if any(type(res) is not int or res <= 0 for res in (play_res_x, play_res_y)):
+        raise ValueError("ASS script resolution requires positive integers")
+    info = ["ScriptType: v4.00+", f"PlayResX: {play_res_x}", f"PlayResY: {play_res_y}",
+            "ScaledBorderAndShadow: yes", "WrapStyle: 0"]
+    if title:
+        if any(c in title for c in "\r\n\0"):
+            raise ValueError("ASS title must fit on one line")
+        info.insert(0, f"Title: {title}")
+    return Document("ass", [], [("[Script Info]", info), ("[V4+ Styles]", []), ("[Events]", [])],
+                    event_fields, style_fields, {ass_style_name(style[0]): style})
+
+
+def srt_document_to_ass(doc: Document, *, style_line: str | None = None, title: str = "",
+                        play_res_x: int = DEFAULT_PLAY_RES_X, play_res_y: int = DEFAULT_PLAY_RES_Y,
+                        direction: str = "rtl", fix_zwnj: bool = True, strip_watermarks: bool = True,
+                        wrap_lines: bool = True, max_chars: int = 42) -> tuple[Document, list[dict]]:
+    if doc.kind != "srt":
+        raise ValueError("SRT document conversion requires SRT input")
+    template = ass_template(style_line, title, play_res_x, play_res_y)
+    return _process_ass_document(doc, template, next(iter(template.styles)), direction, fix_zwnj,
+                                 strip_watermarks, wrap_lines, max_chars)
+
+
+def _process_ass_document(doc: Document, result: Document, style: str, direction: str, fix_zwnj: bool,
+                          strip_watermarks: bool, wrap_lines: bool, max_chars: int) -> tuple[Document, list[dict]]:
+    if direction not in {"rtl", "ltr"}:
+        raise ValueError("Paragraph direction must be ltr or rtl")
+    if max_chars < 1:
+        raise ValueError("Line wrapping requires positive max_chars and max_lines")
+    removed = []
+    for source in doc.cues:
+        effective_times(source.start, source.end, "ass")
+        if strip_watermarks and not has_drawing(source.text, doc.kind) and (reason := watermark_reason(source.text)):
+            removed.append({"id": source.id, "start_ms": source.start, "end_ms": source.end, "reason": reason,
+                            "text": source.text})
+            continue
+        if doc.kind == "srt":
+            cue = srt_to_ass(source)
+            cue.fields["style"] = style
+        else:
+            cue = replace(source, fields=dict(source.fields))
+        cue.text = process_cue_text(cue.text, "ass", direction, max_chars, fix_zwnj, wrap_lines)
+        result.cues.append(cue)
+    return result, removed
+
+
+def ass_document_to_ass(doc: Document, *, style_line: str | None = None, title: str = "", direction: str = "rtl",
+                        fix_zwnj: bool = True, strip_watermarks: bool = True, wrap_lines: bool = True,
+                        max_chars: int = 42) -> tuple[Document, list[dict]]:
+    if doc.kind != "ass":
+        raise ValueError("ASS document conversion requires ASS input")
+    template = ass_template(style_line, title)
+    style, values = next(iter(template.styles.items()))
+    by_field = dict(zip(template.style_fields, values))
+    # Keep named sign styles and the original coordinate system and effects.
+    styles = {**doc.styles, style: [by_field.get(key, "") for key in doc.style_fields]}
+    sections = []
+    for name, lines in doc.sections:
+        if title and ass_key(name) == "[script info]":
+            lines = [f"Title: {title}", *(line for line in lines if not ass_key(ass_line_start(line)).startswith("title:"))]
+        sections.append((name, list(lines)))
+    result = replace(doc, cues=[], sections=sections, styles=styles, comments=0, source_comments={})
+    return _process_ass_document(doc, result, style, direction, fix_zwnj, strip_watermarks, wrap_lines, max_chars)
+
+
+def _source_reference(label: str, text: str) -> str:
+    return re.sub(r"\r\n|\r|\n", lambda _: r"\N", f"{label}: {text}").replace("\x00", "")
+
+
+def build_translator_ass(primary_doc: Document, donor_docs: list[tuple[str, Document]] | None = None, *,
+                         include_source_comments: bool = False, style_line: str | None = None, title: str = "",
+                         strip_watermarks: bool = True, direction: str = "rtl", fix_zwnj: bool = True,
+                         wrap_lines: bool = True, max_chars: int = 42) -> tuple[Document, dict]:
+    convert = srt_document_to_ass if primary_doc.kind == "srt" else ass_document_to_ass
+    edition, removed = convert(primary_doc, style_line=style_line, title=title, strip_watermarks=strip_watermarks,
+                               direction=direction, fix_zwnj=fix_zwnj, wrap_lines=wrap_lines, max_chars=max_chars)
+    style = ass_style_name((DEFAULT_STYLE if style_line is None else style_line.removeprefix("Style:")).split(",", 1)[0])
+    primary = sorted(edition.cues, key=lambda cue: cue.start)
+    starts = [cue.start for cue in primary]
+    far_ends = list(accumulate((cue.end for cue in primary), max))
+    placeholders: dict[tuple[int, int], Cue] = {}
+    source_text = {cue.id: cue.text for cue in primary_doc.cues}
+    if include_source_comments:
+        edition.source_comments = {cue.id: [_source_reference("Primary", source_text[cue.id])] for cue in primary}
+    ids = {cue.id for cue in primary}
+    watermark_count = len(removed)
+    for label, doc in donor_docs or []:
+        for source in doc.cues:
+            start, end = effective_times(source.start, source.end, "ass")
+            if strip_watermarks and not has_drawing(source.text, doc.kind) and watermark_reason(source.text):
+                watermark_count += 1
+                continue
+            begin, finish = bisect_left(far_ends, start - 150), bisect_right(starts, end + 150)
+            best = None
+            best_score = -151
+            for index in range(begin, finish):
+                candidate = primary[index]
+                overlap = min(end, candidate.end) - max(start, candidate.start)
+                if overlap > best_score and (overlap * 4 > end - start or -150 <= overlap <= 0):
+                    best, best_score = candidate, overlap
+                    if not include_source_comments:
+                        break
+            if best is None:
+                best = placeholders.get((start, end))
+                if best is None:
+                    cue_id = f"slot-{len(placeholders) + 1}"
+                    while cue_id in ids:
+                        cue_id += "-"
+                    fields = {"style": style, "layer": "0", "marginl": "0", "marginr": "0", "marginv": "0"}
+                    best = placeholders[start, end] = Cue(cue_id, start, end, "", fields)
+                    ids.add(cue_id)
+            if include_source_comments:
+                edition.source_comments.setdefault(best.id, []).append(_source_reference(label, source.text))
+    edition.cues = sorted([*primary, *placeholders.values()], key=lambda cue: cue.start)
+    edition.comments = sum(map(len, edition.source_comments.values()))
+    edition.chronological = True
+    return edition, {"primary_cues": len(primary), "placeholder_slots": len(placeholders),
+                     "watermarks_removed": watermark_count, "style": style}

@@ -28,9 +28,10 @@ class BootstrapPreferenceTests(WorkspaceCase):
         bad.mkdir()
         good.mkdir()
         # Real Python binary + its runtime tree, not a CMD quoting approximation.
-        base = Path(sys.executable).parent
+        base = Path(sys.base_prefix)
+        source_exe = base / "python.exe" if (base / "python.exe").is_file() else Path(sys.executable)
         for directory, executable in ((bad, "python.exe"), (good, "python3.exe")):
-            shutil.copyfile(sys.executable, directory / executable)
+            shutil.copyfile(source_exe, directory / executable)
             for dll in base.glob("*.dll"):
                 shutil.copyfile(dll, directory / dll.name)
         site = self.root / "site"

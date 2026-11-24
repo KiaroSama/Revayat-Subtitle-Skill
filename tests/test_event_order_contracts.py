@@ -195,7 +195,7 @@ class OrderTests(TrackWorkspace):
         new = workflow.build(self.work)
         self.assertNotEqual(new['identity'], old['identity'])
         self.assertEqual(new['input_identity'], old['input_identity'])
-        self.assertEqual(new['generation_recipe']['normalization'], 10)
+        self.assertEqual(new['generation_recipe']['normalization'], workflow.GENERATION_RECIPE['normalization'])
         self.assertEqual({p: (self.work / p).read_bytes() for p in before}, before)
         self.assertFalse((Path(new['build']) / 'renders').exists())
 

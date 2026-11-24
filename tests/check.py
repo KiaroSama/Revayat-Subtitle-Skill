@@ -91,7 +91,9 @@ class WorkspaceCase(unittest.TestCase):
 
     def retain_failure_evidence(self):
         result = getattr(self._outcome, "result", None)
-        if result is None or not any(test is self for test, _ in result.failures + result.errors):
+        failures = getattr(result, "failures", ()) if result is not None else ()
+        errors = getattr(result, "errors", ()) if result is not None else ()
+        if result is None or not any(test is self for test, _ in (*failures, *errors)):
             return
         destination = ROOT / ".scratch/ci-artifacts" / self.id()
         remaining, count = 10 * 1024 * 1024, 0
@@ -263,7 +265,7 @@ class SubtitleChecks(WorkspaceCase):
         terms = {"series": "Fixture Series", "research": [{"url": "https://example.org/fixture", "note": "Fixture only"}],
                  "terms": [{"source": "Rin", "target": "رین", "locked": True}], "terms_reviewed": True}
         write_json(glossary, terms)
-        prepare([source], self.work, "Fixture Series", 2, "utf-8", glossary, "fa")
+        prepare([source], self.work, "Fixture Series", 2, "utf-8", glossary, "fa", output_format="srt")
         self.assertEqual(read_json(self.work / "glossary.json"), terms)
         sheet = read_json(self.work / "worksheets" / "s0001.json")
         for row in sheet:
@@ -344,10 +346,16 @@ class SubtitleChecks(WorkspaceCase):
             source = path.read_text(encoding="utf-8")
             ast.parse(source, filename=str(path))
             self.assertLessEqual(len(source.splitlines()), 800, str(path))
-        for relative in ("plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json", ".claude-plugin/plugin.json"):
+        for relative in (
+            "plugin.json",
+            ".codex-plugin/plugin.json",
+            ".cursor-plugin/plugin.json",
+            ".claude-plugin/plugin.json",
+            ".antigravity-plugin/plugin.json",
+        ):
             manifest = read_json(ROOT / relative)
             self.assertEqual(manifest["name"], "revayat-subtitle")
-            self.assertEqual(manifest["version"], "1.4.0")
+            self.assertEqual(manifest["version"], "2.0.0")
         documents = [ROOT / "README.md", ROOT / "README.fa.md", *ROOT.glob("docs/**/*.md"),
                      *ROOT.glob("skills/**/*.md")]
         for document in documents:

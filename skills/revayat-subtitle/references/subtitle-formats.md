@@ -184,3 +184,18 @@ After removal, inspect the actual replacement font and every affected symbol.
 Fonts with the same name but different payloads require reconciliation when merging
 ASS donors. External fonts supplied through `--fonts-dir` are rendering inputs,
 not permission to redistribute them. See [persian-typography.md](persian-typography.md).
+
+## Default ASS output, watermarks and Translator Mode
+
+From v2.0, output defaults to ASS (`v4.00+`, `PlayResX: 1920`, `PlayResY: 1080`,
+`ScaledBorderAndShadow: yes`) with `B Koodak` bold styling and subtle black outline
+and shadow (`Outline=1.5`, `Shadow=0.8`), preserving italics, bold, underline,
+strikeout, alignment, color and positioning overrides. Pass `--output-format srt`
+only when SRT is explicitly required.
+
+Fansub and release watermarks (site ads, translator credit lines, URLs and Telegram
+handles) are stripped deterministically while leaving real dialogue untouched.
+Translator Mode (`translator-ass` / `--translator-mode`) builds a chronological
+ASS file with primary cues plus empty placeholder `Dialogue:` slots for every
+non-overlapping timing span present in donor releases, with optional `Comment:`
+reference lines for translators.

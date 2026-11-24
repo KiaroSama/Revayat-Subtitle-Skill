@@ -1,63 +1,67 @@
-<h1 align="center">Revayat Subtitle — روایت زیرنویس</h1>
-
 <div align="center">
 
-[![CI is manually dispatched](https://img.shields.io/badge/CI-manual%20dispatch-217ba3)](.github/workflows/ci.yml)
-[![CodeQL checks Python and Actions](https://img.shields.io/badge/CodeQL-Python%20%7C%20Actions-497e49)](.github/workflows/codeql.yml)
-[![Gitleaks scans Git history](https://img.shields.io/badge/Gitleaks-history%20scans-c26d32)](.github/workflows/gitleaks.yml)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%203.0%2B-2ea44f)](LICENSE)
-[![Plugin version: 1.4.0](https://img.shields.io/badge/Plugin-1.4.0-0d6efd)](plugin.json)
-[![Verified Python tooling: 3.13.15](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
-[![CI platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
-[![Distribution: plugin and standalone skill](https://img.shields.io/badge/Install-plugin%20%7C%20skill-806c46)](install/install.py)
-[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1)](README.fa.md)
-[![Published Git tree at 95ad08b: 1.00 MB](https://img.shields.io/badge/repo%20size-1.00%20MB-ca8a04)](#repository-size)
-[![Subtitle inputs: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb)](skills/revayat-subtitle/references/subtitle-formats.md)
-[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-755e99)](skills/revayat-subtitle/references/persian-typography.md)
-[![Bundled voice guides: Persian, Russian and English](https://img.shields.io/badge/Voice-Persian%20%7C%20Russian%20%7C%20English-43535a)](skills/revayat-subtitle/references/target-voice.md)
+# Revayat Subtitle (روایت زیرنویس)
+
+**Translate, edit, and audio-sync subtitles into reviewed ASS (default) or SRT deliverables in `Sub.zip`. Persian is the default output language.**
+
+[![GitHub Actions CI workflow with manual dispatch](https://img.shields.io/badge/CI-GitHub%20Actions-16a34a)](.github/workflows/ci.yml)
+[![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
+[![Plugin version 2.0.0 across five manifest formats](https://img.shields.io/badge/plugin-v2.0.0-ea580c)](plugin.json)
+[![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
+[![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
+[![Rust 1.99.1 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.99.1-9a3412)](rust/subsync-rs/Cargo.toml)
+[![Runs on Windows, Linux, and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
+[![Install via five plugin formats or standalone scripts](https://img.shields.io/badge/install-5%20plugins%20%7C%20standalone-4f46e5)](#install)
+[![Documentation in English and Persian](https://img.shields.io/badge/docs-English%20%7C%20Persian-0284c7)](README.fa.md)
+[![Published Git tree size measured via git ls-files is 1.69 MB](https://img.shields.io/badge/repo%20size-1.69%20MB-ca8a04)](#repository-size)
+[![ASS default output with bundled B Koodak font and Translator Mode](https://img.shields.io/badge/output-ASS%20%7C%20B%20Koodak-15803d)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Rust FFT and ALASS audio-to-subtitle synchronization engine](https://img.shields.io/badge/audio%20sync-Rust%20FFT%20%7C%20ALASS-b45309)](skills/revayat-subtitle/references/audio-sync.md)
+[![FFmpeg and libass visual verification pipeline](https://img.shields.io/badge/renderer-FFmpeg%20%7C%20libass-334155)](skills/revayat-subtitle/references/persian-typography.md)
+[![Three bundled voice guides for Persian, English, and Russian](https://img.shields.io/badge/voice%20guides-3%20bundled-7c3aed)](skills/revayat-subtitle/references/target-voice.md)
+[![CodeQL static analysis and Gitleaks secret scanning](https://img.shields.io/badge/security-CodeQL%20%7C%20Gitleaks-c2410c)](.github/workflows/codeql.yml)
 [![Support donations](https://img.shields.io/badge/Support-donations-d04a9a)](#donate)
 
 </div>
 
-**Translate or edit anime subtitles and get one reviewed file per episode in `Sub.zip`. Persian is the default output language.**
-
 <a id="repository-size"></a>
 
-Published tree at `95ad08b`: 1,002,998 bytes (1.00 MB), excluding Git history and untracked files.
+Published Git tree size measured from `git ls-files` (v2.0.0): 1,692,624 bytes (1.69 MB) across 214 tracked files, excluding Git history and untracked files.
 
-An agent skill for Claude Code, Codex, Cursor, Kiro, Cline, Hermes, OpenCode,
-Antigravity and any coding agent that can read a `SKILL.md`. It handles the parts
-that need deliberate editorial care: every line in every release, names that stay
-consistent between seasons, Japanese honorifics, effects that are not prose, and
-Persian/English text that must display correctly in a real subtitle renderer.
+An agent skill for Claude Code, Codex, Cursor, Antigravity, Kiro, Cline, Hermes,
+OpenCode, and any coding agent that reads a `SKILL.md`. It handles subtitle work
+that fails in naive machine translation: accounting for every cue across multiple
+releases, keeping character names and honorifics consistent across seasons,
+protecting ASS effects, rendering clean Persian ASS with bundled `B Koodak`,
+anchoring RTL punctuation across line wraps, building Translator Mode files, and
+synchronizing subtitle timing directly to video audio in Rust.
 
 <div align="left"><a href="LICENSE">GPL-3.0 licensed</a></div>
 <div align="right"><a href="README.fa.md">فارسی</a></div>
 
 ---
 
-## What it does that a generic subtitle translator does not
+## What it handles
 
-| | |
+| Capability | How it works |
 | --- | --- |
-| **Every candidate is accounted for** | Stable cue IDs, source hashes and complete worksheets keep an omitted release or unread line from disappearing behind a successful build. |
-| **Spoken Persian** | Any source language is translated and Persian is edited for spelling, meaning and natural conversation; the agent reads the whole dialogue in context. |
-| **Names survive a sequel** | Anime research, source URLs and a reusable locked glossary carry names, places and character voice into later episodes and seasons. |
-| **Japanese honorifics remain Japanese** | سان، کون، ساما، چان and اونی-چان stay forms of address rather than becoming آقا or خانم. |
-| **One edition per episode** | A usable ASS release supplies presentation; better wording and missing content can come from other candidates without concatenating duplicate translations. |
-| **RTL is inspected, not assumed** | Logical Unicode, real direction marks and FFmpeg images expose mixed-script order, punctuation, quote scope, missing glyphs and clipping. |
-| **Real-media boundaries matter** | With matching video, the agent checks audio outside the first/last cue and whether embedded or forced subtitles collide with the selected Persian track. |
-| **Effects remain effects** | Vector paths, positioning, animation, karaoke controls and intentional layers stay distinct from the signs and dialogue that need translation. |
-| **Fonts are a choice** | When embedded fonts are found, the agent asks whether to retain or remove them unless the user already decided for this batch; the replacement font is checked after removal. |
-| **Optional parallel editing** | The agent asks before assigning disjoint episodes or cue ranges to subagents. Shared names, separate worker logs and coordinator review keep the results consistent. |
-| **Narrow cleanup** | Verified promotion, empty cues, hidden comments and unused styles are removed; story dialogue, profanity and sexual language retain their meaning and intensity. |
-| **The delivery checks its own evidence** | `qa` and packaging use the same source, subtitle, glossary and image checks, and the finished ZIP is read back before success. |
+| ASS by default with bundled `B Koodak` | Outputs 1080p ASS (`PlayResX: 1920`, `PlayResY: 1080`) using bundled `BKOODB.TTF` (`B Koodak` Bold) with a subtle black outline (`1.5`) and soft shadow (`0.8`), overridable via CLI flags. SRT remains available on request (`--output-format srt`). |
+| RTL punctuation and balanced wrapping | Wraps long lines to balanced 2-line `\N` breaks (42 visible chars per line) without splitting ASS tags or ZWNJ words, and wraps each display line with `RLE` (`U+202B`), trailing `RLM` (`U+200F`), and `PDF` (`U+202C`) so periods, question marks, and quotes never jump to line 1 in VLC, mpv, PotPlayer, or libass. |
+| Persian ZWNJ and watermark removal | Enforces Persian ZWNJ (نیم‌فاصله) across `می‌`/`نمی‌`, `‌ها`, `‌تر`/`‌ترین`, and `ه‌` enclitics, converts Arabic `ي`/`ك`/`ة`/`ى` to Persian forms outside tags and URLs, and strips fansub, studio, Telegram, and URL credits automatically with a structured removal log. |
+| Preserved italics, bold, and effects | Converts SRT `<i>`, `<b>`, `<u>`, `<s>`, `<font color>`, and `{an1..9}` into ASS override tags (`{\i1}`, `{\b1}`, `{\c&HBBGGRR&}`, `{\an8}`), while keeping existing vector drawings, positioning, karaoke, and layered ASS effects intact. |
+| Translator Mode (`translator-ass`) | Merges a primary release with secondary donor releases in chronological order, inserting empty timed `Dialogue:` placeholder slots for non-overlapping donor cues and optional `Comment:` source reference lines. |
+| Rust audio-to-subtitle sync (`subsync-rs`) | Extracts 16 kHz mono audio via FFmpeg, runs dual-feature FFT voice activity detection, solves global offset and PAL/NTSC FPS drift with `rustfft` cross-correlation, detects mid-episode recap/ad cuts with ALASS split-penalty DP, and snaps cue edges to speech boundaries. Exposed as the sibling `revayat-subtitle-sync` skill and `revayat-subtitle.py sync`. |
+| Rust PyO3 acceleration crates | Heavy text, Persian lint, and markup paths are ported to pure Rust (`rust/subcore-rs`, `rust/persian-lint-rs`, `rust/markup-rs`) with `#![forbid(unsafe_code)]`, behavioral parity verification via `rust-anything`, and per-call Python fallback (`REVAYAT_DISABLE_RUST=1`). |
+| Multi-release editorial tracking | Stable cue IDs, source hashes, locked glossaries, and complete worksheets keep character names, Japanese honorifics, and every cue accounted for across seasons. |
+| Visual FFmpeg + libass verification | Renders PNG frames using the bundled font directory (`:fontsdir=fonts`) so the agent inspects real glyphs, line balance, clipping, and mixed-script order before `qa` and `package` produce `Sub.zip`. |
 
 ## Install
 
-**Python 3.11 or newer**, FFmpeg built with libass, and a Persian-capable font.
-Python uses only its standard library; the requirements file declares that empty
-Python dependency set. FFmpeg and fonts are installed separately.
+Requires **Python 3.11 or newer** and FFmpeg built with libass. Python runtime
+scripts use only the standard library; the bundled `B Koodak` Bold font lives at
+`skills/revayat-subtitle/assets/fonts/BKOODB.TTF` (see its
+[font notice](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). Rust (`1.88+`
+for `subsync-rs`, `1.97+` for optional PyO3 crates) is only needed when building
+the native audio-sync binary or acceleration extensions locally.
 
 ```bash
 git clone https://github.com/KiaroSama/Revayat-Subtitle-Skill.git
@@ -65,7 +69,7 @@ cd Revayat-Subtitle-Skill
 python -m pip install -r skills/revayat-subtitle/requirements.txt
 ```
 
-Then install into the agents you use:
+Install both `revayat-subtitle` and `revayat-subtitle-sync` into your agents:
 
 ```bash
 # macOS / Linux
@@ -77,18 +81,12 @@ bash install/install.sh
 ./install/install.ps1
 ```
 
-By default the installer selects existing user directories. Use `--agent codex`
-for one agent, or `--scope project --path PATH` for a project. `--dry-run` lists
-proposed destinations; `--force` keeps a backup before replacing an installation.
-The Python implementation is shared by the Bash and PowerShell launchers.
-New backups/journals are outside live discovery in the first selected agent root's
-`revayat-recovery/`. Custom destinations require `--recovery-dir` on the same
-filesystem outside all configured discovery roots. One stable same-account OS
-lock in `~/revayat-install-state/` covers install/recovery across destinations;
-no cross-account, hostile-writer or universal power-loss guarantee is claimed.
-Interrupted uncommitted work requires explicit `--recover JOURNAL --recovery-dir DIR`
-to restore the previous complete installation. Changed/foreign state is preserved;
-committed journals do not authorize uninstall. Existing backups are never pruned.
+By default the installer targets existing user directories. Pass `--agent codex`
+for a single agent, `--scope project --path PATH` for a project install,
+`--dry-run` to preview destinations, or `--force` to back up before replacing.
+Both launchers share `install/install.py`. Recovery journals and backups live
+outside skill discovery in `revayat-recovery/`, serialized by an OS lock under
+`~/revayat-install-state/`.
 
 | Agent | User skills | Project skills |
 | --- | --- | --- |
@@ -102,33 +100,39 @@ committed journals do not authorize uninstall. Existing backups are never pruned
 | Antigravity IDE | `~/.gemini/antigravity/skills/` | `.agents/skills/` |
 | Antigravity CLI (`antigravity-cli`) | `~/.gemini/antigravity-cli/skills/` | `.agents/skills/` |
 
-Each destination receives a real `revayat-subtitle` directory. Use `--destination`
-for a managed installation. Reload the agent after installation; Hermes project
-skills also need its explicit trust flow. [Platform references](docs/platforms.md)
-record the current discovery paths. The installer does not grant trust or install
-prerequisites automatically.
+Reload the agent after installing. Full discovery paths and manifest schemas are
+documented in [docs/platforms.md](docs/platforms.md).
 
-### As a Claude Code plugin
+### Plugin installation (five formats)
+
+The repository ships all five plugin manifest formats on the same `2.0.0` tree:
+
+- **Claude Code:** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`
+- **Cursor:** `.cursor-plugin/plugin.json` and `.cursor-plugin/marketplace.json`
+- **Codex:** `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`
+- **Antigravity:** `.antigravity-plugin/plugin.json`
+- **Agent Plugins 1.0:** root `plugin.json`
+
+Install inside Claude Code:
 
 ```text
 /plugin marketplace add KiaroSama/Revayat-Subtitle-Skill
 /plugin install revayat-subtitle@revayat-subtitle-marketplace
 ```
 
-The bundle includes `translate-subtitles`, `revayat-subtitle-resume` and
-`revayat-subtitle-qa`; Claude exposes them under the `revayat-subtitle` namespace.
+The plugin exposes `translate-subtitles`, `revayat-subtitle-resume`,
+`revayat-subtitle-qa`, and `revayat-subtitle-sync` under the `revayat-subtitle`
+namespace. To build a portable local plugin bundle:
 
-For a local portable plugin bundle:
-
-```text
+```bash
 python install/install.py --plugin --destination "PATH/revayat-subtitle" --recovery-dir "PATH/recovery"
 ```
 
-The root Agent Plugins manifest and Claude/Codex/Cursor compatibility manifests
-share the same skill tree. Codex, Kiro Powers, Hermes and Antigravity use their
-own plugin manager to import/enable a portable package. Cursor also accepts a
-local copy under `~/.cursor/plugins/local/revayat-subtitle`. Cline and OpenCode use
-native skill discovery here; their JS/TS extension systems are separate.
+### Build the Rust audio-sync binary (optional)
+
+```bash
+cargo build --release --manifest-path rust/subsync-rs/Cargo.toml
+```
 
 ### Check the install
 
@@ -136,71 +140,72 @@ native skill discovery here; their JS/TS extension systems are separate.
 python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 ```
 
-`ready: true` confirms the FFmpeg filters are available. It does not prove that a
-font can draw Persian or that a particular episode displays correctly. When
-FFmpeg is outside PATH, use `--ffmpeg PATH` or `REVAYAT_FFMPEG`.
-Actual image inspection is part of the workflow.
+`ready: true` confirms FFmpeg and libass are available. Pass `--ffmpeg PATH` or
+set `REVAYAT_FFMPEG` when FFmpeg is outside `PATH`.
 
 ## Use
 
-Tell the agent the anime, season and whether it is a new series or a sequel:
+Ask the agent to translate, convert, build a Translator Mode ASS file, or sync a
+subtitle to video:
 
-> Use revayat-subtitle for these subtitles. This is season 2 of the same anime.
-> Keep the previous names and Japanese honorifics, write spoken Persian, preserve
-> embedded fonts, and return Sub.zip plus the updated glossary.
+> Use revayat-subtitle for these subtitles. Keep character names and Japanese
+> honorifics consistent, write natural spoken Persian in ASS with B Koodak, strip
+> watermarks, and sync the final file to episode01.mkv.
 
-Attach ASS/SRT files or a ZIP and the previous glossary when continuing a series.
-Persian is the default. If you request Russian or English, Revayat uses the
-corresponding [bundled voice guide](skills/revayat-subtitle/references/target-voice.md).
-Both distribution modes include the guides, so you do not need to install them separately.
-In Codex, use `$revayat-subtitle`. With the Claude plugin, start with
-`/revayat-subtitle:translate-subtitles`, resume with
-`/revayat-subtitle:revayat-subtitle-resume`, or request a report with
-`/revayat-subtitle:revayat-subtitle-qa`.
+Persian is the default output language. Russian and English outputs route to the
+[bundled voice guides](skills/revayat-subtitle/references/target-voice.md).
 
-### Or drive it yourself
+### Direct CLI commands
 
 ```bash
-PY=python3                         # use a verified Python interpreter
+PY=python3
 S=skills/revayat-subtitle/scripts
 
+# 1. Environment check
 "$PY" "$S/revayat-subtitle.py" doctor
+
+# 2. Convert SRT to default Persian ASS (B Koodak, outline 1.5, shadow 0.8, ZWNJ, RTL wrap, watermark strip)
+"$PY" "$S/revayat-subtitle.py" convert episode.srt --out episode.ass
+
+# 3. Build a Translator Mode ASS from a primary release plus secondary donors
+"$PY" "$S/revayat-subtitle.py" translator-ass french.srt --donor dutch.srt --out translator.ass
+
+# 4. Audio-sync a subtitle directly to a video using Rust subsync-rs
+"$PY" "$S/revayat-subtitle.py" sync episode.mkv episode.ass --out episode.synced.ass
+
+# 5. Full season editorial workflow
 "$PY" "$S/revayat-subtitle.py" prepare season.zip --work work/season01 --series "Anime title" --season 1
-# Research the anime, settle glossary.json and map the episodes in project.json.
-# Read every cue; complete every worksheet decision and its target text.
+# Settle glossary.json, episode mapping in project.json, and worksheet decisions.
 "$PY" "$S/revayat-subtitle.py" build --work work/season01
-# Set BUILD to the build directory printed by the previous command.
+# Set BUILD to the build path printed above.
 "$PY" "$S/revayat-subtitle.py" render --build "$BUILD" --episode S01E01 --video episode01.mkv
-# Open every PNG and record a real observation in its review file.
+# Inspect every rendered PNG and record real observations in its review file.
 "$PY" "$S/revayat-subtitle.py" qa --build "$BUILD"
 "$PY" "$S/revayat-subtitle.py" package --build "$BUILD" --out out/Sub.zip
 ```
 
-In PowerShell set `$PY = 'python'` and `$S = 'skills/revayat-subtitle/scripts'`,
-and invoke each command with `& $PY "$S/revayat-subtitle.py" ...`.
-The complete file contracts are in [workflow.md](skills/revayat-subtitle/references/workflow.md).
+In PowerShell, set `$PY = 'python'` and `$S = 'skills/revayat-subtitle/scripts'`
+and run `& $PY "$S/revayat-subtitle.py" ...`.
 
-**In:** ASS, SRT, directories and ZIP archives. **Out:** one subtitle per episode
-inside `Sub/`, zipped, plus a separate continuity glossary. Files use `S01E01.ass`,
-`S01OVA01.ass`, `S02E01.ass` and equivalent SRT names. SRT-only episodes stay SRT.
-**Target:** Persian unless the user requests another language.
+**Inputs:** ASS, SRT, folders, and ZIP archives (plus MKV/MP4/WAV for `sync`).
+**Outputs:** ASS by default (`S01E01.ass`, `S01OVA01.ass`), or SRT when requested
+via `--output-format srt`, packaged into `Sub.zip` alongside the updated glossary.
 
 ### Read-only resume and proposals
 
-`status --work WORK` reports pending cues, glossary/assignment gaps and the
-canonical current edition/evidence. `handoff --work WORK --assignment FILE
---result FILE` checks disjoint, revision-bound proposals without dispatch/import.
-Both return version-1 JSON: exit0 complete,1 valid pending,2 malformed/stale.
-No subtitle bodies or automatic editorial/image certification are returned.
-The coordinator still reads and accepts every proposal. See the
-[exact contracts](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs).
-The [categorical rubric](evaluation/rubric.md) and [finite AI pilot](evaluation/pilot.json)
-make unseen wording/context decisions reviewable, not a language-quality score.
+`status --work WORK` reports pending cues, glossary or assignment gaps, and
+matching edition evidence. `handoff --work WORK --assignment FILE --result FILE`
+checks disjoint, revision-bound subagent proposals without importing them. Both
+emit version-1 JSON (exit `0` complete, `1` valid pending, `2` malformed or
+stale). See
+[workflow.md](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs)
+for the full schema, plus the [rubric](evaluation/rubric.md) and
+[pilot dataset](evaluation/pilot.json).
 
 ## How it works
 
 ```text
-ASS / SRT / ZIP
+ASS / SRT / ZIP (+ optional MKV / MP4 / WAV)
        |
        v
 prepare -> immutable sources + project.json + complete worksheets
@@ -210,107 +215,65 @@ prepare -> immutable sources + project.json + complete worksheets
 compare releases <------------------+
        |
        v
-the agent reads, translates and records every cue decision
+agent translates and records every cue decision (ZWNJ, watermark filter, markup)
        |
        v
-build -> overlap-safe ASS order / stable SRT timing sort, cleanup, RTL, one file per episode
+build -> ASS default (B Koodak, outline/shadow, balanced RTL wrap) or requested SRT
        |
        v
-render -> FFmpeg PNGs -> the agent inspects and records observations
+optional sync -> Rust subsync-rs (16 kHz FFT VAD + cross-correlation + ALASS DP)
        |
        v
-qa -> source, edition, glossary and image evidence must agree
+render -> FFmpeg + libass PNGs (bundled fontsdir) -> agent visual inspection
        |
        v
-package -> Sub.zip, read back and checked against the reviewed build
+qa -> source, edition, glossary, and image evidence must agree
+       |
+       v
+package -> Sub.zip, read back and verified against the reviewed build
 ```
-
-The agent owns meaning and visual judgment. Scripts own file structure and the
-checks around those decisions. Sources are never rewritten; changing a worksheet
-creates a different build identity and requires matching evidence.
-
-| Module | Role |
-| --- | --- |
-| `subtitle_formats.py` | ASS/SRT document model, strict parsing, stable serialization, drawing/text separation and bidi marks |
-| `markup.py` / `validation.py` | Shared override/direction parsing and strict editable-record contracts |
-| `workflow.py` | source inventory, worksheets, glossary records, release merging and build identity |
-| `render.py` | FFmpeg samples, shared QA gate and verified ZIP delivery |
-| `runtime.py` | UTF-8 I/O, hashes, bounded subprocesses, staging directories and per-run logging |
-| `process_control.py` / `process_supervisor.py` | Owned process groups/Windows Jobs with wall, idle and output limits |
-| `publication.py` / `png_validation.py` | Complete-file publication and bounded PNG decoding |
-| `revayat-subtitle.py` | one CLI entry point for every stage |
-| `install/install.py` / `install_state.py` / `install_recovery.py` | allowlisted installation, same-account ownership and explicit old-tree recovery |
-| `status.py` / `handoff.py` | bounded read-only resume overview and revision-bound proposal validation |
 
 ## What it is honest about
 
-- **A completed worksheet is a record, not proof of comprehension.** Semantic
-  accuracy and visual inspection require the agent to do the work.
-- **A neutral render is not a video-sync check.** Matching-video frames also show
-  scene contrast, but do not establish audiovisual synchronization by themselves.
-- **Styles are not interchangeable between scripts.** Complex donor markup,
-  incompatible canvases, cuts and font sets require explicit reconciliation.
-- **Player behavior varies.** Some difficult mixed-style lines need libass-specific
-  adaptation; that is disclosed rather than presented as universal VSFilter support.
-- **The real-media test was bounded.** Four full files totaling 5,188 events passed
-  structural round trips; 40 sampled cues and ten actual-video images received
-  editorial/visual review. That is not a full-season quality certificate.
-
-See [verification scope](docs/verification.md). Private media is not distributed.
-The selected real ASS files did not contain embedded font sections; font-payload
-preservation/removal is covered mechanically by authored fixtures.
+- The scripts enforce structure, hashes, ZWNJ rules, RTL marks, timing, and visual
+  review artifacts. Translation fidelity and spoken fluency still depend on the
+  model reading every cue in context.
+- Audio sync (`subsync-rs`) aligns cues to speech activity in the soundtrack. It
+  can recover global offsets, FPS drift, and mid-episode cuts, while heavy music
+  or overlapping dubs may still benefit from a spot-check.
+- `B Koodak` covers Persian letters, digits, punctuation, ZWNJ, and RLM; Latin
+  runs fall back to the host system font via libass.
 
 ## Documentation
 
-The skill routes to these references at the step that needs them:
-
-- [SKILL.md](skills/revayat-subtitle/SKILL.md) — the nine steps and their completion criteria.
-- [translation-policy.md](skills/revayat-subtitle/references/translation-policy.md) — spoken Persian, complete meaning and narrow removals.
-- [persian-typography.md](skills/revayat-subtitle/references/persian-typography.md) — RTL, mixed scripts, quotes, fonts and rendered evidence.
-- [source-languages.md](skills/revayat-subtitle/references/source-languages.md) — direct translation, Japanese, Chinese, French and Spanish profiles, and research for other languages.
-- [research.md](skills/revayat-subtitle/references/research.md) — inspected repositories, adopted ideas and rejected defaults.
-- [glossary-and-voice.md](skills/revayat-subtitle/references/glossary-and-voice.md) — research, names and sequel continuity.
-- [release-selection.md](skills/revayat-subtitle/references/release-selection.md) — candidate comparison and episode identity.
-- [subtitle-formats.md](skills/revayat-subtitle/references/subtitle-formats.md) — ASS/SRT, comments, styles, drawings and optional font removal.
-- [workflow.md](skills/revayat-subtitle/references/workflow.md) — workspace, worksheet and review contracts.
-- [parallel-editorial.md](skills/revayat-subtitle/references/parallel-editorial.md) — consent, assignments, worker logs and final integration.
-- [troubleshooting.md](skills/revayat-subtitle/references/troubleshooting.md) — refusals, recovery and execution logs.
+- [Main skill instructions](skills/revayat-subtitle/SKILL.md)
+- [Audio sync skill instructions](skills/revayat-subtitle-sync/SKILL.md)
+- [Audio sync reference](skills/revayat-subtitle/references/audio-sync.md)
+- [Subtitle formats and Translator Mode](skills/revayat-subtitle/references/subtitle-formats.md)
+- [Persian typography and RTL anchoring](skills/revayat-subtitle/references/persian-typography.md)
+- [Workflow contracts](skills/revayat-subtitle/references/workflow.md)
+- [Target voice guides](skills/revayat-subtitle/references/target-voice.md)
+- [Source language rules](skills/revayat-subtitle/references/source-languages.md)
+- [Platform paths and plugin manifests](docs/platforms.md)
+- [Changelog](CHANGELOG.md)
 
 ## Development
 
 ```bash
 python -m pip install -r requirements-dev.txt
-python tests/check.py
-python tests/check.py --render
-python evaluation/score.py --answers my-answers.json
+python -X utf8 -m pytest tests/ -q
+python -X utf8 tests/check.py --render
+cargo test --manifest-path rust/subsync-rs/Cargo.toml
 ```
 
-The stdlib test runner bounds its worker process and exercises the real CLI and
-native installers. Development dependencies add bounded generated cases and native
-process-identity checks; the installed skill still has no pip runtime dependencies.
-CI covers Linux, macOS and Windows, with libass and 10-bit preview lanes on Linux
-and Windows. Manually dispatch CI to run the test matrix and workflow lint on a
-selected ref. The security workflows keep their own events. The PNG cost comparison
-uses identical authored 320×180 inputs and baseline source, not a universal speed ratio. CodeQL analyzes Python and workflows; actionlint and zizmor block
-workflow defects. Dependency Review runs on PRs; Dependabot covers Actions, the
-development manifest and the empty runtime manifest. Read exact-commit Actions
-results before claiming a pass.
+GitHub Actions CI (`.github/workflows/ci.yml`) runs on manual `workflow_dispatch`
+across 16 jobs covering `actionlint`/`zizmor`, Python 3.11 and 3.14 on Linux,
+Windows, and macOS, full pytest suites, five-format plugin validation, v2 ASS/RTL
+pipeline tests, Rust `subsync-rs` (Linux and Windows), all three PyO3 Rust crates
+(`subcore-rs`, `persian-lint-rs`, `markup-rs`), and repository hygiene metrics.
+CodeQL and Gitleaks workflows scan code and Git history separately.
 
-[evaluation/](evaluation/README.md) contains short authored language cases. Known
-acceptable answers are recognized; unseen wording is reported for human review,
-not declared a bad translation or given a fabricated quality score.
-
-Runtime and installer logs are new UTF-8 UTC files for each run, under the skill's
-`logs/` or `REVAYAT_LOG_DIR`. Separately, every agent using the skill must maintain
-an activity log while researching, translating, correcting, merging and inspecting
-the subtitles, and place that log beside the translated files as required by
-`SKILL.md`. Chat updates and helper execution logs do not replace this agent log.
-
-Execution logs record progress/errors without subtitle bodies;
-`REVAYAT_LOG_LEVEL=DEBUG` enables bounded diagnostic detail (default `INFO`).
-Read-only installations fall back to formatted stderr. Native installer bootstrap
-logs also cover missing Python. See
-[execution logs](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs).
+Execution logs record progress and errors under `logs/` without subtitle bodies.
 
 ## Donate
 
@@ -345,6 +308,7 @@ version. It is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the license for details.
 
-The same license accompanies standalone skill and plugin installations. FFmpeg,
-fonts and the media being processed retain their own licenses and are not
-redistributed by this repository.
+The bundled `B Koodak` Bold font (`skills/revayat-subtitle/assets/fonts/BKOODB.TTF`)
+retains its original Borna Rayaneh attribution in
+[NOTICE.txt](skills/revayat-subtitle/assets/fonts/NOTICE.txt). FFmpeg and user
+media retain their own licenses and are not redistributed by this repository.

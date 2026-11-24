@@ -1,66 +1,58 @@
 <div dir="rtl">
 
-<h1 align="center">روایت زیرنویس — Revayat Subtitle</h1>
-
 <div align="center">
 
-[![CI is manually dispatched](https://img.shields.io/badge/CI-manual%20dispatch-217ba3)](.github/workflows/ci.yml)
-[![CodeQL checks Python and Actions](https://img.shields.io/badge/CodeQL-Python%20%7C%20Actions-497e49)](.github/workflows/codeql.yml)
-[![Gitleaks scans Git history](https://img.shields.io/badge/Gitleaks-history%20scans-c26d32)](.github/workflows/gitleaks.yml)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%203.0%2B-2ea44f)](LICENSE)
-[![Plugin version: 1.4.0](https://img.shields.io/badge/Plugin-1.4.0-0d6efd)](plugin.json)
-[![Verified Python tooling: 3.13.15](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
-[![CI platforms: Windows, Linux and macOS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
-[![Distribution: plugin and standalone skill](https://img.shields.io/badge/Install-plugin%20%7C%20skill-806c46)](install/install.py)
-[![Documentation: English and Persian](https://img.shields.io/badge/Docs-English%20%7C%20Persian-0369a1)](README.fa.md)
-[![Published Git tree at 95ad08b: 1.00 MB](https://img.shields.io/badge/repo%20size-1.00%20MB-ca8a04)](#repository-size)
-[![Subtitle inputs: ASS, SRT and ZIP](https://img.shields.io/badge/Input-ASS%20%7C%20SRT%20%7C%20ZIP-2563eb)](skills/revayat-subtitle/references/subtitle-formats.md)
-[![Renderer: FFmpeg and libass](https://img.shields.io/badge/Renderer-FFmpeg%20%2B%20libass-755e99)](skills/revayat-subtitle/references/persian-typography.md)
-[![Bundled voice guides: Persian, Russian and English](https://img.shields.io/badge/Voice-Persian%20%7C%20Russian%20%7C%20English-43535a)](skills/revayat-subtitle/references/target-voice.md)
+# ‏⁧روایت زیرنویس (Revayat Subtitle)⁩
+
+‏⁧**زیرنویس‌ها را با خروجی پیش‌فرض ASS (یا SRT به انتخاب شما) ترجمه، ویرایش و با صدای ویدئو همگام‌سازی کنید و یک بستهٔ بازبینی‌شده در `Sub.zip` بگیرید. زبان پیش‌فرض خروجی فارسی است.**⁩
+
+[![GitHub Actions CI workflow with manual dispatch](https://img.shields.io/badge/CI-GitHub%20Actions-16a34a)](.github/workflows/ci.yml)
+[![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
+[![Plugin version 2.0.0 across five manifest formats](https://img.shields.io/badge/plugin-v2.0.0-ea580c)](plugin.json)
+[![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
+[![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
+[![Rust 1.99.1 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.99.1-9a3412)](rust/subsync-rs/Cargo.toml)
+[![Runs on Windows, Linux, and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
+[![Install via five plugin formats or standalone scripts](https://img.shields.io/badge/install-5%20plugins%20%7C%20standalone-4f46e5)](#نصب)
+[![Documentation in English and Persian](https://img.shields.io/badge/docs-English%20%7C%20Persian-0284c7)](README.md)
+[![Published Git tree size measured via git ls-files is 1.69 MB](https://img.shields.io/badge/repo%20size-1.69%20MB-ca8a04)](#repository-size)
+[![ASS default output with bundled B Koodak font and Translator Mode](https://img.shields.io/badge/output-ASS%20%7C%20B%20Koodak-15803d)](skills/revayat-subtitle/references/subtitle-formats.md)
+[![Rust FFT and ALASS audio-to-subtitle synchronization engine](https://img.shields.io/badge/audio%20sync-Rust%20FFT%20%7C%20ALASS-b45309)](skills/revayat-subtitle/references/audio-sync.md)
+[![FFmpeg and libass visual verification pipeline](https://img.shields.io/badge/renderer-FFmpeg%20%7C%20libass-334155)](skills/revayat-subtitle/references/persian-typography.md)
+[![Three bundled voice guides for Persian, English, and Russian](https://img.shields.io/badge/voice%20guides-3%20bundled-7c3aed)](skills/revayat-subtitle/references/target-voice.md)
+[![CodeQL static analysis and Gitleaks secret scanning](https://img.shields.io/badge/security-CodeQL%20%7C%20Gitleaks-c2410c)](.github/workflows/codeql.yml)
 [![Support donations](https://img.shields.io/badge/Support-donations-d04a9a)](#donate)
 
 </div>
 
-**زیرنویس انیمه را ترجمه یا ویرایش کنید و برای هر قسمت یک فایل بازبینی‌شده در `Sub.zip` بگیرید. زبان پیش‌فرض خروجی فارسی است.**
-
 <a id="repository-size"></a>
 
-حجم فایل‌های منتشرشده در `95ad08b`: ۱٬۰۰۲٬۹۹۸ بایت (۱٫۰۰ مگابایت)، بدون تاریخچهٔ Git و فایل‌های ثبت‌نشده.
+‏⁧حجم درخت منتشرشده در Git (نسخهٔ `2.0.0`، اندازه‌گیری‌شده با `git ls-files`): ۱٬۶۹۲٬۶۲۴ بایت (۱٫۶۹ مگابایت) در ۲۱۴ فایل ردیابی‌شده، بدون تاریخچهٔ Git و فایل‌های ثبت‌نشده.⁩
 
-اسکیلی برای Claude Code، Codex، Cursor، Kiro، Cline، Hermes، OpenCode،
-Antigravity و هر ایجنتی که `SKILL.md` را می‌خواند. تمرکز آن روی بخش‌هایی است
-که دقت می‌خواهند: تمام خطوط تمام نسخه‌ها، نام‌های یکسان بین فصل‌ها، پسوندهای
-ژاپنی، تشخیص افکت از متن و نمایش درست فارسی و انگلیسی در رندر واقعی.
+‏⁧اسکیلی برای Claude Code، Codex، Cursor، Antigravity، Kiro، Cline، Hermes، OpenCode و هر ایجنتی که `SKILL.md` را می‌خواند. این ابزار بخش‌هایی را حل می‌کند که در ترجمهٔ ماشینی خراب می‌شوند: ردیابی تمام خطوط در چند نسخه، یکدستی نام‌ها و پسوندهای ژاپنی بین فصل‌ها، حفظ افکت‌های ASS، خروجی پیش‌فرض ASS با فونت همراه `B Koodak`، مهار پرش علائم نگارشی در خطوط دوسطری فارسی، ساخت فایل حالت مترجم و همگام‌سازی مستقیم زمان‌بندی زیرنویس با صدای ویدئو به زبان Rust.⁩
 
-<div align="right"><a href="LICENSE">مجوز GPL-3.0</a></div>
+<div align="right"><a href="LICENSE">‏⁧مجوز GPL-3.0⁩</a></div>
 <div align="left"><a href="README.md">English</a></div>
 
 ---
 
-## چه چیزی آن را از یک مترجم زیرنویس معمولی جدا می‌کند
+## ‏⁧قابلیت‌های کلیدی⁩
 
-| | |
+| ‏⁧قابلیت⁩ | ‏⁧نحوهٔ عملکرد⁩ |
 | --- | --- |
-| **تمام نسخه‌ها بررسی می‌شوند** | شناسهٔ ثابت خطوط، هش ورودی‌ها و برگه‌های کامل جلوی فراموش‌شدن یک نسخه یا خط را می‌گیرند. |
-| **فارسی گفتاری** | متن هر زبان مبدأ ترجمه و متن فارسی از نظر املا، معنا و روانی اصلاح می‌شود؛ خود ایجنت گفت‌وگو را در بافتش می‌خواند. |
-| **نام‌ها در فصل بعد عوض نمی‌شوند** | تحقیق دربارهٔ انیمه، ثبت منابع و واژه‌نامهٔ قفل‌شده، نام‌ها و لحن شخصیت‌ها را به قسمت‌ها و فصل‌های بعد منتقل می‌کنند. |
-| **پسوندهای ژاپنی حفظ می‌شوند** | سان، کون، ساما، چان و اونی-چان به آقا و خانم تبدیل نمی‌شوند. |
-| **یک خروجی برای هر قسمت** | نسخهٔ مناسب ASS مبنای نمایش است؛ متن بهتر یا محتوای جاافتاده از نسخه‌های دیگر با تطبیق دقیق وارد می‌شود. |
-| **RTL واقعاً دیده می‌شود** | متن یونیکد با ترتیب منطقی، نشانه‌های جهت و تصاویر FFmpeg، اشکال ترتیب فارسی/انگلیسی، علائم، نقل‌قول و بریدگی را آشکار می‌کنند. |
-| **مرزهای ویدئو هم بررسی می‌شوند** | اگر ویدئوی منطبق موجود باشد، ایجنت صدای قبل از اولین و بعد از آخرین خط و تداخل زیرنویس داخلی یا اجباری با فایل فارسی را بررسی می‌کند. |
-| **افکت با متن اشتباه نمی‌شود** | مسیرهای برداری، موقعیت، حرکت، کارائوکه و لایه‌های عمدی از متن تابلوها و دیالوگ جدا هستند. |
-| **فونت انتخاب کاربر است** | اگر فونت جاسازی‌شده وجود داشته باشد، ایجنت دربارهٔ حذف یا حفظ آن سؤال می‌کند؛ مگر کاربر قبلاً برای همان کار تصمیم داده باشد. فونت جایگزین پس از حذف بررسی می‌شود. |
-| **ویرایش موازی اختیاری است** | ایجنت پیش از تقسیم قسمت‌ها یا بازه‌های خطوط بین ساب‌ایجنت‌ها سؤال می‌کند؛ واژه‌نامهٔ مشترک، لاگ جدا و بازبینی هماهنگ‌کننده الزامی است. |
-| **پاک‌سازی محدود و دقیق** | تبلیغات تأییدشده، خطوط خالی، کامنت‌های مخفی و استایل‌های بی‌استفاده حذف می‌شوند؛ محتوای داستان و شدت فحش و الفاظ جنسی حفظ می‌شود. |
-| **خروجی شواهد خودش را بررسی می‌کند** | QA و بسته‌بندی از بررسی مشترک ورودی، زیرنویس، واژه‌نامه و تصویر استفاده می‌کنند؛ ZIP نهایی دوباره خوانده می‌شود. |
+| ‏⁧خروجی پیش‌فرض ASS با فونت `B Koodak`⁩ | ‏⁧خروجی استاندارد 1080p ASS (`PlayResX: 1920`، `PlayResY: 1080`) با فونت همراه `BKOODB.TTF` (`B Koodak` Bold)، حاشیهٔ مشکی ظریف (`1.5`) و سایهٔ ملایم (`0.8`) تولید می‌شود و از طریق پرچم‌های CLI قابل تغییر است. قالب SRT با `--output-format srt` همچنان در دسترس است.⁩ |
+| ‏⁧مهار پرش علائم نگارشی و شکست متعادل خط⁩ | ‏⁧خطوط طولانی به شکل متعادل در حداکثر ۲ خط (`\N` با سقف ۴۲ کاراکتر) بدون شکستن تگ‌های ASS یا کلمات نیم‌فاصله‌دار تقسیم می‌شوند و هر خط نمایشی با `RLE` (`U+202B`)، `RLM` پایانی (`U+200F`) و `PDF` (`U+202C`) قفل می‌شود تا نقطه، علامت سؤال و گیومه در VLC، mpv، PotPlayer و libass به خط اول نپرند.⁩ |
+| ‏⁧نیم‌فاصلهٔ فارسی و حذف خودکار واترمارک⁩ | ‏⁧نیم‌فاصله را در «می‌»/«نمی‌»، «‌ها»، «‌تر»/«‌ترین» و پسوندهای «ه‌» اعمال می‌کند، حروف عربی `ي`/`ك`/`ة`/`ى` را بیرون از تگ‌ها و پیوندها به فارسی برمی‌گرداند و تبلیغات مترجم، استودیو، کانال تلگرام و نشانی وب را با گزارش ساختاریافته حذف می‌کند.⁩ |
+| ‏⁧حفظ کج‌نویسی، ضخیم‌نویسی و افکت‌ها⁩ | ‏⁧تگ‌های `<i>`، `<b>`، `<u>`، `<s>`، `<font color>` و `{an1..9}` را در SRT به معادل ASS (`{\i1}`، `{\b1}`، `{\c&HBBGGRR&}`، `{\an8}`) تبدیل می‌کند و مسیرهای برداری، کارائوکه و لایه‌های موجود ASS را دست‌نخورده نگه می‌دارد.⁩ |
+| ‏⁧حالت مترجم (`translator-ass`)⁩ | ‏⁧نسخهٔ اصلی و نسخه‌های کمکی را به ترتیب زمانی ترکیب می‌کند، برای خطوط بدون هم‌پوشانی در نسخه‌های کمکی ردیف‌های زمان‌بندی‌شدهٔ خالی (`Dialogue:`) می‌سازد و در صورت نیاز متن منبع را به‌صورت `Comment:` درج می‌کند.⁩ |
+| ‏⁧همگام‌سازی صوتی Rust (`subsync-rs`)⁩ | ‏⁧صدای مونو ۱۶ کیلوهرتز را با FFmpeg استخراج می‌کند، با تشخیص فعالیت گفتار دوویژگی (FFT) و همبستگی متقابل `rustfft` جابه‌جایی سراسری و رانش فریم‌ریت PAL/NTSC را می‌یابد، برش‌های میانی را با برنامه‌ریزی پویا (ALASS) پیدا می‌کند و لبه‌های خط را به مرز گفتار می‌چسباند. به‌صورت اسکیل هم‌تراز `revayat-subtitle-sync` و دستور `revayat-subtitle.py sync` در دسترس است.⁩ |
+| ‏⁧شتاب‌دهنده‌های Rust PyO3⁩ | ‏⁧بخش‌های سنگین پردازش متن، بازبینی فارسی و نشانه‌گذاری با ابزار `rust-anything` به Rust خالص (`rust/subcore-rs`، `rust/persian-lint-rs`، `rust/markup-rs`) با `#![forbid(unsafe_code)]` و بازگشت امن به پایتون (`REVAYAT_DISABLE_RUST=1`) پورت شده‌اند.⁩ |
+| ‏⁧ردیابی ویرایشی چندنسخه‌ای⁩ | ‏⁧شناسهٔ پایدار خطوط، هش منبع، واژه‌نامهٔ قفل‌شده و برگه‌های کامل جلوی جاماندن خطوط و تغییر نام شخصیت‌ها در فصل‌های بعد را می‌گیرند.⁩ |
+| ‏⁧بازبینی بصری با FFmpeg و libass⁩ | ‏⁧فریم‌های PNG را با پوشهٔ فونت همراه (`:fontsdir=fonts`) رندر می‌کند تا ایجنت پیش از `qa` و بسته‌بندی `Sub.zip` ظاهر واقعی حروف، تعادل خط و جهت فارسی/انگلیسی را ببیند.⁩ |
 
-راهنمای [زبان‌های مبدأ](skills/revayat-subtitle/references/source-languages.md) برای ژاپنی، چینی، فرانسوی و اسپانیایی قواعد ویژه دارد؛ برای هر زبان دیگر تحقیق جداگانه لازم است. [گزارش تحقیق](skills/revayat-subtitle/references/research.md) منابع و تصمیم‌ها را ثبت می‌کند. پشتیبانی گردش کار، تضمین مهارت زبانی تمام ایجنت‌ها نیست.
+## ‏⁧نصب⁩
 
-## نصب
-
-**Python 3.11 یا جدیدتر**، FFmpeg دارای libass و یک فونت فارسی لازم است.
-اجرای Python به بستهٔ اضافی نیاز ندارد؛ فایل requirements همین موضوع را مشخص
-می‌کند. FFmpeg و فونت جداگانه نصب می‌شوند.
+‏⁧به **`Python 3.11` یا جدیدتر** و FFmpeg با پشتیبانی libass نیاز است. اسکریپت‌های پایتون فقط از کتابخانهٔ استاندارد استفاده می‌کنند و فونت `B Koodak` Bold همراه مخزن در `skills/revayat-subtitle/assets/fonts/BKOODB.TTF` قرار دارد ([اطلاعیهٔ فونت](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). ابزار Rust (`1.88+` برای `subsync-rs` و `1.97+` برای crateهای PyO3) فقط هنگام ساخت محلی موتور همگام‌سازی یا افزونه‌های بومی لازم است.⁩
 
 <div dir="ltr">
 
@@ -72,7 +64,7 @@ python -m pip install -r skills/revayat-subtitle/requirements.txt
 
 </div>
 
-سپس اسکیل را در ایجنت‌های مورد استفاده نصب کنید:
+‏⁧سپس هر دو اسکیل `revayat-subtitle` و `revayat-subtitle-sync` را در ایجنت‌ها نصب کنید:⁩
 
 <div dir="ltr">
 
@@ -88,17 +80,7 @@ bash install/install.sh
 
 </div>
 
-نصب‌کننده پیش‌فرض مسیرهای کاربری موجود را انتخاب می‌کند. `--agent codex`
-برای یک ایجنت و `--scope project --path PATH` برای نصب در یک پروژه است.
-`--dry-run` مقصدها را نشان می‌دهد؛ `--force` پیش از جایگزینی از نصب قبلی
-پشتیبان نگه می‌دارد. راه‌اندازهای Bash و PowerShell از یک پیاده‌سازی مشترک استفاده می‌کنند.
-پشتیبان و ژورنال جدید بیرون کشف اسکیل، در `revayat-recovery/` اولین مسیر عامل
-انتخاب‌شده نگه داشته می‌شوند. مقصد سفارشی به `--recovery-dir` صریح روی همان
-فایل‌سیستم و بیرون مسیرهای کشف اسکیل/پلاگین نیاز دارد. قفل ثابت سیستم‌عامل در
-`~/revayat-install-state/` نصب و بازیابی همان حساب را سری می‌کند؛ تضمین بین
-حساب‌ها، نویسندهٔ خصمانه یا قطع برق عمومی نیست. بازیابی نصب ناتمام با
-`--recover JOURNAL --recovery-dir DIR` نصب قبلی کامل را برمی‌گرداند؛ دادهٔ
-تغییریافته حفظ و گزارش می‌شود و ژورنال نصب کامل مجوز حذف نصب نیست.
+‏⁧نصب‌کننده به‌طور پیش‌فرض پوشه‌های کاربری موجود را انتخاب می‌کند. برای یک ایجنت خاص از `--agent codex`، برای نصب پروژه‌ای از `--scope project --path PATH`، برای پیش‌نمایش از `--dry-run` و برای جایگزینی با پشتیبان از `--force` استفاده کنید. جزئیات کامل مسیرها در [docs/platforms.md](docs/platforms.md) آمده است.⁩
 
 <div dir="ltr">
 
@@ -116,13 +98,17 @@ bash install/install.sh
 
 </div>
 
-در هر مقصد یک پوشهٔ واقعی `revayat-subtitle` قرار می‌گیرد. برای مسیر دلخواه
-از `--destination` استفاده کنید. پس از نصب ایجنت را reload کنید؛ اسکیل‌های
-پروژه‌ای Hermes به تأیید اعتماد خود آن برنامه هم نیاز دارند.
-[مستندات پلتفرم‌ها](docs/platforms.md) مسیرهای فعلی را ثبت می‌کند. نصب‌کننده
-خودکار اعتماد اعطا نمی‌کند و پیش‌نیازها را نصب نمی‌کند.
+### ‏⁧نصب به‌صورت پلاگین (۵ قالب استاندارد)⁩
 
-### به‌عنوان پلاگین Claude Code
+‏⁧مخزن هر ۵ قالب مانیفست پلاگین نسخهٔ `2.0.0` را روی یک درخت اسکیل مشترک عرضه می‌کند:⁩
+
+- ‏⁧**Claude Code:** `.claude-plugin/plugin.json` و `.claude-plugin/marketplace.json`⁩
+- ‏⁧**Cursor:** `.cursor-plugin/plugin.json` و `.cursor-plugin/marketplace.json`⁩
+- ‏⁧**Codex:** `.codex-plugin/plugin.json` و `.agents/plugins/marketplace.json`⁩
+- ‏⁧**Antigravity:** `.antigravity-plugin/plugin.json`⁩
+- ‏⁧**Agent Plugins 1.0:** فایل ریشهٔ `plugin.json`⁩
+
+‏⁧نصب در Claude Code:⁩
 
 <div dir="ltr">
 
@@ -133,25 +119,27 @@ bash install/install.sh
 
 </div>
 
-بسته سه فرمان `translate-subtitles`، `revayat-subtitle-resume` و
-`revayat-subtitle-qa` دارد؛ Claude آن‌ها را در فضای نام `revayat-subtitle` نمایش می‌دهد.
-برای ساخت یک کپی محلی از پلاگین:
+‏⁧پلاگین فرمان‌های `translate-subtitles`، `revayat-subtitle-resume`، `revayat-subtitle-qa` و `revayat-subtitle-sync` را در فضای نام `revayat-subtitle` ارائه می‌دهد. ساخت بستهٔ محلی پلاگین:⁩
 
 <div dir="ltr">
 
-```text
+```bash
 python install/install.py --plugin --destination "PATH/revayat-subtitle" --recovery-dir "PATH/recovery"
 ```
 
 </div>
 
-مانیفست استاندارد Agent Plugins و مانیفست‌های Claude/Codex/Cursor همگی از
-همین درخت اسکیل استفاده می‌کنند. ورود و فعال‌سازی بسته در Codex، Kiro Powers،
-Hermes و Antigravity از مدیر پلاگین خودشان انجام می‌شود. Cursor کپی محلی در
-`~/.cursor/plugins/local/revayat-subtitle` را هم می‌پذیرد. در Cline و OpenCode
-از نصب اسکیل استفاده کنید؛ سیستم افزونهٔ JS/TS آن‌ها محصول متفاوتی است.
+### ‏⁧ساخت باینری همگام‌سازی صوتی Rust (اختیاری)⁩
 
-### بررسی نصب
+<div dir="ltr">
+
+```bash
+cargo build --release --manifest-path rust/subsync-rs/Cargo.toml
+```
+
+</div>
+
+### ‏⁧بررسی نصب⁩
 
 <div dir="ltr">
 
@@ -161,28 +149,17 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 
 </div>
 
-`ready: true` وجود فیلترهای FFmpeg را تأیید می‌کند؛ مناسب‌بودن فونت یا نمایش
-درست یک قسمت هنوز به رندر و مشاهده نیاز دارد. اگر FFmpeg در PATH نیست، مسیرش
-را با `--ffmpeg` یا `REVAYAT_FFMPEG` مشخص کنید.
+‏⁧خروجی `ready: true` در دسترس‌بودن FFmpeg و libass را تأیید می‌کند. اگر FFmpeg در `PATH` نیست، از `--ffmpeg PATH` یا متغیر `REVAYAT_FFMPEG` استفاده کنید.⁩
 
-## استفاده
+## ‏⁧استفاده⁩
 
-نام انیمه، فصل و جدیدبودن یا ادامهٔ مجموعه را به ایجنت بگویید:
+‏⁧از ایجنت بخواهید زیرنویس‌ها را ترجمه، تبدیل، به حالت مترجم آماده یا با ویدئو همگام کند:⁩
 
-> از revayat-subtitle استفاده کن. این فصل دوم همان انیمه است. نام‌های قبلی و
-> پسوندهای ژاپنی را حفظ کن، فارسی گفتاری بنویس، فونت‌ها را نگه دار و Sub.zip
-> و واژه‌نامهٔ به‌روزشده را بده.
+> ‏⁧از revayat-subtitle برای این زیرنویس‌ها استفاده کن. نام شخصیت‌ها و پسوندهای ژاپنی را یکدست نگه دار، فارسی گفتاری با خروجی ASS و فونت B Koodak بساز، واترمارک‌ها را حذف کن و فایل نهایی را با episode01.mkv همگام‌سازی کن.⁩
 
-فایل‌های ASS/SRT یا ZIP و برای ادامهٔ مجموعه، واژه‌نامهٔ قبلی را ضمیمه کنید.
-زبان پیش‌فرض فارسی است. اگر خروجی روسی یا انگلیسی بخواهید، روایت از
-[راهنمای لحن همان زبان](skills/revayat-subtitle/references/target-voice.md) استفاده می‌کند.
-راهنماها همراه افزونه و نسخهٔ مستقل هستند و نصب جداگانه نمی‌خواهند.
-در Codex از `$revayat-subtitle` استفاده کنید. در پلاگین Claude، شروع کار با
-`/revayat-subtitle:translate-subtitles`، ادامه با
-`/revayat-subtitle:revayat-subtitle-resume` و گزارش QA با
-`/revayat-subtitle:revayat-subtitle-qa` انجام می‌شود.
+‏⁧زبان پیش‌فرض خروجی فارسی است. برای روسی یا انگلیسی، [راهنمای لحن زبان مقصد](skills/revayat-subtitle/references/target-voice.md) به‌کار گرفته می‌شود.⁩
 
-### یا خودتان مرحله‌به‌مرحله اجرا کنید
+### ‏⁧اجرای مستقیم از خط فرمان⁩
 
 <div dir="ltr">
 
@@ -190,46 +167,42 @@ python skills/revayat-subtitle/scripts/revayat-subtitle.py doctor
 PY=python3
 S=skills/revayat-subtitle/scripts
 
+# 1. Environment check
 "$PY" "$S/revayat-subtitle.py" doctor
+
+# 2. Convert SRT to default Persian ASS (B Koodak, outline 1.5, shadow 0.8, ZWNJ, RTL wrap, watermark strip)
+"$PY" "$S/revayat-subtitle.py" convert episode.srt --out episode.ass
+
+# 3. Build a Translator Mode ASS from a primary release plus secondary donors
+"$PY" "$S/revayat-subtitle.py" translator-ass french.srt --donor dutch.srt --out translator.ass
+
+# 4. Audio-sync a subtitle directly to a video using Rust subsync-rs
+"$PY" "$S/revayat-subtitle.py" sync episode.mkv episode.ass --out episode.synced.ass
+
+# 5. Full season editorial workflow
 "$PY" "$S/revayat-subtitle.py" prepare season.zip --work work/season01 --series "Anime title" --season 1
-# Research names, fill glossary.json and map episodes in project.json.
-# Read every cue and complete its worksheet decision and target text.
 "$PY" "$S/revayat-subtitle.py" build --work work/season01
-# Set BUILD to the printed build path.
 "$PY" "$S/revayat-subtitle.py" render --build "$BUILD" --episode S01E01 --video episode01.mkv
-# Inspect every PNG and record observations in its review file.
 "$PY" "$S/revayat-subtitle.py" qa --build "$BUILD"
 "$PY" "$S/revayat-subtitle.py" package --build "$BUILD" --out out/Sub.zip
 ```
 
 </div>
 
-در PowerShell، `$PY = 'python'` و `$S = 'skills/revayat-subtitle/scripts'`
-را تنظیم و فرمان را با `& $PY` اجرا کنید.
-[قرارداد فایل‌ها](skills/revayat-subtitle/references/workflow.md) جزئیات برگه‌ها را توضیح می‌دهد.
+‏⁧در PowerShell، مقدارهای `$PY = 'python'` و `$S = 'skills/revayat-subtitle/scripts'` را تنظیم و دستورها را با `& $PY` اجرا کنید.⁩
 
-**ورودی:** ASS، SRT، پوشه و ZIP. **خروجی:** یک زیرنویس برای هر قسمت در پوشهٔ
-`Sub` داخل ZIP، به‌همراه واژه‌نامه‌ای جدا. نام‌ها مانند `S01E01.ass`،
-`S01OVA01.ass` و `S02E01.ass` هستند. قسمت‌های صرفاً SRT همان قالب را نگه می‌دارند.
-**زبان مقصد:** فارسی، مگر کاربر زبان دیگری بخواهد.
+‏⁧**ورودی‌ها:** ASS، SRT، پوشه و ZIP (و فایل‌های ویدئویی MKV/MP4/WAV برای `sync`). **خروجی:** به‌طور پیش‌فرض ASS (`S01E01.ass`، `S01OVA01.ass`) و در صورت درخواست SRT (`--output-format srt`)، بسته‌بندی‌شده در `Sub.zip` کنار واژه‌نامهٔ به‌روزشده.⁩
 
-### ادامهٔ کار و پیشنهادهای فقط‌خواندنی
+### ‏⁧ادامهٔ کار و پیشنهادهای فقط‌خواندنی⁩
 
-`status --work WORK` خطوط معطل، واژه‌نامه، تقسیم قسمت‌ها و نسخه/شواهد منطبق را
-گزارش می‌کند. `handoff --work WORK --assignment FILE --result FILE` پیشنهادهای
-بدون تداخل را به هش مبدأ و واژه‌نامه متصل می‌کند؛ کارگر اعزام یا داده وارد نمی‌کند.
-JSON نسخهٔ ۱ است: خروج ۰ کامل مکانیکی، ۱ کار معتبر ناتمام، ۲ دادهٔ نامعتبر/کهنه.
-بدنهٔ زیرنویس یا تأیید خودکار معنا/تصویر گزارش نمی‌شود؛ هماهنگ‌کننده همچنان همهٔ
-پیشنهادها را می‌خواند. [قرارداد دقیق](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs)،
-[روبریک دسته‌ای](evaluation/rubric.md) و [پایلوت محدود AI](evaluation/pilot.json)
-شواهد و عدم‌قطعیت را ثبت می‌کنند، نه گواهی کیفیت زبانی.
+‏⁧فرمان `status --work WORK` خطوط باقی‌مانده، وضعیت واژه‌نامه و شواهد نسخهٔ فعال را گزارش می‌کند و `handoff --work WORK --assignment FILE --result FILE` پیشنهادهای بدون تداخل ساب‌ایجنت‌ها را بدون واردکردن خودکار راستی‌آزمایی می‌کند. جزئیات کامل در [workflow.md](skills/revayat-subtitle/references/workflow.md#read-only-status-and-editorial-handoffs)، [روبریک](evaluation/rubric.md) و [پایلوت](evaluation/pilot.json) آمده است.⁩
 
-## معماری
+## ‏⁧معماری⁩
 
 <div dir="ltr">
 
 ```text
-ASS / SRT / ZIP
+ASS / SRT / ZIP (+ optional MKV / MP4 / WAV)
        |
        v
 prepare -> immutable sources + project.json + complete worksheets
@@ -239,102 +212,67 @@ prepare -> immutable sources + project.json + complete worksheets
 compare releases <------------------+
        |
        v
-agent reads, translates and records every cue decision
+agent translates and records every cue decision (ZWNJ, watermark filter, markup)
        |
        v
-build -> overlap-safe ASS order / stable SRT timing sort, cleanup, RTL, one file per episode
+build -> ASS default (B Koodak, outline/shadow, balanced RTL wrap) or requested SRT
        |
        v
-render -> FFmpeg PNGs -> agent inspection and observations
+optional sync -> Rust subsync-rs (16 kHz FFT VAD + cross-correlation + ALASS DP)
        |
        v
-qa -> source, edition, glossary and image evidence agree
+render -> FFmpeg + libass PNGs (bundled fontsdir) -> agent visual inspection
        |
        v
-package -> Sub.zip, read back and checked
+qa -> source, edition, glossary, and image evidence must agree
+       |
+       v
+package -> Sub.zip, read back and verified against the reviewed build
 ```
 
 </div>
 
-معنا و قضاوت تصویری بر عهدهٔ ایجنت است؛ ساختار فایل و بررسی شواهد را اسکریپت‌ها
-انجام می‌دهند. فایل اصلی بازنویسی نمی‌شود و تغییر برگهٔ ترجمه، شناسهٔ ساخت و
-شواهد تصویری تازه می‌خواهد.
+## ‏⁧آنچه صادقانه باید گفت⁩
 
-| ماژول | نقش |
-| --- | --- |
-| `subtitle_formats.py` | مدل ASS/SRT، خواندن و نوشتن دقیق، جداسازی رسم از متن و نشانه‌های جهت |
-| `workflow.py` | فهرست ورودی، برگه‌ها، واژه‌نامه، ادغام نسخه‌ها و هویت ساخت |
-| `render.py` | تصاویر FFmpeg، دروازهٔ مشترک QA و خروجی ZIP بررسی‌شده |
-| `runtime.py` | UTF-8، هش، اجرای محدود فرایندها، پوشهٔ موقت و لاگ اجرا |
-| `revayat-subtitle.py` | ورودی واحد خط فرمان برای تمام مراحل |
-| `install/install.py` | مسیر عامل‌ها و نصب اسکیل/پلاگین از فهرست مجاز فایل‌ها |
+- ‏⁧اسکریپت‌ها ساختار، هش‌ها، قواعد نیم‌فاصله، نشانه‌های RTL، زمان‌بندی و شواهد رندر را تضمین می‌کنند؛ دقت معنایی و طبیعی‌بودن ترجمه همچنان به این وابسته است که مدل تمام دیالوگ‌ها را در بافتشان بخواند.⁩
+- ‏⁧همگام‌سازی صوتی (`subsync-rs`) خطوط را با فعالیت گفتار در باند صوتی تراز می‌کند و جابه‌جایی سراسری، رانش فریم‌ریت و برش‌های میانی را بازیابی می‌کند؛ در بخش‌های پرموسیقی یا دوبلهٔ هم‌پوشان، بازبینی موردی همچنان مفید است.⁩
+- ‏⁧فونت `B Koodak` تمام حروف، ارقام، علائم نگارشی، نیم‌فاصله و `RLM` فارسی را پوشش می‌دهد و libass حروف لاتین را با فونت سیستم نمایش می‌دهد.⁩
 
-## آنچه صادقانه باید گفت
+## ‏⁧مستندات⁩
 
-- **برگهٔ کامل اثبات فهم متن نیست.** دقت معنایی و مشاهدهٔ تصویر همچنان کار ایجنت است.
-- **رندر خنثی آزمون هماهنگی ویدئو نیست.** فریم ویدئوی متناظر کنتراست صحنه را هم نشان می‌دهد، اما به‌تنهایی همگامی صدا و تصویر را ثابت نمی‌کند.
-- **استایل‌ها همیشه قابل جابه‌جایی نیستند.** مارک‌آپ پیچیده، بوم، تدوین و فونت‌های ناسازگار به تطبیق صریح نیاز دارند.
-- **رفتار پخش‌کننده‌ها متفاوت است.** بعضی خطوط دشوار به تنظیم مخصوص libass نیاز دارند و نمی‌توان آن را پشتیبانی عمومی VSFilter نامید.
-- **آزمون واقعی محدود بوده است.** ۵۱۸۸ رویداد در چهار فایل بررسی ساختاری شدند؛ ۴۰ خط نمونه و ۱۰ تصویر از ویدئوی واقعی بازبینی شدند. این گواهی کیفیت یک فصل کامل نیست.
+- ‏⁧[دستورالعمل اسکیل اصلی](skills/revayat-subtitle/SKILL.md)⁩
+- ‏⁧[دستورالعمل اسکیل همگام‌سازی صوتی](skills/revayat-subtitle-sync/SKILL.md)⁩
+- ‏⁧[مرجع همگام‌سازی صوتی](skills/revayat-subtitle/references/audio-sync.md)⁩
+- ‏⁧[قالب‌های زیرنویس و حالت مترجم](skills/revayat-subtitle/references/subtitle-formats.md)⁩
+- ‏⁧[تایپوگرافی فارسی و مهار RTL](skills/revayat-subtitle/references/persian-typography.md)⁩
+- ‏⁧[قراردادهای گردش کار](skills/revayat-subtitle/references/workflow.md)⁩
+- ‏⁧[راهنمای لحن زبان مقصد](skills/revayat-subtitle/references/target-voice.md)⁩
+- ‏⁧[قواعد زبان‌های مبدأ](skills/revayat-subtitle/references/source-languages.md)⁩
+- ‏⁧[مسیرهای پلتفرم و مانیفست‌های پلاگین](docs/platforms.md)⁩
+- ‏⁧[تاریخچهٔ تغییرات](CHANGELOG.md)⁩
 
-[محدودهٔ آزمون](docs/verification.md) ثبت شده است. فایل‌های خصوصی توزیع نمی‌شوند.
-ASSهای واقعی انتخاب‌شده فونت جاسازی‌شده نداشتند؛ حفظ و حذف دادهٔ فونت با نمونه‌های
-ساختاریِ تألیفی بررسی می‌شود.
-
-## مستندات
-
-اسکیل در مرحلهٔ لازم به این منابع مراجعه می‌کند:
-
-- [SKILL.md](skills/revayat-subtitle/SKILL.md) — نُه مرحله و معیار پایان هر مرحله.
-- [translation-policy.md](skills/revayat-subtitle/references/translation-policy.md) — فارسی گفتاری، حفظ کامل معنا و حذف‌های محدود.
-- [persian-typography.md](skills/revayat-subtitle/references/persian-typography.md) — RTL، متن ترکیبی، نقل‌قول، فونت و تصویر.
-- [glossary-and-voice.md](skills/revayat-subtitle/references/glossary-and-voice.md) — تحقیق، اسامی و تداوم فصل‌ها.
-- [release-selection.md](skills/revayat-subtitle/references/release-selection.md) — مقایسهٔ نسخه‌ها و هویت قسمت.
-- [subtitle-formats.md](skills/revayat-subtitle/references/subtitle-formats.md) — قالب‌ها، کامنت، استایل، رسم و حذف اختیاری فونت.
-- [workflow.md](skills/revayat-subtitle/references/workflow.md) — قرارداد پوشهٔ کار، برگه‌ها و بازبینی.
-- [troubleshooting.md](skills/revayat-subtitle/references/troubleshooting.md) — خطاها، بازیابی و لاگ اجرا.
-
-## توسعه
-
-راهنمای [کار موازی](skills/revayat-subtitle/references/parallel-editorial.md) رضایت کاربر، تقسیم بدون تداخل، خروجی و لاگ جداگانه و بازبینی نهایی را مشخص می‌کند. بدون رضایت یا پشتیبانی میزبان، کار ترتیبی ادامه پیدا می‌کند.
+## ‏⁧توسعه⁩
 
 <div dir="ltr">
 
 ```bash
 python -m pip install -r requirements-dev.txt
-python tests/check.py
-python tests/check.py --render
-python evaluation/score.py --answers my-answers.json
+python -X utf8 -m pytest tests/ -q
+python -X utf8 tests/check.py --render
+cargo test --manifest-path rust/subsync-rs/Cargo.toml
 ```
 
 </div>
 
-رانر مبتنی بر کتابخانهٔ استاندارد، زمان اجرای فرایند را محدود و خط فرمان و
-نصب‌کنندهٔ واقعی را بررسی می‌کند. CI را دستی روی شاخهٔ موردنظر اجرا کنید؛ همان اجرا
-تست‌های Linux، macOS و Windows و بررسی گردش‌کارها را پوشش می‌دهد.
-Linux و Windows رندر libass و پیش‌نمایش ویدئوی ۱۰بیتی را هم بررسی می‌کنند. CodeQL کد Python
-و گردش‌کارها را تحلیل می‌کند؛ Dependency Review برای PRهاست و Dependabot
-اکشن‌ها، وابستگی‌های توسعه و مانیفست خالی اجرای اسکیل را مدیریت می‌کند. actionlint و zizmor خطاهای گردش‌کار را مسدود می‌کنند. نتیجهٔ اجرای همان commit ملاک قبولی است. بسته‌های تست وارد اسکیل نصب‌شده نمی‌شوند.
+‏⁧گردش‌کار CI در GitHub Actions (`.github/workflows/ci.yml`) با اجرای دستی `workflow_dispatch` در ۱۶ job شامل `actionlint`/`zizmor`، تست‌های پایتون ۳.۱۱ و ۳.۱۴ در لینوکس، ویندوز و مک، کل مجموعهٔ `pytest`، اعتبارسنجی ۵ قالب پلاگین، تست‌های پایپلاین ASS/RTL نسخهٔ ۲، موتور Rust `subsync-rs`، هر سه crate پورت‌شدهٔ PyO3 (`subcore-rs`، `persian-lint-rs`، `markup-rs`) و سنجه‌های سلامت مخزن اجرا می‌شود.⁩
 
-سطح لاگ پیش‌فرض `INFO` است؛ `REVAYAT_LOG_LEVEL=DEBUG` جزئیات تشخیصی را فعال می‌کند. لاگ آغاز نصب، نبود Python را هم ثبت می‌کند؛ نبود دسترسی نوشتن باعث ارسال لاگ قالب‌بندی‌شده به stderr می‌شود.
+‏⁧گزارش‌های اجرا بدون ذخیرهٔ متن زیرنویس‌ها در پوشهٔ `logs/` ثبت می‌شوند.⁩
 
-[بخش ارزیابی](evaluation/README.md) نمونه‌های زبانی کوتاه و تألیفی دارد. پاسخ‌های
-پذیرفته‌شدهٔ شناخته‌شده تشخیص داده می‌شوند؛ بیان تازه برای بازبینی انسانی گزارش
-می‌شود، نه اینکه خودکار ترجمهٔ غلط نامیده شود یا نمرهٔ ساختگی بگیرد.
+## ‏⁧حمایت مالی⁩
 
-**هر ایجنت استفاده‌کننده موظف است هنگام تحقیق، ترجمه، اصلاح، ادغام و بازبینی،
-لاگ واقعی بنویسد و آن را کنار فایل‌های ترجمه‌شده قرار دهد.** لاگ فقط پیام چت
-یا لاگ اسکریپت نیست؛ محل، قالب و محتوا در قواعد اسکیل مشخص شده‌اند.
+‏⁧اگر این پروژه برایتان مفید است، حمایت مالی شما قدردانی می‌شود.⁩
 
-لاگ اجرایی اسکریپت‌ها نیز برای هر اجرا فایل UTF-8 جدا با زمان UTC می‌سازد و
-متن زیرنویس را ثبت نمی‌کند. جزئیات در
-[لاگ اجرا](skills/revayat-subtitle/references/troubleshooting.md#cli-execution-logs) آمده است.
-
-## حمایت مالی
-
-اگر این پروژه برایتان مفید است، می‌توانید از توسعهٔ آن حمایت کنید.
-
-</div>
+<div dir="ltr">
 
 | Currency | Network | Address |
 | --- | --- | --- |
@@ -347,27 +285,20 @@ Linux و Windows رندر libass و پیش‌نمایش ویدئوی ۱۰بیت�
 | Solana (SOL) | Solana | `7B2wkczUjmkDhETwQuknBL8sUsbuV7nErxc317TmQuwR` |
 | Polygon (POL) | Polygon | `0x0Bd0BA443a8B9cf15922bf7f0Bb0a4b495fD06Ef` |
 
-<div dir="rtl">
+</div>
 
-حمایت در گیت‌هاب: [KiaroSama](https://github.com/sponsors/KiaroSama).
+‏⁧حمایت در GitHub Sponsors: [KiaroSama](https://github.com/sponsors/KiaroSama).⁩
 
-## نویسنده
+## ‏⁧نویسنده⁩
 
-نویسنده: Kiaro Sama
+‏⁧نویسنده: Kiaro Sama⁩
+‏⁧گیت‌هاب: [KiaroSama](https://github.com/KiaroSama)⁩
 
-گیت‌هاب: [KiaroSama](https://github.com/KiaroSama)
+## ‏⁧مجوز⁩
 
-## مجوز
+‏⁧[مجوز عمومی همگانی گنو نسخهٔ ۳ یا جدیدتر](LICENSE). حق نشر © ۲۰۲۶ Kiaro Sama.⁩
 
-[GNU General Public License v3.0 or later](LICENSE). Copyright (C) 2026 Kiaro Sama.
-
-این برنامه نرم‌افزار آزاد است و می‌توانید آن را مطابق نسخهٔ ۳ مجوز GNU GPL
-یا به انتخاب خود نسخه‌ای بعدی، بازتوزیع یا اصلاح کنید. برنامه بدون هیچ ضمانتی،
-از جمله ضمانت ضمنی قابلیت فروش یا مناسب‌بودن برای هدفی خاص، ارائه می‌شود.
-جزئیات در متن مجوز است.
-
-همین مجوز همراه نصب مستقل اسکیل و پلاگین قرار می‌گیرد. FFmpeg، فونت‌ها و
-رسانه‌های پردازش‌شده مجوزهای خودشان را دارند و در این مخزن توزیع نمی‌شوند.
+‏⁧فونت همراه `B Koodak` Bold (`skills/revayat-subtitle/assets/fonts/BKOODB.TTF`) حقوق و انتساب اصلی برنا رایانه را در [NOTICE.txt](skills/revayat-subtitle/assets/fonts/NOTICE.txt) حفظ می‌کند. FFmpeg و رسانه‌های کاربر مجوزهای خودشان را دارند و در این مخزن توزیع نمی‌شوند.⁩
 
 </div>
 

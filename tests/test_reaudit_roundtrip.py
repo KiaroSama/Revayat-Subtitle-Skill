@@ -295,7 +295,7 @@ class RoundtripTests(unittest.TestCase):
         self.assertEqual(before, {p: (work / p).read_bytes() for p in before})
         result = workflow.build(work)
         self.assertEqual(workflow.build(work)['identity'], result['identity'])
-        raw = (Path(result['build']) / 'Sub/S01E01.srt').read_bytes()
+        raw = (Path(result['build']) / 'Sub/S01E01.ass').read_bytes()
         self.assertEqual(runtime.digest(raw), result['episodes'][0]['sha256'])
 
     def test_edition_readback_corruption_is_refused(self):
@@ -328,7 +328,7 @@ class RoundtripTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'already exists'):
             workflow.prepare([self.source('extra.srt')], work, 'Fixture', 1, 'utf-8', None, 'en')
         result = workflow.build(work)
-        path = Path(result['build']) / 'Sub/S01E01.srt'
+        path = Path(result['build']) / 'Sub/S01E01.ass'
         before = path.read_bytes()
         self.assertEqual(workflow.build(work)['identity'], result['identity'])
         self.assertEqual(path.read_bytes(), before)

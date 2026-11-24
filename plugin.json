@@ -1,7 +1,13 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "revayat-subtitle",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "license": "GPL-3.0-or-later",
-  "description": "Translate and edit anime subtitles with cue review and FFmpeg visual checks. Persian is the default; the project bundles Persian, Russian and English voice guides."
+  "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
+  "author": {
+    "name": "Kiaro Sama",
+    "email": "Kiaro.Sama.Dev@gmail.com"
+  },
+  "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+  "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 }

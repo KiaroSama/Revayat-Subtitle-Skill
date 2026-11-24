@@ -26,7 +26,8 @@ from markup import clean_empty_lines, paragraph_direction, remap_resets
 from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times,
-                              ass_key, ass_line_start, ass_style_name, presentation_order)
+                              ass_key, ass_line_start, ass_style_name, ass_template, presentation_order)
+from text_pipeline import process_cue_text, watermark_reason
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_TOTAL = 256 * 1024 * 1024
@@ -36,7 +37,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 11, "normalization": 10, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 12, "normalization": 11, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path, *, excluded_root: Path | None = None):
@@ -142,7 +143,9 @@ def inputs(paths: list[Path], *, excluded_root: Path | None = None):
 
 
 def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: str,
-            glossary: Path | None, target_language: str) -> dict:
+            glossary: Path | None, target_language: str, *, output_format: str = "ass") -> dict:
+    if output_format not in ("ass", "srt"):
+        raise ValueError("output_format must be ass or srt")
     validation.string(series, "series")
     validation.integer(season, "season", 1, 99)
     validation.text_encoding(encoding, "encoding")
@@ -164,7 +167,7 @@ def prepare(paths: list[Path], work: Path, series: str, season: int, encoding: s
         (stage / "sources").mkdir(parents=True)
         (stage / "worksheets").mkdir()
         project = {"version": PROJECT_SCHEMA, "series": series, "season": season, "target_language": target_language,
-                   "font_policy": "keep", "sources": [], "episodes": []}
+                   "font_policy": "keep", "output_format": output_format, "sources": [], "episodes": []}
         total_cues = expanded = 0
         for i, (name, kind, raw, origin) in enumerate(inputs(paths, excluded_root=Path(temporary)), 1):
             doc = parse(raw.decode(encoding), kind)
@@ -384,9 +387,13 @@ def _merge_donor(base, donor, cues: list[Cue], source_id: str, keep_fonts: bool)
     return cues
 
 
-def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
+def assemble(work: Path, *, output_format: str | None = None) -> tuple[dict, dict[str, bytes], dict]:
     """Reconstruct the expected edition without publishing files or changing reviews."""
     project, docs, sheets = load(work)
+    project_format = project.get("output_format", "ass")
+    if project_format not in ("ass", "srt") or (output_format is not None and output_format not in ("ass", "srt")):
+        raise ValueError("output_format must be ass or srt")
+    output_format = output_format or project_format
     glossary = read_json(local_path(work, "glossary.json"))
     verify_glossary(glossary, project["series"])
     if project.get("font_policy") not in {"keep", "remove"}:
@@ -413,6 +420,12 @@ def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
             raise ValueError("Choose the ASS candidate as the base; content can come from other candidates")
         assigned.extend(sources)
         base = copy.deepcopy(docs[base_id])
+        if base.kind == "ass" and output_format == "srt":
+            raise ValueError("Cannot produce SRT from an ASS base without losing its presentation")
+        upgrade_srt = base.kind == "srt" and output_format == "ass"
+        if upgrade_srt:
+            base = ass_template()
+        episode_watermarks = []
         retained = {f"{key}:{cue.id}" for key in sources for cue in reviewed[key][0]}
         paired = []
         for key in sources:
@@ -423,10 +436,20 @@ def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
             original = {cue.id: [cue.start, cue.end] for cue in docs[key].cues}
             reviewed_times = {cue.id: [cue.start, cue.end] for cue in cues}
             changed_structures = {row["id"] for row in sheets[key] if row.get("structure_note", "").strip()}
-            if key != base_id:
+            if key != base_id and not upgrade_srt:
                 cues = merge_donor(base, docs[key], cues, key, project["font_policy"] == "keep")
+            directions = {row["id"]: row.get("direction", "auto") for row in sheets[key]} if upgrade_srt else {}
             for cue in cues:
                 cue.start, cue.end = effective_times(cue.start, cue.end, base.kind)
+                if upgrade_srt:
+                    if reason := watermark_reason(cue.text):
+                        episode_watermarks.append({"source": key, "cue": cue.id, "reason": reason})
+                        continue
+                    cue = srt_to_ass(cue)
+                    direction = directions[cue.id]
+                    if direction == "auto":
+                        direction = paragraph_direction(project["target_language"])
+                    cue.text = process_cue_text(cue.text, direction=direction)
                 emitted = [cue.start, cue.end]
                 paired.append((cue, {"source": key, "cue": cue.id,
                                      "structure_changed": cue.id in changed_structures,
@@ -446,22 +469,25 @@ def assemble(work: Path) -> tuple[dict, dict[str, bytes], dict]:
         report.append({"id": name, "file": f"Sub/{filename}", "sha256": digest(payload),
                        "cues": len(check.cues), "sources": sources, "comparison": episode["comparison"],
                        "provenance": provenance})
+        if episode_watermarks:
+            report[-1]["watermarks_removed"] = episode_watermarks
     if sorted(assigned) != sorted(docs):
         raise ValueError("Assign each source to exactly one episode")
     input_identity = digest(json.dumps([project, sheets, glossary], ensure_ascii=False,
                                        sort_keys=True, allow_nan=False).encode("utf-8"))
-    identity = digest(json.dumps([input_identity, GENERATION_RECIPE], sort_keys=True).encode("utf-8"))
+    identity = digest(json.dumps([input_identity, GENERATION_RECIPE, output_format], sort_keys=True).encode("utf-8"))
     manifest = {"version": 2, "identity": identity, "input_identity": input_identity,
                 "generation_recipe": dict(GENERATION_RECIPE), "series": project["series"],
                 "source_origins": {source["id"]: source.get("origin", {"legacy_name": source["name"],
                                    "status": "legacy origin unavailable"}) for source in project["sources"]},
                 "target_language": project["target_language"], "font_policy": project["font_policy"],
-                "episodes": report, "reviewed_cues": sum(len(doc.cues) for doc in docs.values())}
+                "output_format": output_format, "episodes": report,
+                "reviewed_cues": sum(len(doc.cues) for doc in docs.values())}
     return manifest, files, glossary
 
 
-def build(work: Path) -> dict:
-    manifest, files, glossary = assemble(work)
+def build(work: Path, *, output_format: str | None = None) -> dict:
+    manifest, files, glossary = assemble(work, output_format=output_format)
     destination = local_path(work, "builds/" + manifest["identity"])
     if destination.exists():
         old = read_json(local_path(destination, "manifest.json"))

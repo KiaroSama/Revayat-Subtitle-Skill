@@ -21,6 +21,7 @@ from install_recovery import restore, recover
 from runtime import write_json
 
 NAME = "revayat-subtitle"
+SYNC = SKILL.with_name("revayat-subtitle-sync")
 AGENTS = ("claude", "codex", "cursor", "kiro", "cline", "hermes", "opencode", "antigravity", "antigravity-cli")
 
 
@@ -52,18 +53,25 @@ VOICE_FILES = {
 
 def skill_files() -> list[Path]:
     files = [SKILL / "SKILL.md", SKILL / "LICENSE", SKILL / "requirements.txt", SKILL / "voice/SOURCES.md"]
+    files.extend(SKILL / relative for relative in (
+        "sync/SKILL.md", "assets/fonts/BKOODB.TTF", "assets/fonts/NOTICE.txt",
+    ))
     for folder, suffixes in {"scripts": {".py"}, "references": {".md"}, "agents": {".yaml"}}.items():
         files.extend(sorted(path for path in (SKILL / folder).iterdir() if path.suffix in suffixes))
     files.extend(SKILL / "voice" / name / path for name, paths in VOICE_FILES.items() for path in paths)
+    return distribution_files(files)
+
+
+def distribution_files(files: list[Path]) -> list[Path]:
     checked = set()
     for path in files:
         if not path.is_file():
-            raise ValueError("Skill distribution contains a missing file")
+            raise ValueError("Distribution contains a missing file")
         for entry in (path, *path.parents):
             if entry == REPO:
                 break
             if entry not in checked and linked(entry):
-                raise ValueError("Skill distribution contains a linked file or directory")
+                raise ValueError("Distribution contains a linked file or directory")
             checked.add(entry)
     return files
 
@@ -81,24 +89,28 @@ def payload(plugin: bool):
     pairs = [(path, path.relative_to(SKILL)) for path in skill_files()]
     if plugin:
         pairs = [(path, Path("skills") / NAME / relative) for path, relative in pairs]
-        for relative in ("plugin.json", "LICENSE", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
-                         ".claude-plugin/marketplace.json", ".cursor-plugin/plugin.json",
-                         "commands/translate-subtitles.md", "commands/revayat-subtitle-resume.md",
-                         "commands/revayat-subtitle-qa.md"):
-            source = REPO / relative
-            if not source.is_file() or linked(source):
-                raise ValueError("Plugin distribution contains a missing or linked file")
-            pairs.append((source, Path(relative)))
+        plugin_files = distribution_files([SYNC / "SKILL.md", *(REPO / relative for relative in (
+            "plugin.json", "LICENSE", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
+            ".claude-plugin/marketplace.json", ".cursor-plugin/plugin.json", ".cursor-plugin/marketplace.json",
+            ".agents/plugins/marketplace.json", ".antigravity-plugin/plugin.json", "commands/translate-subtitles.md",
+            "commands/revayat-subtitle-resume.md", "commands/revayat-subtitle-qa.md", "commands/revayat-subtitle-sync.md",
+        ))])
+        pairs.extend((source, source.relative_to(REPO)) for source in plugin_files)
     return pairs
 
 
-def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir: Path | None = None) -> dict:
+def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir: Path | None = None,
+                 include_sync: bool = False) -> dict:
     if type(plugin) is not bool or type(force) is not bool:
         raise ValueError("Installation flags must be booleans")
-    pairs = payload(plugin)
+    payloads = {NAME: payload(plugin)}
+    if include_sync:
+        payloads[SYNC.name] = [(path, path.relative_to(SYNC)) for path in distribution_files([SYNC / "SKILL.md"])]
+        targets = [path for target in targets for path in (target, target.with_name(SYNC.name))]
     planned, seen, ancestors = [], set(), {}
-    protected = [SKILL, REPO / "install", REPO / "commands", REPO / ".codex-plugin",
-                 REPO / ".claude-plugin", REPO / ".cursor-plugin"]
+    protected = [SKILL, SYNC, REPO / "install", REPO / "commands", REPO / ".codex-plugin",
+                 REPO / ".claude-plugin", REPO / ".cursor-plugin", REPO / ".antigravity-plugin",
+                 REPO / ".agents/plugins"]
     for original in targets:
         original = original.absolute()
         for path in (original, *original.parents):
@@ -122,14 +134,15 @@ def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir
         seen.add(key)
         if target.exists() and not force:
             raise ValueError("An installation already exists; use --force to retain a backup")
-        planned.append({"target": target, "previous": identity(target) if target.exists() else None})
+        planned.append({"target": target, "previous": identity(target) if target.exists() else None,
+                        "payload": SYNC.name if include_sync and target.name == SYNC.name else NAME})
     if not planned:
         raise ValueError("No installation targets selected")
     roots = []
     for item in planned:
         target = item["target"]
         if recovery_dir is None:
-            if target.name != NAME or target.parent.name != "skills":
+            if target.name not in payloads or target.parent.name != "skills":
                 raise ValueError("Custom installation needs explicit --recovery-dir outside skill/plugin discovery")
             root = target.parent.parent / "revayat-recovery"
         else:
@@ -151,7 +164,7 @@ def plan_install(targets: list[Path], *, plugin: bool, force: bool, recovery_dir
             ancestors.setdefault(parent, identity(parent) if os.path.lexists(parent) else None)
         roots.append(root)
     # All selected targets share one journal; the first standard agent root owns recovery.
-    return {"targets": planned, "files": pairs, "ancestors": ancestors, "recovery": roots[0]}
+    return {"targets": planned, "payloads": payloads, "ancestors": ancestors, "recovery": roots[0]}
 
 
 def check_parents(parent: Path, expected: dict):
@@ -178,15 +191,20 @@ def execute_plan(plan: dict) -> list[Path | None]:
         return _execute_owned(plan, owner)
 
 
-def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
-    state.refuse_pending(owner, [item["target"] for item in plan["targets"]])
+def distribution_manifest(files) -> dict:
     expected = {}
-    for source, relative in plan["files"]:
+    for source, relative in files:
         fingerprint = file_fingerprint(source, state.MAX_FILE)
         expected[relative.as_posix()] = [fingerprint["bytes"], fingerprint["sha256"]]
     directories = sorted({parent.as_posix() for name in expected for parent in Path(name).parents if parent != Path(".")})
-    new = {"files": expected, "directories": directories}
-    state.validate_manifest(new)
+    manifest = {"files": expected, "directories": directories}
+    state.validate_manifest(manifest)
+    return manifest
+
+
+def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
+    state.refuse_pending(owner, [item["target"] for item in plan["targets"]])
+    manifests = {name: distribution_manifest(files) for name, files in plan["payloads"].items()}
     ancestors, parents = dict(plan["ancestors"]), []
     old = []
     for item in plan["targets"]:
@@ -207,7 +225,7 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
     records = [{"target": str(item["target"]), "stage": str(transaction / f"new-{index:04}"),
                 "backup": str(transaction / f"old-{index:04}"), "disposal": str(transaction / f"dispose-{index:04}"),
                 "previous_id": state.identity(item["target"]) if item["previous"] is not None else None,
-                "stage_id": None, "old": old[index], "new": new, "phase": "staging"}
+                "stage_id": None, "old": old[index], "new": manifests[item["payload"]], "phase": "staging"}
                for index, item in enumerate(plan["targets"])]
     data = {"version": 1, "id": identifier, "owner": str(state.safe_path(Path.home())),
             "recovery": str(recovery), "state": "staging", "records": records,
@@ -217,7 +235,7 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
     write_json(journal, data)
     state.register(owner, journal)
     try:
-        for record in records:
+        for item, record in zip(plan["targets"], records):
             target, stage = Path(record["target"]), Path(record["stage"])
             make_parents(target.parent, parents, ancestors)
             for path in (target.parent, *target.parent.parents):
@@ -226,13 +244,13 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
             stage.mkdir()
             record["stage_id"] = state.identity(stage)
             state.save_journal(owner, journal, data)
-            for source, relative in plan["files"]:
+            for source, relative in plan["payloads"][item["payload"]]:
                 output = stage / relative
                 output.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, output)
                 with output.open("r+b") as handle:
                     os.fsync(handle.fileno())
-            if not state.matches(stage, record["stage_id"], new):
+            if not state.matches(stage, record["stage_id"], record["new"]):
                 raise ValueError("Installation source changed during staging")
             record["phase"] = "staged"
             state.save_journal(owner, journal, data)
@@ -255,7 +273,7 @@ def _execute_owned(plan: dict, owner: Path) -> list[Path | None]:
             state.save_journal(owner, journal, data)
             check_parents(target.parent, ancestors)
             state.move(stage, target, rename_noreplace)
-            if not state.matches(target, record["stage_id"], new):
+            if not state.matches(target, record["stage_id"], record["new"]):
                 raise ValueError("Published installation bytes changed")
             record["phase"] = "published"
             state.save_journal(owner, journal, data)
@@ -349,7 +367,8 @@ def _execute_cli(argv, owner) -> int:
                     targets.append(target)
         if not targets:
             raise ValueError("No installed agents found; select --agent or --destination explicitly")
-        plan = plan_install(targets, plugin=args.plugin, force=args.force, recovery_dir=args.recovery_dir)
+        plan = plan_install(targets, plugin=args.plugin, force=args.force, recovery_dir=args.recovery_dir,
+                            include_sync=args.destination is None)
         if args.dry_run:
             for item in plan["targets"]:
                 print(f"Would install: {item['target']}")

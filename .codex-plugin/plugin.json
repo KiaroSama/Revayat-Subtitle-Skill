@@ -1,12 +1,24 @@
 {
   "name": "revayat-subtitle",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "license": "GPL-3.0-or-later",
-  "description": "Translate and edit anime subtitles with cue review and FFmpeg visual checks. Persian is the default; the project bundles Persian, Russian and English voice guides.",
-  "author": {"name": "Kiaro Sama", "url": "https://github.com/KiaroSama"},
+  "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
+  "author": {
+    "name": "Kiaro Sama",
+    "email": "Kiaro.Sama.Dev@gmail.com"
+  },
   "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
   "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
-  "keywords": ["subtitles", "anime", "persian", "farsi", "rtl", "ass", "srt"],
+  "keywords": [
+    "subtitles",
+    "anime",
+    "persian",
+    "farsi",
+    "rtl",
+    "ass",
+    "srt",
+    "audio-sync"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Revayat Subtitle",
@@ -14,9 +26,17 @@
     "longDescription": "Review every cue, reconcile competing releases, preserve Japanese honorifics and names, inspect FFmpeg renders and deliver Sub.zip.",
     "developerName": "Kiaro Sama",
     "category": "Productivity",
-    "capabilities": ["Read", "Write", "Interactive"],
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
     "websiteURL": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
-    "defaultPrompt": ["Translate these subtitles into spoken Persian.", "Repair this Persian season and give me Sub.zip."],
+    "defaultPrompt": [
+      "Translate these subtitles into spoken Persian.",
+      "Repair this Persian season and give me Sub.zip.",
+      "Sync these subtitles to the video audio."
+    ],
     "brandColor": "#236A70"
   }
 }

@@ -261,7 +261,7 @@ class BoundaryTests(unittest.TestCase):
     def test_rebuild_uses_a_bounded_subtitle_reader(self):
         work = self.workspace()
         output = Path(workflow.build(work)["build"])
-        path = output / "Sub/S01E01.srt"
+        path = output / "Sub/S01E01.ass"
         path.write_bytes(path.read_bytes() + b"x" * 100)
         with self.assertRaisesRegex(ValueError, "byte limit") as caught:
             workflow.build(work)

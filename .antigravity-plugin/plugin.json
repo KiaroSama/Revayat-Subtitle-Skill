@@ -1,0 +1,37 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "revayat-subtitle",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
+  "author": {
+    "name": "Kiaro Sama",
+    "email": "Kiaro.Sama.Dev@gmail.com"
+  },
+  "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+  "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+  "displayName": "Revayat Subtitle",
+  "suggestedPrompts": [
+    "Translate these subtitles into spoken Persian.",
+    "Check these subtitles before delivery.",
+    "Sync these subtitles to the video audio."
+  ],
+  "category": [
+    "Productivity",
+    "Translation"
+  ],
+  "skills": [
+    "./skills/revayat-subtitle",
+    "./skills/revayat-subtitle-sync"
+  ],
+  "keywords": [
+    "subtitles",
+    "anime",
+    "persian",
+    "farsi",
+    "rtl",
+    "ass",
+    "srt",
+    "audio-sync"
+  ]
+}

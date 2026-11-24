@@ -1,13 +1,24 @@
 {
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
   "name": "revayat-subtitle-marketplace",
-  "owner": {"name": "Kiaro Sama"},
-  "description": "Revayat Subtitle and its bundled voice guides.",
+  "description": "Marketplace for Revayat Subtitle v2.0: Persian-default ASS subtitle translation, RTL/ZWNJ normalization, Translator Mode, and Rust audio-to-subtitle sync.",
+  "owner": {
+    "name": "Kiaro Sama",
+    "email": "Kiaro.Sama.Dev@gmail.com"
+  },
   "plugins": [
     {
       "name": "revayat-subtitle",
-      "description": "Translate and edit anime subtitles. Persian is the default.",
-      "source": "./",
-      "version": "1.4.0"
+      "version": "2.0.0",
+      "license": "GPL-3.0-or-later",
+      "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
+      "author": {
+        "name": "Kiaro Sama",
+        "email": "Kiaro.Sama.Dev@gmail.com"
+      },
+      "homepage": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+      "repository": "https://github.com/KiaroSama/Revayat-Subtitle-Skill",
+      "source": "./"
     }
   ]
 }

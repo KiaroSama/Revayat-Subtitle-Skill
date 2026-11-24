@@ -1,0 +1,14 @@
+Bundled Font Notice
+===================
+
+File: BKOODB.TTF
+Family: B Koodak
+Subfamily: Bold
+Full Name: B Koodak Bold
+PostScript Name: BKoodakBold
+Version: Version 2.01 - Build 1379
+Copyright: (c) 2000 Borna Rayaneh (B-Series Persian Fonts)
+
+Bundled inside Revayat Subtitle for consistent Persian ASS subtitle rendering
+with FFmpeg/libass and desktop video players. Latin glyphs fall back to the
+system sans-serif font automatically via Fontconfig/DirectWrite.

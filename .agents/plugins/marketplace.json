@@ -1,0 +1,20 @@
+{
+  "name": "revayat-subtitle-marketplace",
+  "interface": {
+    "displayName": "Revayat Subtitle"
+  },
+  "plugins": [
+    {
+      "name": "revayat-subtitle",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/KiaroSama/Revayat-Subtitle-Skill.git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "NONE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

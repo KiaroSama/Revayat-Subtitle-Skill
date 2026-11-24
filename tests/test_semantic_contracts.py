@@ -322,8 +322,8 @@ class ImmutableTests(SemanticWorkspace):
         output = self.root / "complete.zip"
         render.package(edition, output)
         with zipfile.ZipFile(output) as archive:
-            self.assertEqual(archive.namelist(), ["Sub/S01E01.srt"])
-            self.assertEqual(runtime.digest(archive.read("Sub/S01E01.srt")), result["episodes"][0]["sha256"])
+            self.assertEqual(archive.namelist(), ["Sub/S01E01.ass"])
+            self.assertEqual(runtime.digest(archive.read("Sub/S01E01.ass")), result["episodes"][0]["sha256"])
         manifest_path = edition / "manifest.json"
         original = manifest_path.read_bytes()
         manifest = runtime.read_json(manifest_path)
