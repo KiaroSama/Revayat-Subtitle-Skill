@@ -51,7 +51,7 @@ fn numeric_reference(digits: &str, radix: u32) -> Result<Option<char>, String> {
     })
 }
 
-fn named_reference(body: &str) -> Option<(&'static str, Option<char>)> {
+fn named_reference(body: &str) -> Option<&'static str> {
     // WHATWG legacy names recognized without a semicolon in an attribute.
     const LEGACY: &str = " AElig AMP Aacute Acirc Agrave Aring Atilde Auml COPY Ccedil ETH Eacute Ecirc Egrave Euml GT Iacute Icirc Igrave Iuml LT Ntilde Oacute Ocirc Ograve Oslash Otilde Ouml QUOT REG THORN Uacute Ucirc Ugrave Uuml Yacute aacute acirc acute aelig agrave amp aring atilde auml brvbar ccedil cedil cent copy curren deg divide eacute ecirc egrave eth euml frac12 frac14 frac34 gt iacute icirc iexcl igrave iquest iuml laquo lt macr micro middot nbsp not ntilde oacute ocirc ograve ordf ordm oslash otilde ouml para plusmn pound quot raquo reg sect shy sup1 sup2 sup3 szlig thorn times uacute ucirc ugrave uml uuml yacute yen yuml ";
     let name = if let Some(name) = body.strip_suffix(';') {
@@ -65,18 +65,7 @@ fn named_reference(body: &str) -> Option<(&'static str, Option<char>)> {
     let i = table
         .binary_search_by(|&(key, _)| key.cmp(name.as_bytes()))
         .ok()?;
-    // html-escape 0.2.15 stores only the first scalar of these WHATWG names.
-    let suffix = [
-        ("NotEqualTilde NotGreaterFullEqual NotGreaterGreater NotGreaterSlantEqual NotHumpDownHump NotHumpEqual NotLeftTriangleBar NotLessLess NotLessSlantEqual NotNestedGreaterGreater NotNestedLessLess NotPrecedesEqual NotRightTriangleBar NotSquareSubset NotSquareSuperset NotSucceedsEqual NotSucceedsTilde nGg nGtv nLl nLtv napE napid nbump nbumpe ncongdot nedot nesim ngE ngeqq ngeqslant nges nlE nleqq nleqslant nles notinE notindot npart npre npreceq nrarrc nrarrw nsce nsubE nsubseteqq nsucceq nsupE nsupseteqq", '\u{338}'),
-        ("NotSubset NotSuperset nGt nLt nang nsubset nsupset nvap nvge nvgt nvle nvlt nvltrie nvrtrie nvsim vnsub vnsup", '\u{20d2}'),
-        ("caps cups gesl gvertneqq gvnE lates lesg lvertneqq lvnE smtes sqcaps sqcups varsubsetneq varsubsetneqq varsupsetneq varsupsetneqq vsubnE vsubne vsupnE vsupne", '\u{fe00}'),
-        ("bne bnequiv nparsl", '\u{20e5}'),
-        ("ThickSpace", '\u{200a}'),
-        ("acE", '\u{333}'),
-        ("fjlig", 'j'),
-        ("race", '\u{331}'),
-    ].into_iter().find_map(|(names, scalar)| names.split_ascii_whitespace().any(|item| item == name).then_some(scalar));
-    Some((table[i].1, suffix))
+    Some(table[i].1)
 }
 
 fn attribute_value(value: &str) -> Result<String, String> {
@@ -99,9 +88,8 @@ fn attribute_value(value: &str) -> Result<String, String> {
             if body.ends_with('=') {
                 output.push('=');
             }
-        } else if let Some((decoded, suffix)) = named_reference(body) {
+        } else if let Some(decoded) = named_reference(body) {
             output.push_str(decoded);
-            output.extend(suffix);
         } else {
             output.push_str(reference.as_str());
         }

@@ -27,8 +27,8 @@ both `revayat-subtitle` and `revayat-subtitle-sync`:
 - **Agent Plugins 1.0.0:** root `plugin.json` (convention discovery under `skills/`).
 
 The installer supports a destination override for managed installations and future path
-changes. Python 3.11+ (verified on 3.13.15) is the supported Python floor, and Rust
-(verified on 1.99.1; 1.88+ for `rust/subsync-rs`, 1.97+ for PyO3 crates) builds the
+changes. The installer requires Python 3.11 or newer (verified on 3.13.15).
+Rust 1.100.0 builds the
 `rust/subsync-rs` audio-to-subtitle synchronization CLI and the optional PyO3
 accelerators (`rust/subcore-rs`, `rust/persian-lint-rs`, and `rust/markup-rs`). Older
 dated 3.10 verification records remain historical, not current support.

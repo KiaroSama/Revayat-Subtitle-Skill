@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import math
+import os
 import struct
 import wave
 from pathlib import Path
@@ -32,6 +33,19 @@ def load_bridge():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_locate_subsync_prefers_root_bin(bridge, tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "ROOT", tmp_path)
+    name = "subsync.exe" if os.name == "nt" else "subsync"
+    local = tmp_path / "bin" / name
+    target = tmp_path / "rust" / "subsync-rs" / "target"
+    for candidate in (local, target / "release" / name, target / "debug" / name):
+        candidate.parent.mkdir(parents=True)
+        candidate.touch()
+    monkeypatch.setattr(bridge.shutil, "which", lambda _: str(tmp_path / "path" / name))
+
+    assert bridge.locate_subsync() == local
 
 
 def make_wav(path):

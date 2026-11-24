@@ -8,14 +8,14 @@
 
 [![GitHub Actions CI workflow with manual dispatch](https://img.shields.io/badge/CI-GitHub%20Actions-16a34a)](.github/workflows/ci.yml)
 [![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
-[![Plugin version 2.0.0 across five manifest formats](https://img.shields.io/badge/plugin-v2.0.0-ea580c)](plugin.json)
+[![Release tag v2.0.0 across five plugin formats](https://img.shields.io/badge/release-v2.0.0-ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases/tag/v2.0.0)
 [![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
 [![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
-[![Rust 1.99.1 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.99.1-9a3412)](rust/subsync-rs/Cargo.toml)
+[![Rust 1.100.0 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.100.0-9a3412)](rust/subsync-rs/Cargo.toml)
 [![Runs on Windows, Linux, and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
 [![Install via five plugin formats or standalone scripts](https://img.shields.io/badge/install-5%20plugins%20%7C%20standalone-4f46e5)](#نصب)
 [![Documentation in English and Persian](https://img.shields.io/badge/docs-English%20%7C%20Persian-0284c7)](README.md)
-[![Published Git tree size measured via git ls-files is 1.69 MB](https://img.shields.io/badge/repo%20size-1.69%20MB-ca8a04)](#repository-size)
+[![Published Git tree size measured via git ls-files is 1.71 MB](https://img.shields.io/badge/repo%20size-1.71%20MB-ca8a04)](#repository-size)
 [![ASS default output with bundled B Koodak font and Translator Mode](https://img.shields.io/badge/output-ASS%20%7C%20B%20Koodak-15803d)](skills/revayat-subtitle/references/subtitle-formats.md)
 [![Rust FFT and ALASS audio-to-subtitle synchronization engine](https://img.shields.io/badge/audio%20sync-Rust%20FFT%20%7C%20ALASS-b45309)](skills/revayat-subtitle/references/audio-sync.md)
 [![FFmpeg and libass visual verification pipeline](https://img.shields.io/badge/renderer-FFmpeg%20%7C%20libass-334155)](skills/revayat-subtitle/references/persian-typography.md)
@@ -27,7 +27,7 @@
 
 <a id="repository-size"></a>
 
-‏⁧حجم درخت منتشرشده در Git (نسخهٔ `2.0.0`، اندازه‌گیری‌شده با `git ls-files`): ۱٬۶۹۲٬۶۲۴ بایت (۱٫۶۹ مگابایت) در ۲۱۴ فایل ردیابی‌شده، بدون تاریخچهٔ Git و فایل‌های ثبت‌نشده.⁩
+‏⁧حجم درخت منتشرشده در Git (نسخهٔ `2.0.0`، اندازه‌گیری‌شده با `git ls-files`): ۱٬۷۱۱٬۴۵۲ بایت (۱٫۷۱ مگابایت) در ۲۱۹ فایل ردیابی‌شده، بدون تاریخچهٔ Git و فایل‌های ثبت‌نشده.⁩
 
 ‏⁧اسکیلی برای Claude Code، Codex، Cursor، Antigravity، Kiro، Cline، Hermes، OpenCode و هر ایجنتی که `SKILL.md` را می‌خواند. این ابزار بخش‌هایی را حل می‌کند که در ترجمهٔ ماشینی خراب می‌شوند: ردیابی تمام خطوط در چند نسخه، یکدستی نام‌ها و پسوندهای ژاپنی بین فصل‌ها، حفظ افکت‌های ASS، خروجی پیش‌فرض ASS با فونت همراه `B Koodak`، مهار پرش علائم نگارشی در خطوط دوسطری فارسی، ساخت فایل حالت مترجم و همگام‌سازی مستقیم زمان‌بندی زیرنویس با صدای ویدئو به زبان Rust.⁩
 
@@ -52,7 +52,7 @@
 
 ## ‏⁧نصب⁩
 
-‏⁧به **`Python 3.11` یا جدیدتر** و FFmpeg با پشتیبانی libass نیاز است. اسکریپت‌های پایتون فقط از کتابخانهٔ استاندارد استفاده می‌کنند و فونت `B Koodak` Bold همراه مخزن در `skills/revayat-subtitle/assets/fonts/BKOODB.TTF` قرار دارد ([اطلاعیهٔ فونت](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). ابزار Rust (`1.88+` برای `subsync-rs` و `1.97+` برای crateهای PyO3) فقط هنگام ساخت محلی موتور همگام‌سازی یا افزونه‌های بومی لازم است.⁩
+‏⁧به **`Python 3.11` یا جدیدتر** و FFmpeg با پشتیبانی libass نیاز است. اسکریپت‌های پایتون فقط از کتابخانهٔ استاندارد استفاده می‌کنند و فونت `B Koodak` Bold همراه مخزن در `skills/revayat-subtitle/assets/fonts/BKOODB.TTF` قرار دارد ([اطلاعیهٔ فونت](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). فقط برای ساخت محلی موتور همگام‌سازی صدا یا افزونه‌های اختیاری PyO3 به Rust `1.100.0` نیاز دارید.⁩
 
 <div dir="ltr">
 

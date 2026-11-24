@@ -75,3 +75,5 @@ perf.data.old
 /rust/*/shadow/
 /rust/*/cases.jsonl
 /rust/*/extra-inputs.jsonl
+/bin/
+/.signing/

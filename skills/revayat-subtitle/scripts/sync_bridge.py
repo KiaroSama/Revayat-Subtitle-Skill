@@ -57,6 +57,9 @@ def locate_subsync(*, build_timeout: float = BUILD_TIMEOUT) -> Path:
     crate = ROOT / "rust" / "subsync-rs"
     target = crate / "target"
     name = "subsync.exe" if os.name == "nt" else "subsync"
+    binary = ROOT / "bin" / name
+    if binary.is_file():
+        return binary
     for profile in ("release", "debug"):
         binary = target / profile / name
         if binary.is_file():

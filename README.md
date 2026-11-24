@@ -6,14 +6,14 @@
 
 [![GitHub Actions CI workflow with manual dispatch](https://img.shields.io/badge/CI-GitHub%20Actions-16a34a)](.github/workflows/ci.yml)
 [![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
-[![Plugin version 2.0.0 across five manifest formats](https://img.shields.io/badge/plugin-v2.0.0-ea580c)](plugin.json)
+[![Release tag v2.0.0 across five plugin formats](https://img.shields.io/badge/release-v2.0.0-ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases/tag/v2.0.0)
 [![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
 [![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
-[![Rust 1.99.1 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.99.1-9a3412)](rust/subsync-rs/Cargo.toml)
+[![Rust 1.100.0 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.100.0-9a3412)](rust/subsync-rs/Cargo.toml)
 [![Runs on Windows, Linux, and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-0891b2)](docs/platforms.md)
 [![Install via five plugin formats or standalone scripts](https://img.shields.io/badge/install-5%20plugins%20%7C%20standalone-4f46e5)](#install)
 [![Documentation in English and Persian](https://img.shields.io/badge/docs-English%20%7C%20Persian-0284c7)](README.fa.md)
-[![Published Git tree size measured via git ls-files is 1.69 MB](https://img.shields.io/badge/repo%20size-1.69%20MB-ca8a04)](#repository-size)
+[![Published Git tree size measured via git ls-files is 1.71 MB](https://img.shields.io/badge/repo%20size-1.71%20MB-ca8a04)](#repository-size)
 [![ASS default output with bundled B Koodak font and Translator Mode](https://img.shields.io/badge/output-ASS%20%7C%20B%20Koodak-15803d)](skills/revayat-subtitle/references/subtitle-formats.md)
 [![Rust FFT and ALASS audio-to-subtitle synchronization engine](https://img.shields.io/badge/audio%20sync-Rust%20FFT%20%7C%20ALASS-b45309)](skills/revayat-subtitle/references/audio-sync.md)
 [![FFmpeg and libass visual verification pipeline](https://img.shields.io/badge/renderer-FFmpeg%20%7C%20libass-334155)](skills/revayat-subtitle/references/persian-typography.md)
@@ -25,7 +25,7 @@
 
 <a id="repository-size"></a>
 
-Published Git tree size measured from `git ls-files` (v2.0.0): 1,692,624 bytes (1.69 MB) across 214 tracked files, excluding Git history and untracked files.
+Published Git tree size measured from `git ls-files` (v2.0.0): 1,711,452 bytes (1.71 MB) across 219 tracked files, excluding Git history and untracked files.
 
 An agent skill for Claude Code, Codex, Cursor, Antigravity, Kiro, Cline, Hermes,
 OpenCode, and any coding agent that reads a `SKILL.md`. It handles subtitle work
@@ -59,9 +59,9 @@ synchronizing subtitle timing directly to video audio in Rust.
 Requires **Python 3.11 or newer** and FFmpeg built with libass. Python runtime
 scripts use only the standard library; the bundled `B Koodak` Bold font lives at
 `skills/revayat-subtitle/assets/fonts/BKOODB.TTF` (see its
-[font notice](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). Rust (`1.88+`
-for `subsync-rs`, `1.97+` for optional PyO3 crates) is only needed when building
-the native audio-sync binary or acceleration extensions locally.
+[font notice](skills/revayat-subtitle/assets/fonts/NOTICE.txt)). Rust `1.100.0`
+is only needed to build the native audio-sync binary or optional PyO3 extensions
+locally.
 
 ```bash
 git clone https://github.com/KiaroSama/Revayat-Subtitle-Skill.git
