@@ -199,9 +199,9 @@ jobs:
           cargo fmt --check
           cargo clippy --lib -- -D warnings
           cargo build --release
-          cp "target/release/lib${CRATE_MOD}.so" "${CRATE_MOD}.so"
-          python -c "import os, importlib; m = importlib.import_module(os.environ['CRATE_MOD']); print('Loaded:', m.__name__)"
-          rm -f "${CRATE_MOD}.so"
+          cp "target/release/lib${CRATE_MOD}.so" "python/${CRATE_MOD}/_native.so"
+          PYTHONPATH=python python -c "import os, importlib; m = importlib.import_module(os.environ['CRATE_MOD']); print('Loaded:', m.__name__)"
+          rm -f "python/${CRATE_MOD}/_native.so"
   repo-hygiene:
     name: Repo hygiene and code metrics
     runs-on: ubuntu-latest
