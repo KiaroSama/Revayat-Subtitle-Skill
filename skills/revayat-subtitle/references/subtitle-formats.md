@@ -90,8 +90,9 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation recipe 11 adds overlap-safe ASS ordering; text normalization
-remains 10 and render sampler 12 requires fresh evidence for the new edition.
+state. Generation recipe 13 and normalization 12 include format-aware conversion,
+conservative watermark detection and final emitted-link checks. The renderer
+requires fresh evidence for the new edition.
 Original sources, decisions and old editions stay intact; approvals do not transfer.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
 Removing a hidden comment between vector objects retains an empty `{}` boundary;
@@ -193,9 +194,24 @@ and shadow (`Outline=1.5`, `Shadow=0.8`), preserving italics, bold, underline,
 strikeout, alignment, color and positioning overrides. Pass `--output-format srt`
 only when SRT is explicitly required.
 
-Fansub and release watermarks (site ads, translator credit lines, URLs and Telegram
-handles) are stripped deterministically while leaving real dialogue untouched.
-Translator Mode (`translator-ass` / `--translator-mode`) builds a chronological
-ASS file with primary cues plus empty placeholder `Dialogue:` slots for every
-non-overlapping timing span present in donor releases, with optional `Comment:`
-reference lines for translators.
+Native ASS prose is never passed through the SRT markup decoder: literal `<i>`,
+`<br>` and `<font>` examples stay visible, and count toward wrapping and bidi
+anchoring. SRT markup is converted once at the format boundary.
+
+Fansub and release watermarks are removed only when the whole cue matches
+standalone advertising or credit forms. Credit labels require a short attribution
+(up to three name components) or one URL; longer or clause-like tails remain for
+editorial review. A URL, site name or Telegram address
+inside a sentence is not sufficient; mixed dialogue/advertising cues remain for
+editorial review. `--keep-watermarks` disables automatic removal for conversion.
+This detector is a conservative mechanical aid, not a semantic review certificate.
+Workspace review links must still resolve to emitted cues after normalization;
+linking to an automatically removed credit refuses the build until the coordinator
+repairs the editorial decision. A cue cannot link to itself.
+
+Translator Mode (`translator-ass` / `--translator-mode`) adds empty placeholder
+`Dialogue:` slots for uncovered donor spans, with optional `Comment:` source
+reference lines. A chronological index supports donor matching; final ASS rows
+retain original primary read order inside overlap components so layered effects
+and collision placement survive. Independent components and non-overlapping
+slots remain chronological.

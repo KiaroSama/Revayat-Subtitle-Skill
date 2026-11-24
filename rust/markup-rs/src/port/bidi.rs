@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use unicode_bidi::{BidiClass, bidi_class};
 
@@ -15,7 +16,13 @@ const LRE: char = '\u{202a}';
 const PDF: char = '\u{202c}';
 pub(super) const CONTROLS: &str = "\u{061c}\u{200e}\u{200f}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069}";
 
-fn strong(c: char) -> Option<BidiClass> {
+fn strong(c: char, runtime_classes: Option<&HashMap<char, BidiClass>>) -> Option<BidiClass> {
+    if CONTROLS.contains(c) {
+        return None;
+    }
+    if let Some(classes) = runtime_classes {
+        return classes.get(&c).copied();
+    }
     // Unicode supplies default bidi classes for unassigned codepoints; Python returns no class.
     let assigned = pattern!(Regex, r"\A[\p{Age=15.1}&&\P{Cn}]\z");
     (!CONTROLS.contains(c) && (c.is_ascii() || assigned.is_match(c.encode_utf8(&mut [0; 4])))).then(
@@ -29,19 +36,37 @@ fn strong(c: char) -> Option<BidiClass> {
 }
 
 pub(super) fn has_rtl(text: &str) -> bool {
+    has_rtl_with_classes(text, None)
+}
+
+pub(super) fn has_rtl_with_classes(
+    text: &str,
+    runtime_classes: Option<&HashMap<char, BidiClass>>,
+) -> bool {
     text.chars().any(|c| {
         matches!(c, '\u{0620}'..='\u{063f}' | '\u{0641}'..='\u{064a}' | '\u{0660}'..='\u{0669}'
             | '\u{066e}'..='\u{06d3}' | '\u{06f0}'..='\u{06fc}')
             || matches!(
-                strong(c),
+                strong(c, runtime_classes),
                 Some(BidiClass::R | BidiClass::AL | BidiClass::AN)
             )
     })
 }
 
 pub(super) fn has_ltr(text: &str) -> bool {
-    text.chars()
-        .any(|c| matches!(strong(c), Some(BidiClass::L | BidiClass::EN)))
+    has_ltr_with_classes(text, None)
+}
+
+pub(super) fn has_ltr_with_classes(
+    text: &str,
+    runtime_classes: Option<&HashMap<char, BidiClass>>,
+) -> bool {
+    text.chars().any(|c| {
+        matches!(
+            strong(c, runtime_classes),
+            Some(BidiClass::L | BidiClass::EN)
+        )
+    })
 }
 
 pub(super) fn validate(text: &str, kind: &str) -> Result<(), String> {
@@ -95,7 +120,16 @@ fn text_runs<'a>(text: &'a str, kind: &str) -> Result<Vec<Token<'a>>, String> {
     Ok(runs)
 }
 
-fn flush(line: &mut Vec<Token<'_>>, output: &mut String, kind: &str, rtl: bool, force: bool) {
+fn flush(
+    line: &mut Vec<Token<'_>>,
+    output: &mut String,
+    kind: &str,
+    rtl: bool,
+    force: bool,
+    runtime_classes: Option<&HashMap<char, BidiClass>>,
+) {
+    let has_rtl = |text: &str| has_rtl_with_classes(text, runtime_classes);
+    let has_ltr = |text: &str| has_ltr_with_classes(text, runtime_classes);
     let indices = line
         .iter()
         .enumerate()
@@ -158,6 +192,7 @@ pub(super) fn normalize(
     kind: &str,
     direction: &str,
     force: bool,
+    runtime_classes: Option<&HashMap<char, BidiClass>>,
 ) -> Result<String, String> {
     if !matches!(direction, "rtl" | "ltr") {
         return Err("ValueError: Paragraph direction must be ltr or rtl".into());
@@ -178,7 +213,14 @@ pub(super) fn normalize(
         }
         let mut add = |part| {
             if matches!(part, "\n" | r"\N" | r"\n") {
-                flush(&mut line, &mut output, kind, direction == "rtl", force);
+                flush(
+                    &mut line,
+                    &mut output,
+                    kind,
+                    direction == "rtl",
+                    force,
+                    runtime_classes,
+                );
                 output.push_str(part);
             } else {
                 line.push((Text, Cow::Borrowed(part)));
@@ -192,7 +234,14 @@ pub(super) fn normalize(
         }
         add(&value[cursor..]);
     }
-    flush(&mut line, &mut output, kind, direction == "rtl", force);
+    flush(
+        &mut line,
+        &mut output,
+        kind,
+        direction == "rtl",
+        force,
+        runtime_classes,
+    );
     validate(&output, kind)?;
     Ok(output)
 }

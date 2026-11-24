@@ -1,10 +1,9 @@
+use std::collections::HashSet;
 use unicode_bidi::{BidiClass, bidi_class};
 
 use super::drawing::drawing_mode;
-use super::{
-    ASS, BIDI, FancyRegex, PDF, RLE, RLM, Regex, WORD, ZWNJ, alignment, py_space, regex_error,
-    segments, srt_break, srt_tag_fits, tags,
-};
+use super::tokens;
+use super::{BIDI, PDF, RLE, RLM, Regex, WORD, ZWNJ, py_space, srt_break, srt_tag_fits};
 
 type Token<'a> = (&'a str, bool);
 type Line<'a> = Vec<Token<'a>>;
@@ -19,8 +18,7 @@ fn lines<'a>(text: &'a str, kind: &str) -> Result<(Vec<Line<'a>>, Vec<&'a str>),
     } else {
         pattern!(Regex, r"\r\n|\n|\r")
     };
-    for segment in segments(text, tags()) {
-        let (prose, tag) = segment?;
+    for (prose, tag) in tokens::segments(text, kind)? {
         let mut start = 0;
         for m in newlines.find_iter(prose) {
             if m.start() > start {
@@ -43,10 +41,7 @@ fn lines<'a>(text: &'a str, kind: &str) -> Result<(Vec<Line<'a>>, Vec<&'a str>),
             breaks.push(tag);
             lines.push(std::mem::take(&mut line));
         } else {
-            line.push((
-                tag,
-                kind == "srt" && tag.starts_with('{') && !alignment().is_match(tag),
-            ));
+            line.push((tag, false));
         }
     }
     lines.push(line);
@@ -174,11 +169,12 @@ pub(super) fn wrap(text: String, width: i64, limit: i64, kind: &str) -> Result<S
     let width = usize::try_from(width).unwrap_or(usize::MAX);
     let limit = usize::try_from(limit).unwrap_or(usize::MAX);
     if kind == "ass" {
-        for block in pattern!(FancyRegex, ASS).find_iter(&text) {
-            let block = block.map_err(regex_error)?;
-            if drawing_mode(block.as_str(), false)? {
+        let mut drawing = false;
+        for (prose, tag) in tokens::segments(&text, kind)? {
+            if drawing && !prose.is_empty() {
                 return Ok(text);
             }
+            drawing = drawing_mode(tag, drawing)?;
         }
     }
     let (lines, breaks) = lines(&text, kind)?;
@@ -241,66 +237,29 @@ fn balanced(text: &str, kind: &str) -> bool {
         }
         true
     };
-    let mut cursor = 0;
-    if kind == "ass" {
-        let mut search = 0;
-        let mut drawing = false;
-        while let Some(start) = text[search..].find('{').map(|i| search + i) {
-            search = start + 1;
-            if !drawing && start > 0 && text.as_bytes()[start - 1] == b'\\' {
-                continue;
-            }
-            let Some(end) = text[search..].find('}').map(|i| search + i + 1) else {
-                break;
-            };
-            let Ok(next) = drawing_mode(&text[start..end], drawing) else {
+    let Ok(tokens) = tokens::segments(text, kind) else {
+        return false;
+    };
+    let mut drawing = false;
+    for (prose, tag) in tokens {
+        if !drawing && !feed(prose) {
+            return false;
+        }
+        if kind == "ass" {
+            let Ok(next) = drawing_mode(tag, drawing) else {
                 return false;
             };
-            if !drawing && !feed(&text[cursor..start]) {
-                return false;
-            }
             drawing = next;
-            cursor = end;
-            search = end;
-        }
-        if !drawing && !feed(&text[cursor..]) {
-            return false;
-        }
-    } else {
-        let blocks = pattern!(
-            Regex,
-            r"</?(?i-u:br)/?(?: [^<>]*)?>|<!--|</?(?i-u:i|b|u|s|font)(?: [^<>]*)?>|\{\\(?i-u:an)[1-9]\}"
-        );
-        let mut search = 0;
-        let mut no_comment_end = false;
-        while search < text.len() {
-            let Some(m) = blocks.find_at(text, search) else {
-                break;
-            };
-            search = m.end();
-            if m.as_str() == "<!--" {
-                if !no_comment_end && let Some(end) = text[search..].find("-->") {
-                    search += end + 3;
-                } else {
-                    no_comment_end = true;
-                    continue;
-                }
-            } else if !srt_tag_fits(m.as_str()) {
-                continue;
-            }
-            if !feed(&text[cursor..m.start()]) {
-                return false;
-            }
-            cursor = search;
-        }
-        if !feed(&text[cursor..]) {
-            return false;
         }
     }
     stack.is_empty()
 }
 
-pub(super) fn anchor(text: String, kind: &str) -> Result<String, String> {
+pub(super) fn anchor(
+    text: String,
+    kind: &str,
+    runtime_rtl_letters: Option<&HashSet<char>>,
+) -> Result<String, String> {
     let (lines, breaks) = lines(&text, kind)?;
     let whole_balanced = balanced(&text, kind);
     let alpha = pattern!(Regex, r"\A\p{L}\z");
@@ -308,6 +267,9 @@ pub(super) fn anchor(text: String, kind: &str) -> Result<String, String> {
     for (i, line) in lines.iter().enumerate() {
         let mut raw = original(line);
         let has_rtl = visible(line, kind).chars().any(|c| {
+            if let Some(letters) = runtime_rtl_letters {
+                return letters.contains(&c);
+            }
             matches!(bidi_class(c), BidiClass::R | BidiClass::AL)
                 && alpha.is_match(c.encode_utf8(&mut [0; 4]))
         });

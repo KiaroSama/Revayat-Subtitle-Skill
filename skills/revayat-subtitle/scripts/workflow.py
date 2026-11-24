@@ -27,7 +27,7 @@ from publication import publish_bytes, rename_noreplace
 from subtitle_formats import (Cue, DEFAULT_STYLE, STYLE_FIELDS, has_drawing, parse,
                               rtl, serialize, srt_to_ass, structure, uncomment, visible, effective_times,
                               ass_key, ass_line_start, ass_style_name, ass_template, presentation_order)
-from text_pipeline import process_cue_text, watermark_reason
+from text_pipeline import process_ass_text, watermark_reason
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_TOTAL = 256 * 1024 * 1024
@@ -37,7 +37,7 @@ MAX_WORKSPACE = 512 * 1024 * 1024
 EPISODE = re.compile(r"S([0-9]{2})(E|OVA)([0-9]{2}|[1-9][0-9]{2})")
 SOURCE = re.compile(r"s[0-9]{4}")
 PROJECT_SCHEMA = 2
-GENERATION_RECIPE = {"version": 12, "normalization": 11, "timing": "floor-centisecond"}
+GENERATION_RECIPE = {"version": 13, "normalization": 12, "timing": "floor-centisecond"}
 
 
 def input_candidates(path: Path, *, excluded_root: Path | None = None):
@@ -431,6 +431,8 @@ def assemble(work: Path, *, output_format: str | None = None) -> tuple[dict, dic
         for key in sources:
             cues, decisions = copy.deepcopy(reviewed[key])
             for decision in decisions:
+                if f"{key}:{decision['id']}" in decision["links"]:
+                    raise ValueError("A review link cannot target itself")
                 if any(link not in retained for link in decision["links"]):
                     raise ValueError("Review links must identify retained cues in this episode")
             original = {cue.id: [cue.start, cue.end] for cue in docs[key].cues}
@@ -449,13 +451,18 @@ def assemble(work: Path, *, output_format: str | None = None) -> tuple[dict, dic
                     direction = directions[cue.id]
                     if direction == "auto":
                         direction = paragraph_direction(project["target_language"])
-                    cue.text = process_cue_text(cue.text, direction=direction)
+                    cue.text = process_ass_text(cue.text, direction=direction)
                 emitted = [cue.start, cue.end]
                 paired.append((cue, {"source": key, "cue": cue.id,
                                      "structure_changed": cue.id in changed_structures,
                                      "timing": {"original": original[cue.id],
                                                 "reviewed": reviewed_times[cue.id], "emitted": emitted,
                                                 "conversion": "floor-centisecond" if emitted != reviewed_times[cue.id] else None}}))
+        emitted_keys = {f"{record['source']}:{record['cue']}" for _, record in paired}
+        for key in sources:
+            for decision in reviewed[key][1]:
+                if any(link not in emitted_keys for link in decision["links"]):
+                    raise ValueError("Review links must identify emitted cues; a linked target was removed during normalization")
         order = presentation_order([item[0] for item in paired], base.kind)
         paired = [paired[index] for index in order]
         merged = [cue for cue, _ in paired]

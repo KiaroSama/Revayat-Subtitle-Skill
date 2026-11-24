@@ -135,7 +135,8 @@ def execute(argv=None) -> int:
             from handoff import handoff
             result = handoff(args.work.resolve(), args.assignment, args.result)
         else:
-            result = render_module.package(args.build.resolve(), args.out.resolve())
+            # Preserve an occupied leaf name for the exclusive publication check.
+            result = render_module.package(args.build.resolve(), args.out.absolute())
         code = 1 if result.get("ready") is False else 0
         print(json.dumps(result, ensure_ascii=False, indent=2))
         logging.log(logging.INFO if code == 0 else logging.ERROR, "Command completed exit=%d", code)

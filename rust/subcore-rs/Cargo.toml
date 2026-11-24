@@ -9,8 +9,12 @@ description = "Rust port of `skills/revayat-subtitle/scripts/text_pipeline.py`, 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
+
 [dependencies]
-pyo3 = { version = "0.30", features = ["extension-module", "abi3-py39"] }
+pyo3 = { version = "0.30", features = ["abi3-py39"] }
 caseless = "0.2.2"
 fancy-regex = "0.20.2"
 regex = "1"

@@ -152,7 +152,7 @@ build under its original workspace: render/package recheck that workspace. A cha
 edit creates a new build; use that new path, not the old one. Repeated identical
 builds are read back and checked, so accidental output edits are refused.
 
-Generation recipe 11 is part of the edition identity, separate from reviewed-input
+Generation recipe 13 is part of the edition identity, separate from reviewed-input
 identity. Schema-1 workspaces remain readable; rebuild and rerender legacy editions
 with the current recipe. Old editions/decisions stay intact; image approvals are
 not copied to changed output. Provenance retains input-root/member origins without

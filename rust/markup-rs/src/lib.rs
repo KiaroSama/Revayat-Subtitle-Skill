@@ -1,9 +1,12 @@
-//! Python bindings for `skills/revayat-subtitle/scripts/markup.py`: generated from the signatures in `port.rs` by rust-anything.
-//! Regenerate with `rust-anything refresh` after changing them.
+//! Python bindings for `skills/revayat-subtitle/scripts/markup.py`.
+//! The initial rust-anything scaffold now includes maintained runtime-compatibility adapters.
+//! Regeneration must preserve these adapters and pass the compiled cross-version parity suite.
 
 #![allow(clippy::too_many_arguments)]
 
 use pyo3::prelude::*;
+use std::collections::{HashMap, HashSet};
+use unicode_bidi::BidiClass;
 
 pub mod js;
 pub mod port;
@@ -77,40 +80,68 @@ fn srt_tag_fits(tag: String) -> PyResult<bool> {
     srt_tag_fits_inner(tag).map_err(error)
 }
 
-fn has_rtl_inner(text: String) -> Result<bool, String> {
-    let out = port::has_rtl(text)?;
-    Ok(out)
+fn runtime_bidi_classes(py: Python<'_>, text: &str) -> PyResult<HashMap<char, BidiClass>> {
+    // Python's supported versions ship different Unicode databases. Read each
+    // distinct non-ASCII character once, then keep tokenization and rewriting in
+    // Rust. This avoids hard-coded Unicode-version assumptions in the binding.
+    let classify = py.import("unicodedata")?.getattr("bidirectional")?;
+    let mut classes = HashMap::new();
+    for c in text.chars().collect::<HashSet<_>>() {
+        let class = if c.is_ascii_alphabetic() {
+            Some(BidiClass::L)
+        } else if c.is_ascii_digit() {
+            Some(BidiClass::EN)
+        } else if c.is_ascii() {
+            None
+        } else {
+            match classify
+                .call1((c.to_string(),))?
+                .extract::<String>()?
+                .as_str()
+            {
+                "L" => Some(BidiClass::L),
+                "R" => Some(BidiClass::R),
+                "AL" => Some(BidiClass::AL),
+                "AN" => Some(BidiClass::AN),
+                "EN" => Some(BidiClass::EN),
+                _ => None,
+            }
+        };
+        if let Some(class) = class {
+            classes.insert(c, class);
+        }
+    }
+    Ok(classes)
 }
 
 /// `has_rtl`.
 #[pyfunction]
 #[pyo3(name = "has_rtl", signature = (text))]
-fn has_rtl(text: String) -> PyResult<bool> {
-    has_rtl_inner(text).map_err(error)
-}
-
-fn has_ltr_inner(text: String) -> Result<bool, String> {
-    let out = port::has_ltr(text)?;
-    Ok(out)
+fn has_rtl(py: Python<'_>, text: String) -> PyResult<bool> {
+    Ok(port::has_rtl_with_classes(
+        &text,
+        &runtime_bidi_classes(py, &text)?,
+    ))
 }
 
 /// `has_ltr`.
 #[pyfunction]
 #[pyo3(name = "has_ltr", signature = (text))]
-fn has_ltr(text: String) -> PyResult<bool> {
-    has_ltr_inner(text).map_err(error)
-}
-
-fn srt_font_names_inner(tag: String) -> Result<serde_json::Value, String> {
-    let out = port::srt_font_names(tag)?;
-    Ok(out)
+fn has_ltr(py: Python<'_>, text: String) -> PyResult<bool> {
+    Ok(port::has_ltr_with_classes(
+        &text,
+        &runtime_bidi_classes(py, &text)?,
+    ))
 }
 
 /// `srt_font_names`.
 #[pyfunction]
 #[pyo3(name = "srt_font_names", signature = (tag))]
 fn srt_font_names(py: Python<'_>, tag: String) -> PyResult<Py<PyAny>> {
-    srt_font_names_inner(tag)
+    // HTMLParser's attribute decoding changed within supported Python releases.
+    // Detect that contract instead of assuming a particular patch-version floor.
+    let legacy_attributes = !py.import("html.parser")?.hasattr("_unescape_attrvalue")?;
+    port::srt_font_names_with_legacy_attributes(tag, legacy_attributes)
         .map_err(error)
         .and_then(|v| crate::pyconv::ToPy::to_py(&v, py))
 }
@@ -164,16 +195,18 @@ fn validate_bidi(text: String, kind: String) -> PyResult<()> {
     validate_bidi_inner(text, kind).map_err(error)
 }
 
-fn rtl_inner(text: String, kind: String, direction: String, force: bool) -> Result<String, String> {
-    let out = port::rtl(text, kind, direction, force)?;
-    Ok(out)
-}
-
 /// `rtl`.
 #[pyfunction]
 #[pyo3(name = "rtl", signature = (text, kind, direction=String::from("rtl"), *, force=false))]
-fn rtl(text: String, kind: String, direction: String, force: bool) -> PyResult<String> {
-    rtl_inner(text, kind, direction, force).map_err(error)
+fn rtl(
+    py: Python<'_>,
+    text: String,
+    kind: String,
+    direction: String,
+    force: bool,
+) -> PyResult<String> {
+    let classes = runtime_bidi_classes(py, &text)?;
+    port::rtl_with_classes(&text, &kind, &direction, force, &classes).map_err(error)
 }
 
 fn clean_empty_lines_inner(text: String, kind: String, preserve: bool) -> Result<String, String> {

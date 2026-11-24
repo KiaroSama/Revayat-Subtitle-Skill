@@ -4,9 +4,9 @@
 
 **Translate, edit, and audio-sync subtitles into reviewed ASS (default) or SRT deliverables in `Sub.zip`. Persian is the default output language.**
 
-[![GitHub Actions CI workflow with manual dispatch](https://img.shields.io/badge/CI-GitHub%20Actions-16a34a)](.github/workflows/ci.yml)
+[![GitHub Actions CI](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
 [![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
-[![Release tag v2.0.0 across five plugin formats](https://img.shields.io/badge/release-v2.0.0-ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases/tag/v2.0.0)
+[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=date&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
 [![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
 [![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
 [![Rust 1.100.0 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.100.0-9a3412)](rust/subsync-rs/Cargo.toml)
@@ -266,14 +266,29 @@ python -X utf8 tests/check.py --render
 cargo test --manifest-path rust/subsync-rs/Cargo.toml
 ```
 
-GitHub Actions CI (`.github/workflows/ci.yml`) runs on manual `workflow_dispatch`
-across 16 jobs covering `actionlint`/`zizmor`, Python 3.11 and 3.14 on Linux,
-Windows, and macOS, full pytest suites, five-format plugin validation, v2 ASS/RTL
-pipeline tests, Rust `subsync-rs` (Linux and Windows), all three PyO3 Rust crates
-(`subcore-rs`, `persian-lint-rs`, `markup-rs`), and repository hygiene metrics.
+GitHub Actions CI (`.github/workflows/ci.yml`) runs on every push to `main`, pull
+request update, merge queue request, and manual dispatch. It covers
+`actionlint`/`zizmor`, Python 3.11 and 3.14, full pytest suites, five-format plugin
+validation, the ASS/RTL pipeline, and repository hygiene. Rust `subsync-rs` and
+all three PyO3 extensions run on Linux, Windows, and macOS. Native jobs execute
+the actual Python contracts and compare all extension APIs with their Python
+references; a missing native module fails that lane. Cargo uses the checked-in
+toolchain and lockfiles. The `CI required` check fails if any validation lane
+fails or is skipped. Signed releases depend on this same validation workflow.
 CodeQL and Gitleaks workflows scan code and Git history separately.
 
 Execution logs record progress and errors under `logs/` without subtitle bodies.
+
+## Releases and tags
+
+[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=date&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
+
+The badge reads the latest tag from GitHub, including prerelease tags; it is not
+a hard-coded version. Badge caches can take a short time to refresh. See
+[all tags](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags),
+[published releases](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases),
+and [signature verification](docs/signing/README.md). Plugin manifest versions
+are release metadata and must still be updated together when publishing a release.
 
 ## Donate
 

@@ -42,7 +42,7 @@ impl SubtitleDocument {
     pub fn parse(text: &str, path: Option<&Path>) -> Result<Self, SyncError> {
         let text = text.trim_start_matches('\u{feff}');
         let format = path.and_then(SubtitleFormat::from_path).unwrap_or_else(|| {
-            if text.lines().any(|line| {
+            if source_lines(text).any(|(_, _, line)| {
                 let line = line.trim();
                 line.eq_ignore_ascii_case("[Script Info]") || line.eq_ignore_ascii_case("[Events]")
             }) {
@@ -144,7 +144,10 @@ impl SubtitleDocument {
                 .peek()
                 .is_some_and(|(_, _, value)| !value.trim().is_empty())
             {
-                lines.next();
+                let (line, _, value) = lines.next().expect("peeked SRT content line");
+                if is_srt_timing(value) {
+                    return Err(invalid_line(line, "missing SRT cue separator"));
+                }
             }
         }
         Ok(())
@@ -217,13 +220,36 @@ impl SubtitleDocument {
 }
 
 fn source_lines(text: &str) -> impl Iterator<Item = (usize, usize, &str)> {
-    text.split_inclusive('\n')
-        .enumerate()
-        .scan(0, |base, (i, raw)| {
-            let offset = *base;
-            *base += raw.len();
-            Some((i + 1, offset, raw.trim_end_matches(['\r', '\n'])))
-        })
+    let mut offset = 0;
+    let mut line = 0;
+    std::iter::from_fn(move || {
+        if offset == text.len() {
+            return None;
+        }
+        let rest = &text[offset..];
+        let length = rest.find(['\r', '\n']).unwrap_or(rest.len());
+        let base = offset;
+        offset += length;
+        // Count CRLF as one boundary and retain byte ranges for lossless replacement.
+        if text[offset..].starts_with("\r\n") {
+            offset += 2;
+        } else if offset < text.len() {
+            offset += 1;
+        }
+        line += 1;
+        Some((line, base, &text[base..base + length]))
+    })
+}
+
+fn is_srt_timing(value: &str) -> bool {
+    let Some((start, end)) = value.split_once("-->") else {
+        return false;
+    };
+    parse_time(start.trim(), SubtitleFormat::Srt).is_some()
+        && end
+            .split_whitespace()
+            .next()
+            .is_some_and(|end| parse_time(end, SubtitleFormat::Srt).is_some())
 }
 
 fn trimmed_range(base: usize, value: &str) -> Range<usize> {
@@ -279,6 +305,41 @@ mod tests {
         let body = "7\r\n  01:00:00,024 --> 01:00:00,907 X1:33\n{\\an8}<b>x</b>\r\n<i>y</i>";
         let doc = SubtitleDocument::parse(body, None).unwrap();
         assert_eq!(doc.serialize().unwrap(), body);
+    }
+
+    #[test]
+    fn preserves_cr_only_and_mixed_newlines_without_skipping_cues() {
+        for newline in ["\r", "\r\n", "\n"] {
+            let body = [
+                "1",
+                "00:00:01,000 --> 00:00:02,000",
+                "First",
+                "",
+                "2",
+                "00:00:03,000 --> 00:00:04,000",
+                "Second",
+                "",
+            ]
+            .join(newline);
+            let doc = SubtitleDocument::parse(&body, None).unwrap();
+            assert_eq!(doc.cues.len(), 2, "newline {newline:?}");
+            assert_eq!(doc.serialize().unwrap(), body);
+        }
+        let body = "[Events]\rFormat: Start, End, Text\rDialogue: 0:00:01.00,0:00:02.00,First\nDialogue: 0:00:03.00,0:00:04.00,Second\r\n";
+        let doc = SubtitleDocument::parse(body, None).unwrap();
+        assert_eq!(doc.cues.len(), 2);
+        assert_eq!(doc.serialize().unwrap(), body);
+    }
+
+    #[test]
+    fn refuses_missing_srt_separator_instead_of_partially_retiming_a_document() {
+        for body in [
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n2\n00:00:03,000 --> 00:00:04,000\nSecond\n",
+            "00:00:01,000 --> 00:00:02,000\nFirst\n00:00:03,000 --> 00:00:04,000\nSecond\n",
+        ] {
+            let error = SubtitleDocument::parse(body, None).unwrap_err();
+            assert!(error.to_string().contains("separator"), "{error}");
+        }
     }
 
     #[test]

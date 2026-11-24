@@ -15,6 +15,7 @@ import json
 MAX_ENTRIES = 10000
 MAX_BYTES = 256 * 1024 * 1024
 MAX_FILE = 16 * 1024 * 1024
+MAX_REGISTRY = 1000
 
 
 def identity(path: Path):
@@ -158,7 +159,9 @@ def registry(root: Path) -> list[dict]:
         return []
     safe_path(path, directory=False)
     value = read_json(path, MAX_FILE)
-    if not isinstance(value, list) or len(value) > 1000:
+    # Older writers could persist one row beyond the limit before failing.
+    # Admit that bounded schema-valid state so explicit recovery remains usable.
+    if not isinstance(value, list) or len(value) > MAX_REGISTRY + 1:
         raise ValueError("Installation pending registry is invalid; preserve state")
     seen = set()
     for item in value:
@@ -176,6 +179,14 @@ def register(root: Path, journal: Path):
     entries = registry(root)
     if any(item["path"] == str(journal) for item in entries):
         raise ValueError("Installation transaction is already registered")
+    while len(entries) >= MAX_REGISTRY:
+        # Retire only the oldest completed binding. Its journal and backup bytes
+        # remain intact; an active or interrupted transaction is never evicted.
+        completed = next((i for i, item in enumerate(entries) if not item["active"]), None)
+        if completed is None:
+            raise ValueError("Installation pending registry is full; recover active transactions first")
+        entries.pop(completed)
+        logging.info("Retired oldest completed installation registry binding; recovery files retained")
     entries.append({"path": str(journal), "transaction_id": identity(journal.parent),
                     "digests": [digest(read_limited(journal, MAX_FILE))], "active": True})
     write_json(root / "pending.json", entries)
@@ -219,6 +230,10 @@ def unregister(root: Path, journal: Path):
     registered(root, journal)
     entries = registry(root)
     next(item for item in entries if item["path"] == str(journal))["active"] = False
+    while len(entries) > MAX_REGISTRY:
+        completed = next(i for i, item in enumerate(entries) if not item["active"])
+        entries.pop(completed)
+        logging.info("Retired completed legacy registry binding; recovery files retained")
     write_json(root / "pending.json", entries)
 
 
@@ -230,6 +245,9 @@ def refuse_pending(root: Path, targets: list[Path]):
         registered(root, path)
         data = load_journal(path)
         if data["state"] in {"committed", "restored"}:
+            # A process can stop after committing/restoring the journal but
+            # before unregistering. Its authenticated terminal state is final.
+            unregister(root, path)
             continue
         previous = [Path(record["target"]) for record in data["records"]]
         if any(a.is_relative_to(b) or b.is_relative_to(a) for a in targets for b in previous):

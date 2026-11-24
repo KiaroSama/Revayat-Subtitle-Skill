@@ -7,7 +7,9 @@ use std::{
     path::PathBuf,
     process::ExitCode,
 };
-use subsync_rs::{SyncConfig, SyncError, sync_file_to_video, sync_file_to_wav, write_new_file};
+use subsync_rs::{
+    SyncConfig, SyncError, sync_file_to_video_with_report, sync_file_to_wav_with_report,
+};
 
 const USAGE: &str = "Usage: subsync (--video PATH | --wav PATH) --in PATH --out PATH\n       [--ffmpeg PATH] [--max-offset-sec 60] [--max-split-offset-ms 15000]\n       [--split-penalty 7.0] [--snap-ms 350] [--no-fps-search] [--json-report PATH]";
 
@@ -104,15 +106,21 @@ fn run() -> Result<(), SyncError> {
         parent(path)?;
     }
     let report = match (video, wav) {
-        (Some(video), None) => sync_file_to_video(&video, &input, &output, &ffmpeg, &config)?,
-        (None, Some(wav)) => sync_file_to_wav(&wav, &input, &output, &config)?,
+        (Some(video), None) => sync_file_to_video_with_report(
+            &video,
+            &input,
+            &output,
+            &ffmpeg,
+            &config,
+            json_report.as_deref(),
+        )?,
+        (None, Some(wav)) => {
+            sync_file_to_wav_with_report(&wav, &input, &output, &config, json_report.as_deref())?
+        }
         _ => return Err(invalid("choose exactly one of --video or --wav")),
     };
     let mut json = serde_json::to_vec_pretty(&report).map_err(SyncError::Json)?;
     json.push(b'\n');
-    if let Some(path) = json_report {
-        write_new_file(&path, &json)?;
-    }
     io::stdout()
         .lock()
         .write_all(&json)

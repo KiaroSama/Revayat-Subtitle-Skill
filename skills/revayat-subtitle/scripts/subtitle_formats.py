@@ -9,7 +9,7 @@ from itertools import accumulate
 from math import isfinite
 
 from markup import SRT_BREAK, ARABIC, BIDI, PDF, RLE, RLM, overrides, pieces, rtl, uncomment, srt_tag_fits
-from text_pipeline import SRT_ALIGNMENT, SRT_COLOR, convert_srt_markup_to_ass, process_cue_text, watermark_reason
+from text_pipeline import SRT_ALIGNMENT, SRT_COLOR, convert_srt_markup_to_ass, process_ass_text, watermark_reason
 from validation import MAX_TIME_MS
 
 ASS_FIELDS = "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -453,7 +453,7 @@ def _process_ass_document(doc: Document, result: Document, style: str, direction
             cue.fields["style"] = style
         else:
             cue = replace(source, fields=dict(source.fields))
-        cue.text = process_cue_text(cue.text, "ass", direction, max_chars, fix_zwnj, wrap_lines)
+        cue.text = process_ass_text(cue.text, direction, max_chars, fix_zwnj, wrap_lines)
         result.cues.append(cue)
     return result, removed
 
@@ -525,8 +525,11 @@ def build_translator_ass(primary_doc: Document, donor_docs: list[tuple[str, Docu
                     ids.add(cue_id)
             if include_source_comments:
                 edition.source_comments.setdefault(best.id, []).append(_source_reference(label, source.text))
-    edition.cues = sorted([*primary, *placeholders.values()], key=lambda cue: cue.start)
+    # The sorted view above is only a timing lookup. Preserve primary ASS read
+    # order within overlap components, where it controls layering/collisions.
+    combined = [*edition.cues, *placeholders.values()]
+    edition.cues = [combined[index] for index in presentation_order(combined, "ass")]
     edition.comments = sum(map(len, edition.source_comments.values()))
-    edition.chronological = True
+    edition.chronological = False
     return edition, {"primary_cues": len(primary), "placeholder_slots": len(placeholders),
                      "watermarks_removed": watermark_count, "style": style}

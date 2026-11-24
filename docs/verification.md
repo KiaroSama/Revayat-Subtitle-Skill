@@ -1,5 +1,44 @@
 # Verification scope
 
+## Reliability audit, 2026-11-24
+
+The [audit report and reviewer instructions](audit-2026-11-24.md) map 14 defect
+groups to authored reproductions, implemented repairs and acceptance criteria.
+This includes content-preserving ASS conversion and credit detection, reviewed
+cue-link coverage, overlapping Translator Mode order, malformed-comment cost,
+Persian protected spans, interpreter-specific native parity, legacy install
+recovery, sync parsing and complete-file publication, and package symlink refusal.
+
+The baseline was tested from a detached Git worktree at `8f003e5` with full
+history: 490 pytest cases passed, 44 skipped and 698 subtests passed; the separate
+bounded/render runner passed 463 tests with 8 skips. The repaired fallback suite
+passed on Python 3.11.18 and 3.14.10 with 539 tests and 705 subtests per run
+(50 skips); the Python 3.14.10 bounded/render run passed 478 tests (11 skips).
+Native results are a separate requirement: missing compiled modules must fail
+when `REVAYAT_REQUIRE_NATIVE=1`. Neither a fallback pass nor an import-only probe
+establishes native compatibility. The final compiled release run passed 543 tests
+and 1,812 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
+Python 3.14.10 passed 581 tests and 1,887 subtests (8 skips). The three accelerator
+crates passed 32 Rust unit tests in total. The malformed-comment regression also
+checks real Persian normalization after the 400 KB literal prefix; this caught
+and closed a native regex-budget failure during consolidated testing. Use the
+exact candidate's Actions results for hosted platform evidence.
+
+The sync audit additionally passed 18 Rust tests plus doctests and 31 real-engine
+Python cases locally, with FFmpeg required and no local skips. It exercised a
+12-minute, 192-cue authored alignment with 12 edits; actual FFmpeg extraction and
+timeout cleanup; complete-file write failure and retry; report staging failure;
+and exclusive publication races. Two separate final paths are not an atomic
+transaction: a late report collision explicitly identifies the already complete
+subtitle and preserves the independent report. No power-loss guarantee follows.
+
+CI now runs automatically on PRs, main pushes and merge queues, with a required
+aggregate for every lane and mandatory native parity on Linux, Windows and macOS.
+Release builds reuse that validation; independent release runs have distinct
+validation concurrency identities. Platform success must be read from the
+corresponding hosted job, not inferred from this Linux audit host. The source
+document does not certify future commits or semantic correctness of real media.
+
 ## Automated checks
 
 The bounded stdlib runner exercises the actual CLI and OS installer, complete cue

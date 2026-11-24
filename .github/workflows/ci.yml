@@ -1,13 +1,25 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      validation_id:
+        description: Isolate validation for independent caller runs
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.validation_id || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -132,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -145,63 +157,94 @@ jobs:
       - name: Ensure Rust toolchain with rustfmt and clippy
         shell: bash
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
-          rustup component add rustfmt clippy
+          toolchain=$(python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal --component rustfmt --component clippy
           rustc --version
       - name: Format, lint, test, and build subsync-rs
         shell: bash
         working-directory: rust/subsync-rs
         run: |
           cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
-          cargo build --release
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+          cargo build --locked --release
+      - name: Install Linux audio extraction tool
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Install macOS audio extraction tool
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install verified Windows audio extraction tool
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $PWD '.scratch/ffmpeg'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $archive = Join-Path $destination 'ffmpeg.zip'
+          Invoke-WebRequest -TimeoutSec 120 -Uri 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip' -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba') { throw 'FFmpeg checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $destination
+          $binary = Get-ChildItem -LiteralPath $destination -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          if (-not $binary) { throw 'FFmpeg executable missing' }
+          $binary.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Run Python subsync bridge tests
+        env:
+          REVAYAT_REQUIRE_FFMPEG: '1'
         run: python -X utf8 -m pytest tests/test_subsync.py -v
   rust-crates:
-    name: Rust crate (${{ matrix.crate }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Native Rust parity (${{ matrix.os }} / Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
-          - crate: subcore-rs
-            module: subcore_rs
-          - crate: persian-lint-rs
-            module: persian_lint_rs
-          - crate: markup-rs
-            module: markup_rs
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: ubuntu-latest
+            python: '3.14'
+          - os: windows-latest
+            python: '3.14'
+          - os: macos-latest
+            python: '3.14'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.14'
-      - name: Ensure Rust toolchain with rustfmt and clippy
+          python-version: ${{ matrix.python }}
+      - name: Install bounded test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: Ensure pinned Rust toolchain with rustfmt and clippy
         shell: bash
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
-          rustup component add rustfmt clippy
+          toolchain=$(python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal --component rustfmt --component clippy
           rustc --version
-      - name: Format, lint, build, and import PyO3 extension
+      - name: Format, lint, test, and build all PyO3 extensions
         shell: bash
-        env:
-          CRATE_DIR: rust/${{ matrix.crate }}
-          CRATE_MOD: ${{ matrix.module }}
         run: |
-          PYO3_PYTHON="$(command -v python)"
+          PYO3_PYTHON=$(python -c 'import sys; print(sys.executable)')
           export PYO3_PYTHON
-          cd "$CRATE_DIR"
-          cargo fmt --check
-          cargo clippy --lib -- -D warnings
-          cargo build --release
-          cp "target/release/lib${CRATE_MOD}.so" "python/${CRATE_MOD}/_native.so"
-          PYTHONPATH=python python -c "import os, importlib; m = importlib.import_module(os.environ['CRATE_MOD']); print('Loaded:', m.__name__)"
-          rm -f "python/${CRATE_MOD}/_native.so"
+          for crate in subcore-rs persian-lint-rs markup-rs; do
+            (
+              cd "rust/$crate"
+              cargo fmt --check
+              cargo clippy --locked --lib -- -D warnings
+              cargo test --locked --no-default-features --lib
+              cargo build --locked --release
+            )
+          done
+      - name: Stage native extensions using this interpreter's ABI suffix
+        shell: bash
+        run: python tests/stage_native.py
+      - name: Run Python contracts with mandatory native parity
+        env:
+          REVAYAT_REQUIRE_NATIVE: '1'
+          REVAYAT_DISABLE_RUST: '0'
+        run: python -X utf8 -m pytest tests/ --ignore=tests/test_subsync.py -q
   repo-hygiene:
     name: Repo hygiene and code metrics
     runs-on: ubuntu-latest
@@ -243,4 +286,28 @@ jobs:
           if share < 20.0:
               print("Rust code share below 20% threshold", file=sys.stderr)
               sys.exit(1)
+          PY
+  required:
+    name: CI required
+    if: always()
+    needs: [workflow-lint, check, pytest-suite, plugin-manifests, v2-pipeline, rust-subsync, rust-crates, repo-hygiene]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every validation lane to pass
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import logging
+          import os
+          import sys
+          logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
+          results = json.loads(os.environ["JOB_RESULTS"])
+          failed = [name for name, value in results.items() if value["result"] != "success"]
+          if failed:
+              logging.error("Required validation lanes did not pass: %s", ", ".join(sorted(failed)))
+              sys.exit(1)
+          logging.info("All %d validation lanes passed for this revision", len(results))
           PY
