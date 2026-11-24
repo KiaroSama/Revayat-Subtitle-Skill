@@ -8,7 +8,7 @@
 
 [![GitHub Actions CI](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions/workflows/ci.yml)
 [![GNU General Public License v3.0 or later](https://img.shields.io/badge/license-GPL--3.0--or--later-2563eb)](LICENSE)
-[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=date&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
+[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=semver&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
 [![Automated pytest and cargo test suites across CI matrices](https://img.shields.io/badge/tests-pytest%20%7C%20cargo-0d9488)](.github/workflows/ci.yml)
 [![Python 3.13.15 measured locally, requires Python 3.11 or newer](https://img.shields.io/badge/Python-3.13.15-8b5cf6)](docs/platforms.md)
 [![Rust 1.100.0 measured locally for audio sync and PyO3 acceleration crates](https://img.shields.io/badge/Rust-1.100.0-9a3412)](rust/subsync-rs/Cargo.toml)
@@ -272,9 +272,9 @@ cargo test --manifest-path rust/subsync-rs/Cargo.toml
 
 ## نسخه‌ها و تگ‌ها
 
-[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=date&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
+[![Latest GitHub tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?sort=semver&include_prereleases&label=tag&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags)
 
-این badge از [تگ‌های واقعی مخزن](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags) خوانده می‌شود و نسخهٔ ثابت ندارد؛ تازه‌شدن کش ممکن است کمی زمان ببرد. [انتشارها](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases) و [روش بررسی امضا](docs/signing/README.md) جداگانه در دسترس‌اند. نسخهٔ manifestهای پلاگین همچنان باید هنگام انتشار هماهنگ به‌روزرسانی شود.
+این badge از [تگ‌های واقعی مخزن](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags) به‌ترتیب نسخهٔ معنایی، با احتساب نسخه‌های پیش‌انتشار، خوانده می‌شود. با انتشار تگی که نسخهٔ بالاتری دارد و پس از تازه‌شدن کش، خودکار به‌روزرسانی می‌شود؛ تگ‌های backport نسخهٔ نمایشی را پایین نمی‌آورند. [انتشارها](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases) و [روش بررسی امضا](docs/signing/README.md) جداگانه در دسترس‌اند. نسخهٔ manifestهای پلاگین همچنان باید هنگام انتشار هماهنگ به‌روزرسانی شود.
 
 ## ‏⁧حمایت مالی⁩
 

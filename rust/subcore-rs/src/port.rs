@@ -326,6 +326,16 @@ mod tests {
             "I asked who the subtitles by Alice were for.",
             "Downloaded from the device, the files contain evidence.",
             "Subtitles by amateurs can contain mistakes.",
+            "Subtitles by amateurs are unreliable.",
+            "«SUBTITLES BY AMATEURS ARE UNRELIABLE!»",
+            "Subtitles by humans fail.",
+            "Captioned by humans looks better.",
+            "Encoded by machines looks better.",
+            "Subtitles by amateurs\nare unreliable.",
+            "Subtitles by amateurs<br>are unreliable.",
+            "Subtitles by John O'Connor",
+            "Downloaded from the web",
+            "زیرنویس از دو دوست",
             "من این کانال تلگرام را نمی‌شناسم.",
             "Save the evidence.\nhttps://example.test",
             "Save the evidence.<br>https://example.test",
@@ -341,6 +351,15 @@ mod tests {
             watermark_reason("<i>Subtitles by Alice</i><br>https://example.test".into()).as_deref(),
             Ok("fansub-credit")
         );
+        for text in [
+            "Subtitles by @actual_team",
+            "Downloaded from https://example.test",
+        ] {
+            assert_eq!(
+                watermark_reason(text.into()).as_deref(),
+                Ok("fansub-credit")
+            );
+        }
     }
 
     #[test]

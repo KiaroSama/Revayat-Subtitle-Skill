@@ -111,11 +111,11 @@ _SITE = re.compile(
     r"کانال تلگرام|ساب ?تایتل|فارس ?ساب|موویکو|دیجی ?موویز|زارفیل|سافت ?ساب)(?!\w)"
 )
 _LINK = re.compile(r"(?<![\w@])(?:https?://|www\.|t\.me/)[^\s]+")
-_ATTRIBUTION = re.compile(r"[\w@]+(?:[.'’+-][\w@]+)*\.?(?: +[\w@]+(?:[.'’+-][\w@]+)*\.?){0,2}")
+_ATTRIBUTION = re.compile(r"[\w@]+(?:[.'’+-][\w@]+)*\.?")
 
 
 def _credit_line(line: str, pattern: re.Pattern) -> bool:
-    """Require a short attribution or link after a credit label, not a clause."""
+    """Recognize an explicit link or one identifier; leave free-form tails for review."""
     match = pattern.match(line)
     if match is None:
         return False
@@ -123,6 +123,7 @@ def _credit_line(line: str, pattern: re.Pattern) -> bool:
     if suffix and suffix[0] not in " :":
         return False
     suffix = suffix.strip(" :")
+    # Whitespace-separated names cannot be distinguished from short spoken clauses.
     return not suffix or _LINK.fullmatch(suffix) is not None or _ATTRIBUTION.fullmatch(suffix) is not None
 
 

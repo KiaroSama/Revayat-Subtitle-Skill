@@ -230,10 +230,7 @@ pub(super) fn watermark_prepared(
         )
     );
     let site = word_pattern(site, runtime_word_class)?;
-    let attribution = pattern!(
-        Regex,
-        r"\A[\p{L}\p{N}_@]+(?:[.'’+-][\p{L}\p{N}_@]+)*\.?(?: +[\p{L}\p{N}_@]+(?:[.'’+-][\p{L}\p{N}_@]+)*\.?){0,2}\z"
-    );
+    let attribution = pattern!(Regex, r"\A[\p{L}\p{N}_@]+(?:[.'’+-][\p{L}\p{N}_@]+)*\.?\z");
     let attribution = match runtime_word_class {
         Some(word) => Cow::Owned(
             Regex::new(&attribution.as_str().replace(WORD, word))

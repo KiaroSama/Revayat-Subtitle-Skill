@@ -199,9 +199,12 @@ Native ASS prose is never passed through the SRT markup decoder: literal `<i>`,
 anchoring. SRT markup is converted once at the format boundary.
 
 Fansub and release watermarks are removed only when the whole cue matches
-standalone advertising or credit forms. Credit labels require a short attribution
-(up to three name components) or one URL; longer or clause-like tails remain for
-editorial review. A URL, site name or Telegram address
+standalone advertising or credit forms. After a recognized credit label, automatic
+attribution matching accepts an explicit URL/handle or one name/identifier token,
+such as `Alice`, `O'Connor`, or `@team`. Free-form multiword tails remain for
+editorial review, including genuine names such as `John O'Connor`: a short clause
+like `Subtitles by amateurs are unreliable.` is not distinguishable by word count.
+Mark a genuine multiword credit explicitly in its worksheet instead. A URL, site name or Telegram address
 inside a sentence is not sufficient; mixed dialogue/advertising cues remain for
 editorial review. `--keep-watermarks` disables automatic removal for conversion.
 This detector is a conservative mechanical aid, not a semantic review certificate.

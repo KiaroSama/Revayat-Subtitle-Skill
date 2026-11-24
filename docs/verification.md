@@ -12,21 +12,22 @@ recovery, sync parsing and complete-file publication, and package symlink refusa
 The baseline was tested from a detached Git worktree at `8f003e5` with full
 history: 490 pytest cases passed, 44 skipped and 698 subtests passed; the separate
 bounded/render runner passed 463 tests with 8 skips. The repaired fallback suite
-passed on Python 3.11.18 and 3.14.10 with 539 tests and 705 subtests per run
+passed on Python 3.11.18 and 3.14.10 with 553 tests and 705 subtests per run
 (50 skips); the Python 3.14.10 bounded/render run passed 478 tests (11 skips).
 Native results are a separate requirement: missing compiled modules must fail
 when `REVAYAT_REQUIRE_NATIVE=1`. Neither a fallback pass nor an import-only probe
-establishes native compatibility. The final compiled release run passed 543 tests
-and 1,812 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
-Python 3.14.10 passed 581 tests and 1,887 subtests (8 skips). The three accelerator
+establishes native compatibility. The final compiled release run passed 557 tests
+and 1,982 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
+Python 3.14.10 passed 595 tests and 2,057 subtests (8 skips). The three accelerator
 crates passed 32 Rust unit tests in total. The malformed-comment regression also
 checks real Persian normalization after the 400 KB literal prefix; this caught
 and closed a native regex-budget failure during consolidated testing. Use the
 exact candidate's Actions results for hosted platform evidence.
 
-The sync audit additionally passed 18 Rust tests plus doctests and 31 real-engine
-Python cases locally, with FFmpeg required and no local skips. It exercised a
-12-minute, 192-cue authored alignment with 12 edits; actual FFmpeg extraction and
+The sync audit additionally passed 18 Rust tests plus doctests and 31 Python
+sync cases locally, including real-engine FFmpeg tests, with no local skips. It
+exercised a 12-minute, 192-cue authored alignment with 12 independently shifted
+sections; actual FFmpeg extraction and
 timeout cleanup; complete-file write failure and retry; report staging failure;
 and exclusive publication races. Two separate final paths are not an atomic
 transaction: a late report collision explicitly identifies the already complete

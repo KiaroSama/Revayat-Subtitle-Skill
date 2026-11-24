@@ -136,7 +136,12 @@ class SubcoreNativeParityTests(NativeParityCase):
                  "before\x00after", "- first speaker\n- second speaker", "\U00010d50!",
                  "مي رود", "\U00010d50 \U0001e4d0?", "مي روم\U0001e4d0",
                  "\U0001e4d0می روم", "خانه ها\U0001e4d0", "خانه ام\U0001e4d0",
-                 "هم چنین\U0001e4d0", "Subtitles by \U0001e4d0", "Subtitles by \u1c89")
+                 "هم چنین\U0001e4d0", "Subtitles by \U0001e4d0", "Subtitles by \u1c89",
+                 "Subtitles by amateurs are unreliable.", "«SUBTITLES BY HUMANS FAIL!»",
+                 "Captioned by humans looks better.", "Subtitles by amateurs<br>are unreliable.",
+                 "Subtitles by amateurs\nare unreliable.", "Subtitles by John O'Connor",
+                 "زیرنویس از دو دوست", "Downloaded from the web", "Subtitles by @actual_team",
+                 "Downloaded from https://example.test")
         for text in cases:
             for name in ("normalize_persian_zwnj", "watermark_reason", "is_watermark_cue",
                          "convert_srt_markup_to_ass"):

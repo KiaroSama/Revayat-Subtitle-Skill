@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import os
 from pathlib import Path
@@ -95,16 +96,51 @@ def test_complete_comments_remain_protected_in_text_transforms():
     assert pipeline.convert_srt_markup_to_ass("A<!--{-->B<i>C</i>") == r"A<!--{-->B{\i1}C{\i0}"
 
 
-@pytest.mark.parametrize("text", [
+CREDIT_PROSE = (
     "Downloaded from the device, the files contain evidence.",
     "Subtitles by amateurs can contain mistakes.",
-])
+    "Subtitles by amateurs are unreliable.",
+    "«SUBTITLES BY AMATEURS ARE UNRELIABLE!»",
+    "Subtitles by humans fail.",
+    "Captioned by humans looks better.",
+    "Encoded by machines looks better.",
+    "Subtitles by amateurs\nare unreliable.",
+    "Subtitles by amateurs<br>are unreliable.",
+    "Subtitles by John O'Connor",
+    "Downloaded from the web",
+    "زیرنویس از دو دوست",
+)
+
+
+@pytest.mark.parametrize("text", CREDIT_PROSE)
 def test_credit_prefix_with_a_spoken_clause_is_preserved(text):
     assert pipeline.watermark_reason(text) == ""
     original = formats.Document("srt", [formats.Cue("c000001", 1000, 3000, text)])
     converted, removed = formats.srt_document_to_ass(original, direction="ltr", wrap_lines=False)
     assert not removed
-    assert formats.visible(converted.cues[0].text, "ass") == text
+    assert formats.visible(converted.cues[0].text, "ass") == formats.visible(text, "srt")
+
+
+def test_public_srt_conversion_preserves_free_form_credit_prose(tmp_path):
+    credits = ("Subtitles by Alice", "Subtitles by @actual_team", "Downloaded from https://example.test")
+    path = tmp_path / "credit-prose.srt"
+    original = "\n\n".join(
+        f"{index}\n00:00:{2 * index:02d},000 --> 00:00:{2 * index + 1:02d},000\n{text}"
+        for index, text in enumerate((*CREDIT_PROSE, *credits), 1)
+    ).encode("utf-8")
+    path.write_bytes(original)
+    output = tmp_path / "credit-prose.ass"
+    report = json.loads(runtime.run([
+        sys.executable, "-X", "utf8", str(SCRIPTS / "revayat-subtitle.py"), "convert", str(path),
+        "--out", str(output), "--direction", "ltr", "--no-zwnj", "--max-chars", "500",
+    ]))
+    converted = formats.parse(output.read_text(encoding="utf-8"), "ass")
+    assert [formats.visible(cue.text, "ass") for cue in converted.cues] == [
+        formats.visible(text, "srt") for text in CREDIT_PROSE
+    ]
+    assert report["watermarks_removed"] == len(credits)
+    assert report["cues"] == len(CREDIT_PROSE)
+    assert path.read_bytes() == original
 
 
 @pytest.mark.parametrize("text", [
@@ -135,7 +171,10 @@ def test_watermark_detection_never_discards_ordinary_or_mixed_dialogue(text):
     ("OpenSubtitles", "site-watermark"),
     ("OpenSubtitles.org", "site-watermark"),
     ("Subtitles by Alice", "fansub-credit"),
-    ("Subtitles by John O'Connor", "fansub-credit"),
+    ("Subtitles by O'Connor", "fansub-credit"),
+    ("Subtitles by Alice-Smith", "fansub-credit"),
+    ("Subtitles by @actual_team", "fansub-credit"),
+    ("Subtitles by https://example.test", "fansub-credit"),
     ("Downloaded from https://example.test", "fansub-credit"),
     ("Sous-titres : Alice", "studio-credit"),
     ("<i>Subtitles by Alice</i><br>https://example.test", "fansub-credit"),

@@ -404,22 +404,20 @@ def test_sync_timeout_terminates_owned_rust_and_ffmpeg(bridge, tmp_path):
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
 
-    observer = threading.Thread(target=observe_owned_ffmpeg)
-    observer.start()
-    began = time.monotonic()
-    try:
-        with pytest.raises(bridge.SyncBridgeError, match="timed out"):
-            bridge.sync_subtitle_to_video(fifo, original, output, ffmpeg=ffmpeg, timeout=2)
-    finally:
-        stop.set()
-        observer.join(timeout=3)
     def active(process):
         try:
             return process.is_running() and process.status() not in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD)
         except psutil.NoSuchProcess:
             return False
 
+    observer = threading.Thread(target=observe_owned_ffmpeg)
+    observer.start()
+    began = time.monotonic()
     try:
+        with pytest.raises(bridge.SyncBridgeError, match="timed out"):
+            bridge.sync_subtitle_to_video(fifo, original, output, ffmpeg=ffmpeg, timeout=2)
+        stop.set()
+        observer.join(timeout=3)
         assert not observer.is_alive()
         assert observed, "The real FFmpeg child must start before cancellation is tested"
         assert time.monotonic() - began < 10
@@ -432,6 +430,8 @@ def test_sync_timeout_terminates_owned_rust_and_ffmpeg(bridge, tmp_path):
             assert not active(process)
         assert not output.exists()
     finally:
+        stop.set()
+        observer.join(timeout=3)
         for process in observed:
             try:
                 if active(process):
