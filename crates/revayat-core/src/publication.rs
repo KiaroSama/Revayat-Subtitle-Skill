@@ -63,6 +63,8 @@ pub fn publish_bytes(destination: &Path, data: &[u8]) -> io::Result<()> {
         )
     })?;
     fs::create_dir_all(parent)?;
+    #[cfg(unix)]
+    let parent_handle = fs::File::open(parent)?;
     let (mut file, temporary) = tempfile::Builder::new()
         .prefix(".publish-")
         .suffix(".tmp")
@@ -87,7 +89,7 @@ pub fn publish_bytes(destination: &Path, data: &[u8]) -> io::Result<()> {
         }
         rename_noreplace(&stage, &destination)?;
         #[cfg(unix)]
-        fs::File::open(parent)?.sync_all().map_err(|e| {
+        parent_handle.sync_all().map_err(|e| {
             io::Error::new(
                 e.kind(),
                 format!("Publication committed; directory synchronization failed: {e}"),
@@ -100,7 +102,7 @@ pub fn publish_bytes(destination: &Path, data: &[u8]) -> io::Result<()> {
         && let Err(e) = fs::remove_file(&stage)
         && e.kind() != io::ErrorKind::NotFound
     {
-        eprintln!("WARNING: Publication staging cleanup failed.");
+        crate::runtime::logging::stderr_line("WARNING: Publication staging cleanup failed.");
     }
     result
 }

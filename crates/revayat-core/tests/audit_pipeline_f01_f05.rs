@@ -425,6 +425,75 @@ fn f02_workspace_ass_upgrade_validates_before_ad_deletion() -> Check {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn workspace_stage_cleanup_stays_with_its_original_parent() -> Check {
+    let root = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let parent = root.path().join("parent");
+    let original = root.path().join("original");
+    fs::create_dir(&parent).map_err(|e| e.to_string())?;
+    let stage = workspace::stage(&parent, ".stage-")?;
+    let name = stage.path().file_name().ok_or("stage name")?.to_owned();
+    let outside = root.path().join("outside");
+    fs::create_dir(&outside).map_err(|e| e.to_string())?;
+    fs::write(outside.join("preserve"), b"outside").map_err(|e| e.to_string())?;
+    fs::create_dir(stage.path().join("nested")).map_err(|e| e.to_string())?;
+    fs::write(stage.path().join("nested/owned"), b"owned").map_err(|e| e.to_string())?;
+    std::os::unix::fs::symlink(&outside, stage.path().join("linked")).map_err(|e| e.to_string())?;
+    fs::rename(&parent, &original).map_err(|e| e.to_string())?;
+    fs::create_dir_all(parent.join(&name)).map_err(|e| e.to_string())?;
+    drop(stage);
+    assert!(!original.join(&name).exists());
+    assert!(parent.join(&name).is_dir());
+    assert_eq!(
+        fs::read(outside.join("preserve")).map_err(|e| e.to_string())?,
+        b"outside"
+    );
+    Ok(())
+}
+
+#[test]
+fn f02_workspace_rejects_braced_handle_before_watermark_removal() -> Check {
+    let root = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let source = format!("{RETAINED}\n2\n00:00:04,000 --> 00:00:06,000\n{{@channel}}\n");
+    let work = reviewed(root.path(), &[&source])?;
+    let expected = document::srt_to_ass(srt("{@channel}").cues.remove(0))
+        .expect_err("SRT literal braces cannot be converted to ASS");
+    assert_eq!(workspace::build(&work, None).unwrap_err(), expected);
+    assert!(!work.join("builds").exists());
+    Ok(())
+}
+
+#[test]
+fn f02_workspace_removes_plain_handle_after_validation() -> Check {
+    let root = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let source = format!("{RETAINED}\n2\n00:00:04,000 --> 00:00:06,000\n@channel\n");
+    let work = reviewed(root.path(), &[&source])?;
+    let build = workspace::build(&work, None)?;
+    let episode = &build["episodes"][0];
+    assert_eq!(episode["cues"], 1);
+    assert_eq!(
+        episode["watermarks_removed"][0]["reason"],
+        "telegram-handle"
+    );
+    Ok(())
+}
+
+#[test]
+fn f02_standalone_conversion_validates_handles_before_removal() -> Check {
+    let braced = srt("{@channel}");
+    let expected = document::srt_to_ass(braced.cues[0].clone())
+        .expect_err("SRT literal braces cannot be converted to ASS");
+    assert_eq!(
+        conversion::convert(&braced, &options()).unwrap_err(),
+        expected
+    );
+    let (output, removed) = conversion::convert(&srt("@channel"), &options())?;
+    assert!(output.cues.is_empty());
+    assert_eq!(removed[0]["reason"], "telegram-handle");
+    Ok(())
+}
+
 #[test]
 fn f02_workflow_retains_reviewed_dialogue_with_url() -> Check {
     let root = tempfile::tempdir().map_err(|e| e.to_string())?;

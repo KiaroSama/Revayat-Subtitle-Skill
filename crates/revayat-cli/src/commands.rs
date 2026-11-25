@@ -224,7 +224,7 @@ fn supervise(timeout: f64, command: &[String]) -> Result<i32> {
             Ok(process_control::exit_code(&output))
         }
         Err(error @ RunError::Timeout { .. }) => {
-            eprintln!("ERROR: {}", redact(&error.to_string()));
+            let _ = writeln!(io::stderr(), "ERROR: {}", redact(&error.to_string()));
             Ok(124)
         }
         Err(error) => Err(error.into()),

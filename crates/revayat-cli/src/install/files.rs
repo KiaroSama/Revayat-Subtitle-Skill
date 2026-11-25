@@ -105,8 +105,11 @@ pub fn identity_numbers(path: &Path) -> io::Result<(u64, u64)> {
 }
 
 pub fn identity(path: &Path) -> io::Result<Identity> {
-    let (device, inode) = identity_numbers(path)?;
-    Ok([format!("{device:x}"), format!("{inode:x}")])
+    identity_numbers(path).map(format_identity)
+}
+
+pub(super) fn format_identity((device, inode): (u64, u64)) -> Identity {
+    [format!("{device:x}"), format!("{inode:x}")]
 }
 
 pub fn is_hex(s: &str, length: usize) -> bool {
@@ -363,6 +366,10 @@ pub fn fingerprint(path: &Path) -> io::Result<Value> {
 }
 
 pub fn tree_manifest(root: &Path) -> io::Result<Value> {
+    inspect_tree(root).map(|(_, manifest)| manifest)
+}
+
+pub(super) fn inspect_tree(root: &Path) -> io::Result<(Identity, Value)> {
     let root = safe_path(root, true)?;
     let initial = identity(&root)?;
     let mut files = std::collections::BTreeMap::new();
@@ -423,11 +430,11 @@ pub fn tree_manifest(root: &Path) -> io::Result<Value> {
     directories.sort();
     let result = json!({"files":files,"directories":directories});
     validate_manifest(&result)?;
-    Ok(result)
+    Ok((initial, result))
 }
 
 pub fn matches(path: &Path, owned: &Value, manifest: &Value) -> bool {
     valid_identity(owned)
-        && identity(path).is_ok_and(|id| json!(id) == *owned)
-        && tree_manifest(path).is_ok_and(|current| current == *manifest)
+        && inspect_tree(path)
+            .is_ok_and(|(identity, current)| json!(identity) == *owned && current == *manifest)
 }

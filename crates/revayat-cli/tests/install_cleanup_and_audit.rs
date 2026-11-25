@@ -194,6 +194,44 @@ fn missing_signed_registry_is_not_treated_as_empty_history() -> Result<()> {
 }
 
 #[test]
+fn interrupted_first_registry_publication_resumes_with_the_published_key() -> Result<()> {
+    let a = Account::new()?;
+    let target = a.home.join("installed skill");
+    a.install(&target, false)?;
+    let signed = files::read_json(&a.pending())?;
+    let key_path = a.state.join("registry.key");
+    let key = fs::read(&key_path)?;
+    let staged = a.state.join("pending.json.new");
+    for legacy in [false, true] {
+        fs::rename(a.pending(), &staged)?;
+        if legacy {
+            files::write_json(&a.pending(), &signed["records"])?;
+        }
+        assert_eq!(registry::registry(&a.state)?.len(), 1);
+        assert_eq!(files::read_json(&a.pending())?, signed);
+        assert_eq!(fs::read(&key_path)?, key);
+        assert!(!staged.exists());
+    }
+    a.uninstall(&target)?;
+    assert!(!target.exists());
+    Ok(())
+}
+
+#[test]
+fn unsigned_staged_registry_cannot_resume_after_key_publication() -> Result<()> {
+    let a = Account::new()?;
+    a.install(&a.home.join("first"), false)?;
+    let signed = files::read_json(&a.pending())?;
+    fs::remove_file(a.pending())?;
+    let staged = a.state.join("pending.json.new");
+    files::write_json(&staged, &signed["records"])?;
+    assert!(registry::registry(&a.state).is_err());
+    assert!(!a.pending().exists());
+    assert_eq!(files::read_json(&staged)?, signed["records"]);
+    Ok(())
+}
+
+#[test]
 fn damaged_authentication_key_does_not_reinitialize_history() -> Result<()> {
     let a = Account::new()?;
     a.install(&a.home.join("first"), false)?;
@@ -217,6 +255,24 @@ fn capacity_retires_inactive_history_and_accepts_a_new_install() -> Result<()> {
     assert!(rows.iter().all(|row| row.path != journal));
     assert!(journal.is_file());
     assert_eq!(fs::read(target.join("SKILL.md"))?, b"bundled skill");
+    Ok(())
+}
+
+#[test]
+fn capacity_keeps_the_only_record_for_a_live_installation() -> Result<()> {
+    for filler in [999, 1000] {
+        let a = Account::new()?;
+        let first = a.home.join("first");
+        a.install(&first, false)?;
+        let journal = registry::registry(&a.state)?.remove(0).path;
+        fs::remove_file(a.state.join("registry.key"))?;
+        a.legacy(Some(&journal), filler, false)?;
+
+        a.install(&a.home.join("second"), false)?;
+        assert_eq!(registry::registry(&a.state)?.len(), 1000);
+        a.uninstall(&first)?;
+        assert!(!first.exists());
+    }
     Ok(())
 }
 

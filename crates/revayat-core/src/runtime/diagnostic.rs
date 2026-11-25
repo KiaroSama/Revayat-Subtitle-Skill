@@ -3,7 +3,7 @@ use regex::Regex;
 use std::{borrow::Cow, sync::LazyLock};
 
 static CREDENTIAL: LazyLock<Option<Regex>> = LazyLock::new(|| {
-    Regex::new(r#"(?i)(\b(?:authorization|proxy-authorization|cookie|set-cookie)\s*:\s*)[^\r\n]+|(\b(?:api[_-]?key|password|passwd|token|secret|credential|session(?:[_-]?id)?|access[_-]?key)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)"#).ok()
+    Regex::new(r#"(?i)(\b(?:authorization|proxy-authorization|cookie|set-cookie)\s*:\s*)[^\r\n]+|(\b(?:api[_-]?key|password|passwd|token|secret|credential|session(?:[_-]?id)?|access[_-]?key)["']?\s*[:=]\s*)(?:"(?:\\(?s:.)|[^"\\])*"|'(?:\\(?s:.)|[^'\\])*'|[^\s,;]+)"#).ok()
 });
 static URL: LazyLock<Option<Regex>> =
     LazyLock::new(|| Regex::new(r"(?i)(https?://)[^\s/@]+(?::[^\s/@]*)?@").ok());

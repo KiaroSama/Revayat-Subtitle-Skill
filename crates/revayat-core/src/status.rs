@@ -11,7 +11,7 @@ use crate::workflow::workspace::{
 };
 use crate::workflow::{docs_value, review};
 use serde_json::{Map, Value, json};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet, hash_map::Entry};
 use std::fs;
 use std::path::Path;
 
@@ -154,9 +154,7 @@ pub fn report(work: &Path) -> Result<Value, String> {
         && glossary_ready
         && unassigned.is_empty()
         && !items(&project["episodes"]).is_empty();
-    let expected = complete
-        .then(|| workspace::assemble(work, None))
-        .transpose()?;
+    let mut expected_by_format = HashMap::new();
     let mut editions = Vec::new();
     let root = local_path(work, "builds")?;
     let mut ready = false;
@@ -213,10 +211,19 @@ pub fn report(work: &Path) -> Result<Value, String> {
             }
             let mut item =
                 json!({"identity": name, "state": "stale", "episodes": 0, "visual_pending": 0});
-            if expected
-                .as_ref()
-                .is_some_and(|edition| edition.manifest["identity"] == name)
-            {
+            let format = string(&manifest["output_format"]);
+            workspace::format(format)?;
+            let mut matches = false;
+            if complete {
+                let expected = match expected_by_format.entry(format.to_owned()) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(entry) => entry.insert(
+                        workspace::assemble(work, Some(format))?.manifest["identity"].clone(),
+                    ),
+                };
+                matches = *expected == name;
+            }
+            if matches {
                 let (verified, _) = delivery::load_build(&path)?;
                 let episodes = items(&verified["episodes"]);
                 let mut existing = HashSet::new();
@@ -244,13 +251,14 @@ pub fn report(work: &Path) -> Result<Value, String> {
                 if !existing.is_empty() && (visual_pending != 0 || missing != 0) {
                     delivery::check_delivery(&path, false, Some(&existing))?;
                 }
-                if visual_pending == 0 && missing == 0 {
+                let edition_ready = visual_pending == 0 && missing == 0;
+                if edition_ready {
                     delivery::check_delivery(&path, true, None)?;
                     ready = true;
                 }
                 item["episodes"] = json!(episodes.len());
                 item["visual_pending"] = json!(visual_pending + missing);
-                item["state"] = json!(if ready { "complete" } else { "pending" });
+                item["state"] = json!(if edition_ready { "complete" } else { "pending" });
             }
             editions.push(item);
         }

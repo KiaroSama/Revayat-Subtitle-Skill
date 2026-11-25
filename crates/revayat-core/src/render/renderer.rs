@@ -5,9 +5,10 @@ use super::delivery::{
 use super::sampling::{SAMPLER_VERSION, changed_indices, requested_fonts, samples};
 use crate::png_validation::{MAX_PNG_BYTES, decode_dimensions};
 use crate::process_control::{RunError, RunOptions, run_owned};
-use crate::publication::publish_bytes;
+use crate::publication::{publish_bytes, rename_noreplace};
 use crate::runtime::files::{
     file_fingerprint, local_path, output_directory, read_limited, write_json,
+    write_json_with_commit,
 };
 use crate::subtitle_formats::document::Document;
 use crate::workflow::contract::{io_error, item, items, linked, string, value_error};
@@ -152,6 +153,14 @@ pub struct RenderEvidence<'a> {
 }
 
 pub fn write_evidence(build: &Path, evidence: &RenderEvidence<'_>) -> Result<Value, String> {
+    record_evidence(build, evidence, None)
+}
+
+fn record_evidence(
+    build: &Path,
+    evidence: &RenderEvidence<'_>,
+    staged_frames: Option<&Path>,
+) -> Result<Value, String> {
     let RenderEvidence {
         manifest,
         episode,
@@ -194,7 +203,11 @@ pub fn write_evidence(build: &Path, evidence: &RenderEvidence<'_>) -> Result<Val
         .ok_or_else(|| value_error("Frame has no render directory"))?
         .join("receipt.json");
     let relative = utf8_path(&rel)?.replace(std::path::MAIN_SEPARATOR, "/");
-    let receipt_path = local_path(build, &relative)?;
+    let final_receipt = local_path(build, &relative)?;
+    let receipt_path = staged_frames.map_or_else(
+        || final_receipt.clone(),
+        |directory| directory.join("receipt.json"),
+    );
     write_json(&receipt_path, &receipt)?;
     let raw = read_limited(&receipt_path, 16 * 1024 * 1024)?;
     let mut evidence = fields(&receipt, RECEIPT_FIELDS)?;
@@ -210,9 +223,32 @@ pub fn write_evidence(build: &Path, evidence: &RenderEvidence<'_>) -> Result<Val
             })
             .collect::<Vec<_>>()
     );
-    write_json(&path, &evidence)?;
+    let review = display_path(&path)?;
+    if let Some(staged) = staged_frames {
+        let published = final_receipt
+            .parent()
+            .ok_or_else(|| value_error("Render receipt has no directory"))?;
+        let original = same_file::Handle::from_path(staged).map_err(io_error)?;
+        let parent = published
+            .parent()
+            .ok_or_else(|| value_error("Render directory has no parent"))?;
+        fs::create_dir_all(parent).map_err(io_error)?;
+        rename_noreplace(staged, published).map_err(io_error)?;
+        let mut committed = false;
+        let result = write_json_with_commit(&path, &evidence, || committed = true);
+        // A post-rename sync failure must leave the new review and its frames together.
+        if !committed
+            && same_file::Handle::from_path(published).is_ok_and(|current| current == original)
+            && fs::remove_dir_all(published).is_err()
+        {
+            crate::runtime::logging::stderr_line("WARNING: Render cleanup failed.");
+        }
+        result?;
+    } else {
+        write_json(&path, &evidence)?;
+    }
     Ok(
-        json!({"review":display_path(&path)?,"frames":evidence["frames"],"next":"Inspect every image; set reviewed=true and write an observation for each frame"}),
+        json!({"review":review,"frames":evidence["frames"],"next":"Inspect every image; set reviewed=true and write an observation for each frame"}),
     )
 }
 
@@ -337,7 +373,6 @@ pub fn render(
     fonts: Option<&Path>,
     all_cues: bool,
 ) -> Result<Value, String> {
-    let root = local_path(build, "renders")?;
     let ffmpeg = ffmpeg_path(executable)?;
     let executable = utf8_path(&ffmpeg)?;
     let (manifest, docs) = load_build(build)?;
@@ -375,10 +410,9 @@ pub fn render(
     let default_fonts = fonts.is_none().then(bundled_fonts_dir).flatten();
     let fonts = fonts.or(default_fonts.as_deref());
     let mut recipe = json!({"sampler":SAMPLER_VERSION,"profile":"rgb24-v1","renderer":renderer,"fonts":[],"requested_fonts":requested_fonts(doc)?,"font_resolution":"system fallback requires visual inspection; selected system font files are not attested","video":video_fingerprint});
-    fs::create_dir_all(&root).map_err(io_error)?;
-    let destination = output_directory(&root, &format!("{episode_id}-"))?;
     let staging = stage(build, ".render-")?;
     let stage = staging.path();
+    let staged_frames = output_directory(stage, &format!("{episode_id}-"))?;
     let input = format!("input.{}", doc.kind);
     publish_bytes(&stage.join(&input), &subtitle_snapshot(build, episode)?).map_err(io_error)?;
     let mut filter = if doc.kind == "ass" {
@@ -390,7 +424,7 @@ pub fn render(
         recipe["fonts"] = json!(stage_fonts(fonts, stage)?);
         filter.push_str(":fontsdir=fonts");
     }
-    let relative = destination
+    let relative = staged_frames
         .file_name()
         .and_then(|s| s.to_str())
         .ok_or_else(|| value_error("Render directory has no filename"))?;
@@ -430,7 +464,7 @@ pub fn render(
                 "Render exceeded its 2 GiB episode artifact budget",
             ));
         }
-        publish_bytes(&destination.join(&filename), &raw).map_err(io_error)?;
+        publish_bytes(&staged_frames.join(&filename), &raw).map_err(io_error)?;
         sample["file"] = json!(format!("renders/{relative}/{filename}"));
         sample["sha256"] = json!(digest(&raw));
         sample["width"] = json!(width);
@@ -449,7 +483,7 @@ pub fn render(
         return Err(value_error("Render exceeded its 900-second episode budget"));
     }
     load_build(build)?;
-    write_evidence(
+    record_evidence(
         build,
         &RenderEvidence {
             manifest: &manifest,
@@ -459,5 +493,6 @@ pub fn render(
             all_cues,
             recipe: &recipe,
         },
+        Some(&staged_frames),
     )
 }

@@ -27,13 +27,33 @@ fn value(message: &str) -> String {
     format!("ValueError: {message}")
 }
 
+pub(crate) fn open_artifact(path: &Path) -> io::Result<File> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use rustix::fs::OFlags;
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags((OFlags::NONBLOCK | OFlags::NOFOLLOW).bits() as i32);
+    }
+    options.open(path)
+}
+
 pub fn read_limited(path: &Path, maximum: u64) -> Result<Vec<u8>, String> {
+    read_limited_with_metadata(path, maximum).map(|(data, _)| data)
+}
+
+pub(crate) fn read_limited_with_metadata(
+    path: &Path,
+    maximum: u64,
+) -> Result<(Vec<u8>, fs::Metadata), String> {
     let name = basename(path);
     if !fs::metadata(path).map_err(os)?.is_file() {
         return Err(value(&format!("{name}: expected a regular artifact file")));
     }
-    let reader = File::open(path).map_err(os)?;
-    if !reader.metadata().map_err(os)?.is_file() {
+    let reader = open_artifact(path).map_err(os)?;
+    let metadata = reader.metadata().map_err(os)?;
+    if !metadata.is_file() {
         return Err(value(&format!(
             "{name}: artifact type changed while opening"
         )));
@@ -48,7 +68,7 @@ pub fn read_limited(path: &Path, maximum: u64) -> Result<Vec<u8>, String> {
             "{name}: file exceeds the supported byte limit"
         )));
     }
-    Ok(data)
+    Ok((data, metadata))
 }
 
 fn unchanged(a: &fs::Metadata, b: &fs::Metadata) -> bool {
@@ -71,7 +91,7 @@ pub fn file_fingerprint(path: &Path, maximum: u64) -> Result<Value, String> {
             "Fingerprint input exceeds the supported file-size limit",
         ));
     }
-    let mut reader = Handle::from_path(path).map_err(os)?;
+    let mut reader = Handle::from_file(open_artifact(path).map_err(os)?).map_err(os)?;
     let opened = reader.as_file().metadata().map_err(os)?;
     if !opened.is_file() || !unchanged(&opened, &before) {
         return Err(value("Fingerprint input changed while opening"));
@@ -93,7 +113,7 @@ pub fn file_fingerprint(path: &Path, maximum: u64) -> Result<Value, String> {
         sha.update(&buf[..n]);
     }
     let finished = reader.as_file().metadata().map_err(os)?;
-    let after = Handle::from_path(path).map_err(os)?;
+    let after = Handle::from_file(open_artifact(path).map_err(os)?).map_err(os)?;
     if total != opened.len()
         || !unchanged(&opened, &finished)
         || reader != after
@@ -198,8 +218,13 @@ pub fn read_json(path: &Path, maximum: u64) -> Result<Value, String> {
             e
         }
     })?;
-    let source = std::str::from_utf8(&bytes).map_err(|_| invalid("UnicodeDecodeError"))?;
-    if !number_budget(&bytes) {
+    parse_json(&bytes, &name)
+}
+
+pub(crate) fn parse_json(bytes: &[u8], name: &str) -> Result<Value, String> {
+    let invalid = |label: &str| value(&format!("{name}: invalid JSON ({label})"));
+    let source = std::str::from_utf8(bytes).map_err(|_| invalid("UnicodeDecodeError"))?;
+    if !number_budget(bytes) {
         return Err(invalid("ValueError"));
     }
     let mut parser = serde_json::Deserializer::from_str(source);
@@ -227,6 +252,32 @@ pub fn linked(m: &fs::Metadata) -> bool {
     m.file_type().is_symlink()
 }
 pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
+    write_json_with_commit(path, value, || {})
+}
+
+pub(crate) fn write_json_with_commit(
+    path: &Path,
+    value: &Value,
+    committed: impl FnOnce(),
+) -> Result<(), String> {
+    // serde_json's reader rejects the 128th nested object or array.
+    fn within_depth(value: &Value, remaining: usize) -> bool {
+        match value {
+            Value::Array(items) => {
+                remaining > 0 && items.iter().all(|item| within_depth(item, remaining - 1))
+            }
+            Value::Object(items) => {
+                remaining > 0 && items.values().all(|item| within_depth(item, remaining - 1))
+            }
+            _ => true,
+        }
+    }
+    if !within_depth(value, 127) {
+        return Err(format!(
+            "ValueError: {}: invalid JSON (RecursionError)",
+            basename(path)
+        ));
+    }
     let mut data = serde_json::to_vec_pretty(value)
         .map_err(|_| String::from("ValueError: Value cannot be written as JSON"))?;
     data.push(b'\n');
@@ -260,6 +311,7 @@ pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
             return Err("OSError: Staged JSON bytes or identity changed".into());
         }
         fs::rename(&stage, &absolute).map_err(os)?;
+        committed();
         if read_limited(&absolute, data.len() as u64)? != data {
             return Err(
                 "OSError: Published JSON bytes changed; verify the saved state before retrying"
@@ -276,7 +328,9 @@ pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
         && let Err(e) = fs::remove_file(&stage)
         && e.kind() != io::ErrorKind::NotFound
     {
-        eprintln!("WARNING: JSON staging cleanup failed; original operation result is preserved");
+        super::logging::stderr_line(
+            "WARNING: JSON staging cleanup failed; original operation result is preserved",
+        );
     }
     result
 }

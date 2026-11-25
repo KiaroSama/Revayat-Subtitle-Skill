@@ -220,7 +220,12 @@ pub fn review_handoff(
                 .map(move |row| (format!("{source}:{}", string(&row["id"])), row.clone()))
         })
         .collect();
-    let (mut received, mut proposals, mut reports) = (HashSet::new(), HashMap::new(), Vec::new());
+    let (mut received, mut reports) = (HashSet::new(), Vec::new());
+    let episode_sources: Vec<_> = episodes.iter().map(source_keys).collect();
+    let source_scopes: HashMap<_, _> = episode_sources
+        .iter()
+        .flat_map(|keys| keys.iter().map(move |&source| (source, keys.as_slice())))
+        .collect();
     let mut pending_total = 0;
     for path in results {
         let result = read_envelope(path, RESULT, &required(RESULT, "activity_log"))?;
@@ -267,11 +272,10 @@ pub fn review_handoff(
         let source = string(&assignment["source"]);
         let doc = &docs[source];
         let originals: HashMap<_, _> = doc.cues.iter().map(|cue| (cue.id.as_str(), cue)).collect();
-        let sources = episodes
-            .iter()
-            .map(source_keys)
-            .find(|keys| keys.contains(&source))
-            .unwrap_or_else(|| vec![source]);
+        let sources = source_scopes
+            .get(source)
+            .copied()
+            .unwrap_or_else(|| std::slice::from_ref(&source));
         let known_links: HashSet<_> = sources
             .iter()
             .flat_map(|key| {
@@ -306,7 +310,6 @@ pub fn review_handoff(
                     string(&project["target_language"]),
                 )?;
             }
-            proposals.insert(key.clone(), sources.clone());
             effective.insert(key, row.clone());
         }
         if (state == "complete") != (count == 0) {
@@ -321,17 +324,23 @@ pub fn review_handoff(
     if received.len() != assignment_map.len() {
         return Err(value_error("A result is required for every assignment"));
     }
-    for (key, sources) in proposals {
-        let row = &effective[&key];
-        if row["reviewed"] != true {
+    for (key, row) in &effective {
+        if row["reviewed"] != true || items(&row["links"]).is_empty() {
             continue;
         }
+        let (source, _) = key
+            .split_once(':')
+            .ok_or_else(|| value_error("Invalid worksheet cue key"))?;
+        let sources = source_scopes
+            .get(source)
+            .copied()
+            .unwrap_or_else(|| std::slice::from_ref(&source));
         let mut unresolved = false;
         for link in items(&row["links"]).iter().map(string) {
             let target = effective
                 .get(link)
                 .filter(|_| {
-                    link != key
+                    link != key.as_str()
                         && link
                             .split_once(':')
                             .is_some_and(|(source, _)| sources.contains(&source))

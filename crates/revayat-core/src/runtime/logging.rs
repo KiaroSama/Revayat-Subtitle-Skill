@@ -7,6 +7,10 @@ use std::{
     time::Instant,
 };
 
+pub(crate) fn stderr_line(line: &str) {
+    let _ = writeln!(io::stderr(), "{line}");
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum LogLevel {
     Debug,
@@ -83,14 +87,11 @@ impl OperationalLog {
         }
         let file = directory.and_then(|path| open(path, component).ok());
         if file.is_none() {
-            eprintln!(
-                "{}",
-                line(
-                    component,
-                    "WARNING",
-                    "File logging unavailable; using stderr."
-                )
-            );
+            stderr_line(&line(
+                component,
+                "WARNING",
+                "File logging unavailable; using stderr.",
+            ));
         }
         let mut log = Self {
             component: component.into(),
@@ -128,21 +129,18 @@ impl OperationalLog {
                 .is_ok()
             {
                 if level >= LogLevel::Error {
-                    eprintln!("{entry}");
+                    stderr_line(&entry);
                 }
                 return;
             }
             self.file = None;
-            eprintln!(
-                "{}",
-                line(
-                    &self.component,
-                    "WARNING",
-                    "File logging failed; using stderr."
-                )
-            );
+            stderr_line(&line(
+                &self.component,
+                "WARNING",
+                "File logging failed; using stderr.",
+            ));
         }
-        eprintln!("{entry}");
+        stderr_line(&entry);
     }
 
     pub fn finish(mut self, exit_code: i32) {

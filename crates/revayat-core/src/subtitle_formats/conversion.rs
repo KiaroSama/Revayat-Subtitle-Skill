@@ -5,7 +5,7 @@ use super::{
 use crate::text_pipeline as text;
 use indexmap::IndexMap;
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub struct Options<'a> {
     pub style: Option<&'a str>,
@@ -88,10 +88,6 @@ fn process(
     let mut removed = Vec::new();
     for source in &doc.cues {
         document::effective_times(source.start, source.end, "ass")?;
-        if let Some(reason) = mark(doc, source, options.strip_watermarks)? {
-            removed.push(json!({"id":source.id,"start_ms":source.start,"end_ms":source.end,"reason":reason,"text":source.text}));
-            continue;
-        }
         let mut cue = if doc.kind == "srt" {
             let mut cue = srt_to_ass(source.clone())?;
             cue.fields.insert("style".into(), style.into());
@@ -99,6 +95,10 @@ fn process(
         } else {
             source.clone()
         };
+        if let Some(reason) = mark(doc, source, options.strip_watermarks)? {
+            removed.push(json!({"id":source.id,"start_ms":source.start,"end_ms":source.end,"reason":reason,"text":source.text}));
+            continue;
+        }
         if options.direction == "rtl" && options.fix_zwnj {
             cue.text = text::normalize_persian_zwnj(cue.text)?;
         }
@@ -199,14 +199,8 @@ pub fn build_translator_ass(
     );
     let mut primary: Vec<_> = edition.cues.iter().collect();
     primary.sort_by_key(|c| c.start);
-    let mut far_end = i64::MIN;
-    let far_ends: Vec<_> = primary
-        .iter()
-        .map(|c| {
-            far_end = far_end.max(c.end);
-            far_end
-        })
-        .collect();
+    let mut by_end: Vec<_> = (0..primary.len()).collect();
+    by_end.sort_unstable_by_key(|&i| primary[i].end);
     let mut placeholders: IndexMap<(i64, i64), Cue> = IndexMap::new();
     let mut ids: HashSet<_> = primary.iter().map(|c| c.id.clone()).collect();
     if include_comments {
@@ -222,30 +216,48 @@ pub fn build_translator_ass(
     }
     let mut watermarks = removed.len();
     for (label, doc) in donors {
+        let mut retained = Vec::new();
         for source in &doc.cues {
             let (start, end) = document::effective_times(source.start, source.end, "ass")?;
             if mark(doc, source, options.strip_watermarks)?.is_some() {
                 watermarks += 1;
-                continue;
+            } else {
+                retained.push((source, start, end, None));
             }
-            let begin = far_ends.partition_point(|&n| n < start - 150);
-            let finish = primary.partition_point(|c| c.start <= end + 150);
-            let mut best = None;
+        }
+        // Sweep by donor start, then emit in source order to preserve comment and slot order.
+        let mut order: Vec<_> = (0..retained.len()).collect();
+        order.sort_unstable_by_key(|&i| retained[i].1);
+        let mut active = BTreeSet::new();
+        let (mut next_start, mut next_end) = (0, 0);
+        for i in order {
+            let (_, start, end, best) = &mut retained[i];
+            let finish = primary.partition_point(|c| c.start <= *end + 150);
+            while next_end < by_end.len() && primary[by_end[next_end]].end < *start - 150 {
+                active.remove(&by_end[next_end]);
+                next_end += 1;
+            }
+            while next_start < finish {
+                if primary[next_start].end >= *start - 150 {
+                    active.insert(next_start);
+                }
+                next_start += 1;
+            }
             let mut score = -151;
-            if let Some(candidates) = primary.get(begin..finish) {
-                for candidate in candidates {
-                    let overlap = end.min(candidate.end) - start.max(candidate.start);
-                    if overlap > score
-                        && (overlap * 4 > end - start || (-150..=0).contains(&overlap))
-                    {
-                        score = overlap;
-                        best = Some(candidate.id.as_str());
-                        if !include_comments {
-                            break;
-                        }
+            for &j in active.range(..finish) {
+                let candidate = primary[j];
+                let overlap = (*end).min(candidate.end) - (*start).max(candidate.start);
+                if overlap > score && (overlap * 4 > *end - *start || (-150..=0).contains(&overlap))
+                {
+                    score = overlap;
+                    *best = Some(candidate.id.as_str());
+                    if !include_comments {
+                        break;
                     }
                 }
             }
+        }
+        for (source, start, end, best) in retained {
             let id = if let Some(id) = best {
                 id
             } else {

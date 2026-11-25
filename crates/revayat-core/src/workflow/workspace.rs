@@ -8,6 +8,13 @@ use crate::subtitle_formats::document::{
 };
 use crate::validation;
 use regex::Regex;
+#[cfg(unix)]
+use rustix::{
+    fd::OwnedFd,
+    fs::{AtFlags, CWD, Dir, Mode, OFlags, fstat, mkdirat, openat, statat, unlinkat},
+    io::{Errno, Result as UnixResult},
+};
+#[cfg(not(unix))]
 use same_file::Handle;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -54,6 +61,9 @@ pub fn display_path(path: &Path) -> Result<std::borrow::Cow<'_, str>, String> {
 #[derive(Debug)]
 pub struct StagedDir {
     path: PathBuf,
+    #[cfg(unix)]
+    original: Option<(OwnedFd, OwnedFd)>,
+    #[cfg(not(unix))]
     original: Option<Handle>,
 }
 
@@ -76,15 +86,96 @@ impl AsRef<Path> for StagedDir {
 
 impl Drop for StagedDir {
     fn drop(&mut self) {
-        // shortcut: the identity check is not atomic with deletion; use handle-relative cleanup for untrusted parents.
+        #[cfg(unix)]
+        if let Some((parent, original)) = &self.original
+            && let Some(name) = self.path.file_name()
+        {
+            let _ = remove_staging(parent, name, original);
+        }
+        #[cfg(not(unix))]
         if let Some(original) = &self.original
             && Handle::from_path(&self.path).is_ok_and(|current| &current == original)
         {
+            // shortcut: cleanup uses the path after verification; use relative handles when available.
             let _ = fs::remove_dir_all(&self.path);
         }
     }
 }
 
+#[cfg(unix)]
+const DIR_FLAGS: OFlags = OFlags::RDONLY
+    .union(OFlags::DIRECTORY)
+    .union(OFlags::NOFOLLOW)
+    .union(OFlags::CLOEXEC);
+
+#[cfg(unix)]
+fn remove_staging(
+    parent: &OwnedFd,
+    name: impl rustix::path::Arg + Copy,
+    dir: &OwnedFd,
+) -> UnixResult<()> {
+    let owned = fstat(dir)?;
+    let unchanged = || {
+        statat(parent, name, AtFlags::SYMLINK_NOFOLLOW)
+            .is_ok_and(|entry| (entry.st_dev, entry.st_ino) == (owned.st_dev, owned.st_ino))
+    };
+    if !unchanged() {
+        return Ok(());
+    }
+    for entry in Dir::read_from(dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if matches!(name.to_bytes(), b"." | b"..") {
+            continue;
+        }
+        match openat(dir, name, DIR_FLAGS, Mode::empty()) {
+            Ok(child) if fstat(&child)?.st_dev == owned.st_dev => {
+                remove_staging(dir, name, &child)?;
+            }
+            Ok(_) => return Err(Errno::XDEV),
+            Err(Errno::NOTDIR | Errno::LOOP) => unlinkat(dir, name, AtFlags::empty())?,
+            Err(error) => return Err(error),
+        }
+    }
+    if unchanged() {
+        unlinkat(parent, name, AtFlags::REMOVEDIR)?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
+    let parent = std::path::absolute(parent).map_err(io_error)?;
+    let parent_fd =
+        openat(CWD, &parent, DIR_FLAGS, Mode::empty()).map_err(|error| io_error(error.into()))?;
+    let stat = fstat(&parent_fd).map_err(|error| io_error(error.into()))?;
+    let uid = rustix::process::geteuid().as_raw();
+    // Trust owner-controlled parents, including root-owned sticky temporary directories.
+    if stat.st_uid != uid && stat.st_uid != 0
+        || stat.st_mode & 0o002 != 0 && stat.st_mode & 0o1000 == 0
+    {
+        return Err(value_error("Staging requires a protected parent directory"));
+    }
+    let temporary = tempfile::Builder::new()
+        .prefix(prefix)
+        .disable_cleanup(true)
+        .make_in(&parent, |path| {
+            let name = path
+                .file_name()
+                .filter(|_| path.parent() == Some(parent.as_path()))
+                .ok_or(std::io::ErrorKind::InvalidInput)?;
+            mkdirat(&parent_fd, name, Mode::RWXU)?;
+            Ok(openat(&parent_fd, name, DIR_FLAGS, Mode::empty())?)
+        })
+        .map_err(io_error)?;
+    let (original, path) = temporary.keep().map_err(|error| io_error(error.error))?;
+    Ok(StagedDir {
+        path,
+        original: Some((parent_fd, original)),
+    })
+}
+
+#[cfg(not(unix))]
 pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
     let path = tempfile::Builder::new()
         .prefix(prefix)
@@ -368,8 +459,10 @@ pub fn assemble(work: &Path, output_format: Option<&str>) -> Result<Edition, Str
                     cue.start, cue.end, &base.kind,
                 )?;
                 if upgrade {
+                    let original_text = cue.text.clone();
+                    cue = srt_to_ass(cue)?;
                     let reason = crate::text_pipeline::watermark_reason_with_kind(
-                        cue.text.clone(),
+                        original_text,
                         &docs[key].kind,
                     )?;
                     if !reason.is_empty() {
@@ -384,7 +477,6 @@ pub fn assemble(work: &Path, output_format: Option<&str>) -> Result<Edition, Str
                     } else {
                         direction.into()
                     };
-                    cue = srt_to_ass(cue)?;
                     if direction == "rtl" {
                         cue.text = crate::text_pipeline::normalize_persian_zwnj(cue.text)?;
                     }

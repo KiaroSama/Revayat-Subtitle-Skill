@@ -40,10 +40,11 @@ terms against reliable sources for that work and the locked glossary. Log the
 sources and flag conflicts for the coordinator; do not silently change a term.
 For Persian terminology, export readable source text to {{SOURCE_TEXT}} and run
 revayat-subtitle lookup --json "{{SOURCE_TEXT}}".
-Use natural spoken Persian for dialogue unless the scene calls for a different
-register. Keep previous episodes' names and the source's honorifics. Match each
-speaker's cadence, humor and the intensity of threats, swearing
-and other dialogue. Keep meaning, quantities, negation and story references.
+For a Persian target, use natural spoken Persian unless the scene calls for a
+different register. For other targets, write dialogue in {{TARGET_LOCALE}} and
+use a register that fits the scene. Keep previous episodes' names and the source's
+honorifics. Match each speaker's cadence, humor and the intensity of threats,
+swearing and other dialogue. Keep meaning, quantities, negation and story references.
 Translate readable signs and OP/ED lyrics; preserve protected tags and drawings.
 Do not add facts or fill gaps with guesses. Flag uncertain readings and missing
 material by cue ID, with the evidence needed to decide them.

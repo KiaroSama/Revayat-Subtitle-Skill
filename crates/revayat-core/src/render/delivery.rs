@@ -3,17 +3,21 @@ use super::sampling::{
 };
 use crate::png_validation::{MAX_PNG_BYTES, decode_dimensions};
 use crate::publication::publish_bytes;
-use crate::runtime::files::{local_path, read_json, read_limited};
+use crate::runtime::files::{local_path, parse_json, read_limited, read_limited_with_metadata};
 use crate::subtitle_formats::document::parse;
 use crate::validation;
 use crate::workflow::contract::{io_error, item, items, string, value_error};
+#[cfg(windows)]
+use crate::workflow::workspace::utf8_path;
 use crate::workflow::workspace::{
-    self, Documents, Edition, digest, display_path, read_record, stage, utf8_path,
+    self, Documents, Edition, digest, display_path, read_record, stage,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeSet, HashSet};
 use std::fs::{self, File};
 use std::io::{ErrorKind, Read};
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use zip::write::SimpleFileOptions;
@@ -160,8 +164,9 @@ pub fn check_delivery(
     if names.iter().collect::<HashSet<_>>().len() != names.len() {
         return Err(value_error("Duplicate episode filenames"));
     }
-    let (mut backgrounds, mut paths, mut physical) =
-        (BTreeSet::new(), HashSet::new(), HashSet::new());
+    let (mut backgrounds, mut paths) = (BTreeSet::new(), HashSet::new());
+    #[cfg(any(unix, windows))]
+    let mut physical = HashSet::new();
     let mut frame_count = 0;
     let deadline = Instant::now() + Duration::from_secs(900);
     let renders = local_path(build, "renders")?;
@@ -196,10 +201,7 @@ pub fn check_delivery(
                 "Render receipt changed; rerender rather than transferring approval",
             ));
         }
-        let receipt = validation::obj(
-            read_json(&receipt_path, MAX_RECEIPT_BYTES)?,
-            "render receipt".into(),
-        )?;
+        let receipt = validation::obj(parse_json(&raw, "receipt.json")?, "render receipt".into())?;
         for &field in RECEIPT_FIELDS {
             if receipt[field] != evidence[field] {
                 return Err(value_error(format!(
@@ -328,12 +330,11 @@ pub fn check_delivery(
                     "Frame path is not its assigned episode/sample file",
                 ));
             }
-            let handle = same_file::Handle::from_path(&path).map_err(io_error)?;
             #[cfg(windows)]
             let key = utf8_path(&path)?.to_lowercase();
             #[cfg(not(windows))]
             let key = path.clone();
-            if !paths.insert(key) || !physical.insert(handle) {
+            if !paths.insert(key) {
                 return Err(value_error("Duplicate or aliased render frame path"));
             }
             if require_review
@@ -341,7 +342,36 @@ pub fn check_delivery(
             {
                 return Err(value_error("Inspect every rendered frame before packaging"));
             }
-            let raw = read_limited(&path, MAX_PNG_BYTES as u64)?;
+            let (raw, metadata) = read_limited_with_metadata(&path, MAX_PNG_BYTES as u64)?;
+            #[cfg(unix)]
+            let identity = (metadata.dev(), metadata.ino());
+            #[cfg(windows)]
+            let identity = {
+                use winsafe::co::{DISPOSITION, FILE_ATTRIBUTE, FILE_SHARE, GENERIC};
+                let win_error = |error: winsafe::co::ERROR| {
+                    io_error(std::io::Error::from_raw_os_error(error.raw() as i32))
+                };
+                let (file, _) = winsafe::HFILE::CreateFile(
+                    utf8_path(&path)?,
+                    GENERIC::READ,
+                    Some(FILE_SHARE::READ | FILE_SHARE::WRITE | FILE_SHARE::DELETE),
+                    None,
+                    DISPOSITION::OPEN_EXISTING,
+                    FILE_ATTRIBUTE::NORMAL,
+                    None,
+                    None,
+                    None,
+                )
+                .map_err(win_error)?;
+                let info = file.GetFileInformationByHandle().map_err(win_error)?;
+                (info.dwVolumeSerialNumber, info.nFileIndex())
+            };
+            #[cfg(not(unix))]
+            let _ = metadata;
+            #[cfg(any(unix, windows))]
+            if !physical.insert(identity) {
+                return Err(value_error("Duplicate or aliased render frame path"));
+            }
             if digest(&raw) != frame["sha256"] {
                 return Err(value_error("Rendered image changed after review"));
             }

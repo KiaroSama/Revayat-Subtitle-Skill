@@ -321,8 +321,12 @@ pub fn execute_owned(
         if observed(target)? != item.previous {
             return Err(invalid("Installation target changed after preflight"));
         }
-        let (previous_id, old) = if item.previous.is_some() {
-            (json!(identity(target)?), tree_manifest(target)?)
+        let (previous_id, old) = if let Some(expected) = item.previous {
+            let (id, manifest) = inspect_tree(target)?;
+            if id != format_identity(expected) {
+                return Err(invalid("Installation target changed during inspection"));
+            }
+            (json!(id), manifest)
         } else {
             (Value::Null, Value::Null)
         };
@@ -433,16 +437,16 @@ fn stage_and_publish(
         if data["records"][i]["new"].is_null() {
             continue;
         }
-        let stage = path(&data["records"][i]["stage"])?.to_path_buf();
-        safe_path(&stage, true)?;
-        fs::create_dir(&stage)?;
-        sync_directory(
-            stage
-                .parent()
-                .ok_or_else(|| invalid("Missing transaction directory"))?,
-        )?;
-        data["records"][i]["stage_id"] = json!(identity(&stage)?);
+        let stage = safe_path(path(&data["records"][i]["stage"])?, true)?;
+        let parent = stage
+            .parent()
+            .ok_or_else(|| invalid("Missing transaction directory"))?;
+        // Recovery ignores an unbound sibling and only cleans the reserved name after binding it.
+        let sibling = parent.join(format!(".stage-{}", uuid::Uuid::new_v4().simple()));
+        fs::create_dir(&sibling)?;
+        data["records"][i]["stage_id"] = json!(identity(&sibling)?);
         registry::save_journal(owner, journal, data)?;
+        move_owned(&sibling, &stage)?;
         for (source, relative) in plan
             .payloads
             .get(&item.payload)

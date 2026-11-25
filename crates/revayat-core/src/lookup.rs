@@ -96,33 +96,49 @@ pub fn load(fname: serde_json::Value) -> Result<serde_json::Value, String> {
         ),
     })?;
     let path = if Path::new(fname).is_absolute() {
-        Path::new(fname).to_path_buf()
-    } else if let Some(path) = crate::runtime::assets::find_file(&Path::new(DATA).join(fname)) {
-        path
+        Some(Path::new(fname).to_path_buf())
     } else {
-        return Ok(json!([]));
+        crate::runtime::assets::find_file(&Path::new(DATA).join(fname))
     };
-    if !path.exists() {
-        return Ok(json!([]));
+    if let Some(path) = path.filter(|path| path.exists()) {
+        return fs::read_to_string(&path)
+            .map(|text| bank_rows(&text))
+            .map_err(|error| {
+                let (kind, errno, detail) = match error.kind() {
+                    std::io::ErrorKind::PermissionDenied => {
+                        ("PermissionError", 13, "Permission denied")
+                    }
+                    std::io::ErrorKind::IsADirectory => ("IsADirectoryError", 21, "Is a directory"),
+                    std::io::ErrorKind::NotFound => {
+                        ("FileNotFoundError", 2, "No such file or directory")
+                    }
+                    _ => return format!("OSError: {error}"),
+                };
+                let path = path.to_string_lossy();
+                let quote = if path.contains('\'') && !path.contains('"') {
+                    '"'
+                } else {
+                    '\''
+                };
+                let escaped = path
+                    .replace('\\', "\\\\")
+                    .replace(quote, &format!("\\{quote}"));
+                format!("{kind}: [Errno {errno}] {detail}: {quote}{escaped}{quote}")
+            });
     }
-    let content = fs::read_to_string(&path).map_err(|error| {
-        let (kind, errno, detail) = match error.kind() {
-            std::io::ErrorKind::PermissionDenied => ("PermissionError", 13, "Permission denied"),
-            std::io::ErrorKind::IsADirectory => ("IsADirectoryError", 21, "Is a directory"),
-            std::io::ErrorKind::NotFound => ("FileNotFoundError", 2, "No such file or directory"),
-            _ => return format!("OSError: {error}"),
-        };
-        let path = path.to_string_lossy();
-        let quote = if path.contains('\'') && !path.contains('"') {
-            '"'
-        } else {
-            '\''
-        };
-        let escaped = path
-            .replace('\\', "\\\\")
-            .replace(quote, &format!("\\{quote}"));
-        format!("{kind}: [Errno {errno}] {detail}: {quote}{escaped}{quote}")
-    })?;
+    let built_in = match fname {
+        "idioms.tsv" => {
+            include_str!("../../../skills/revayat-subtitle/voice/persian/scripts/data/idioms.tsv")
+        }
+        "glossary.tsv" => {
+            include_str!("../../../skills/revayat-subtitle/voice/persian/scripts/data/glossary.tsv")
+        }
+        _ => "",
+    };
+    Ok(bank_rows(built_in))
+}
+
+fn bank_rows(content: &str) -> Value {
     let rows: Vec<_> = content
         .split(['\r', '\n'])
         .filter(|line| !line.trim_start_matches(space).starts_with('#'))
@@ -133,7 +149,7 @@ pub fn load(fname: serde_json::Value) -> Result<serde_json::Value, String> {
                 .then(|| json!({"$tuple": [en, fa, parts.next().unwrap_or_default()]}))
         })
         .collect();
-    Ok(json!(rows))
+    json!(rows)
 }
 
 fn pattern_parts(phrase: &Value) -> Result<(Vec<&str>, bool, bool), String> {

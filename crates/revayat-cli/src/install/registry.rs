@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use sha2::Sha256;
 use std::{
     collections::HashSet,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -13,6 +13,7 @@ pub const CAPACITY: usize = 1000;
 pub const LEGACY_CAPACITY: usize = CAPACITY + 1;
 const KEY: &str = "registry.key";
 const REGISTRY: &str = "pending.json";
+const STAGED_REGISTRY: &str = "pending.json.new";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -31,36 +32,32 @@ pub struct InstallRegistry {
 impl InstallRegistry {
     pub fn load(root: &Path) -> io::Result<Self> {
         let path = safe_path(&root.join(REGISTRY), false)?;
-        let key = key(root)?;
-        let authentication =
-            || invalid("Installation pending registry authentication failed; preserve state");
-        if !existing(&path)? {
-            return if key.is_some() {
-                Err(authentication())
-            } else {
-                Ok(Self {
-                    records: Vec::new(),
-                })
-            };
-        }
-        let value = read_json(&path)?;
-        let records = match key {
-            Some(key) => {
-                if !object_fields(&value, &["records", "hmac"]) {
+        let current = existing(&path)?.then(|| read_json(&path)).transpose()?;
+        let records = match (key(root)?, current) {
+            (Some(key), Some(value)) if !value.is_array() => signed_records(value, &key)?,
+            (Some(key), _) => {
+                let pending = safe_path(&root.join(STAGED_REGISTRY), false)?;
+                if !existing(&pending)? {
                     return Err(authentication());
                 }
-                let tag = value["hmac"]
-                    .as_str()
-                    .filter(|s| is_hex(s, 64))
-                    .ok_or_else(authentication)?;
-                mac(&key, &value["records"])?
-                    .verify_slice(&hex::decode(tag).map_err(io::Error::other)?)
-                    .map_err(|_| authentication())?;
-                value["records"].clone()
+                let bytes = read_limited(&pending, MAX_FILE)?;
+                let records = signed_records(serde_json::from_slice(&bytes)?, &key)?;
+                let registry = Self::from_records(records)?;
+                finish_publication(root)?;
+                return Ok(registry);
             }
-            None if value.is_array() => value,
-            None => return Err(authentication()),
+            (None, Some(value)) if value.is_array() => value,
+            (None, None) => {
+                return Ok(Self {
+                    records: Vec::new(),
+                });
+            }
+            (None, Some(_)) => return Err(authentication()),
         };
+        Self::from_records(records)
+    }
+
+    fn from_records(records: Value) -> io::Result<Self> {
         let schema = || invalid("Installation pending registry is invalid; preserve state");
         if !records
             .as_array()
@@ -96,11 +93,13 @@ impl InstallRegistry {
         };
         let hmac = hex::encode(mac(&key, &records)?.finalize().into_bytes());
         let data = json_bytes(&json!({"records": records, "hmac": hmac}))?;
-        // Key-first publication prevents accepting a downgrade after an interrupted migration.
         if existing_key.is_none() {
+            write_bytes(&root.join(STAGED_REGISTRY), &data, true)?;
             write_bytes(&root.join(KEY), &key, false)?;
+            finish_publication(root)
+        } else {
+            write_bytes(&root.join(REGISTRY), &data, true)
         }
-        write_bytes(&root.join(REGISTRY), &data, true)
     }
 
     fn entry_index(&self, journal: &Path) -> io::Result<usize> {
@@ -132,31 +131,74 @@ impl InstallRegistry {
         )
     }
 
-    fn can_retire(&self, entry: &RegistryEntry, home: &Path) -> io::Result<bool> {
-        if entry.active {
-            return Ok(false);
-        }
+    fn can_retire(
+        &self,
+        entry: &RegistryEntry,
+        home: &Path,
+        seen: &mut HashSet<PathBuf>,
+    ) -> io::Result<bool> {
         if !existing(&safe_path(&entry.path, false)?)? {
-            return Ok(true);
+            return Ok(!entry.active);
         }
         let data = self.load_journal(&entry.path, home)?;
-        Ok(data["state"] == "committed"
-            || data["state"] == "restored" && !disposals_pending(&data)?)
+        if data["state"] == "committed" {
+            let mut protected = false;
+            for record in records(&data)? {
+                let target = path(&record["target"])?;
+                if seen.insert(path_key(target)) && existing(target).unwrap_or(true) {
+                    protected = true;
+                }
+            }
+            return Ok(!entry.active && !protected);
+        }
+        Ok(!entry.active && data["state"] == "restored" && !disposals_pending(&data)?)
     }
 
     fn evict_one(&mut self, home: &Path, preserve: Option<&Path>) -> bool {
-        let index = self.records.iter().position(|row| {
-            preserve != Some(row.path.as_path()) && self.can_retire(row, home).unwrap_or(false)
-        });
-        if let Some(index) = index {
+        let mut seen = HashSet::new();
+        let mut oldest = None;
+        // Read newest first to retain the committed row that governs each live target.
+        for (index, row) in self.records.iter().enumerate().rev() {
+            if self.can_retire(row, home, &mut seen).unwrap_or(false)
+                && preserve != Some(row.path.as_path())
+            {
+                oldest = Some(index);
+            }
+        }
+        if let Some(index) = oldest {
             self.records.remove(index);
         }
-        index.is_some()
+        oldest.is_some()
     }
 }
 
 fn changed() -> io::Error {
     invalid("Unregistered or changed installation transaction instructions; preserve state")
+}
+
+fn authentication() -> io::Error {
+    invalid("Installation pending registry authentication failed; preserve state")
+}
+
+fn signed_records(mut value: Value, key: &[u8; 32]) -> io::Result<Value> {
+    if !object_fields(&value, &["records", "hmac"]) {
+        return Err(authentication());
+    }
+    let tag = value["hmac"]
+        .as_str()
+        .filter(|s| is_hex(s, 64))
+        .ok_or_else(authentication)?;
+    mac(key, &value["records"])?
+        .verify_slice(&hex::decode(tag).map_err(io::Error::other)?)
+        .map_err(|_| authentication())?;
+    Ok(value["records"].take())
+}
+
+fn finish_publication(root: &Path) -> io::Result<()> {
+    let pending = safe_path(&root.join(STAGED_REGISTRY), false)?;
+    let published = safe_path(&root.join(REGISTRY), false)?;
+    fs::rename(pending, published)?;
+    sync_directory(root)
 }
 
 fn key(root: &Path) -> io::Result<Option<[u8; 32]>> {
@@ -246,7 +288,8 @@ pub fn save_journal(root: &Path, journal: &Path, data: &Value) -> io::Result<()>
     registry.save(root)?;
     let outcome = write_bytes(journal, &bytes, true);
     // An uncertain replacement can leave either exact revision on disk.
-    if let Ok(observed) = read_limited(journal, MAX_FILE).map(|bytes| digest(&bytes))
+    if outcome.is_ok()
+        && let Ok(observed) = read_limited(journal, MAX_FILE).map(|bytes| digest(&bytes))
         && (observed == old || observed == new)
     {
         registry.records[i].digests = vec![observed];
