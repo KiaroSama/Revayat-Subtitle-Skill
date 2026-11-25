@@ -5,7 +5,7 @@ description: Use when subtitle timing depends on choosing the right audio track,
 
 # FFmpeg for subtitle sync
 
-Revayat Subtitle v3.0.0 uses FFmpeg to read media and the Rust CLI to align SRT or ASS cues. Use local `ffmpeg` and `ffprobe` for inspection. No helper scripts are needed. A build with libass is needed only for the optional subtitle render check.
+Revayat Subtitle v3.0.1 uses FFmpeg to read media and the Rust CLI to align SRT or ASS cues. Use local `ffmpeg` and `ffprobe` for inspection. No helper scripts are needed. A build with libass is needed only for the optional subtitle render check.
 
 1. Probe the matching release. Confirm the picture, dialogue track, stream start times, and duration. On a multi-track release, check the language and title tags, then listen if the tags are missing or ambiguous.
 2. Use video directly if FFmpeg's automatic audio choice is the track you want. To control which audio track is used, [extract it as a 16 kHz mono PCM WAV](references/sync-and-probing.md#extract-the-chosen-track), verify it, and pass it with `--wav` instead of `--video`.

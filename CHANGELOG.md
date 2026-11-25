@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 3.0.1 (2026-11-25)
+
+- Close the Rust audit's R01-R27 findings across subtitle processing, sync, installation, and output validation.
+- Keep status checks working when a build staging directory disappears mid-scan. Fix Persian lint failures on long subtitle files by scanning single-line rules one line at a time.
+- Score FPS drift against the full subtitle energy. Refine each dialogue cue's start and end against its own audio within neighboring cue bounds, then snap eligible starts to speech onsets.
+- Validate marketplace versions against the release tag and require a passing full-history Gitleaks scan before building or signing release binaries.
+- Improve Windows and Linux test reliability with isolated temporary directories for non-admin Windows runs and a bounded retry for Linux test launches that encounter `ETXTBSY`.
 - Repair the Rust v3 subtitle pipeline's comment/override preservation, bidi scopes, SRT separator runs, generated styles, codec validation and literal JSON edition identities. Use generation recipe `14` and normalization recipe `13`; historical workspaces keep their sources and reviews while new editions require fresh image evidence.
 - Preserve delayed/gapped audio timelines during sync, clean up owned processes on cancellation, bound standalone inputs, and replay external-worker endpoint transformations against the requested limits before publication.
 - Correct automatic uninstall discovery, authenticated Unix executable ownership, early distribution budgets and Windows recovery path aliases. Keep legacy journal compatibility and safe retry behavior.

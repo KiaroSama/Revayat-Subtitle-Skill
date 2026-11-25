@@ -266,7 +266,7 @@ checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
 
 [[package]]
 name = "subsync-rs"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "nix",
  "process-wrap",
