@@ -4,11 +4,11 @@ Idioms and collocations are where literal translation fails hardest, and the rig
 the collocation (the dictionary's first hit is often the machine-Persian tell). Don't load the whole
 banks; run the lookup so only the entries in *your* text surface:
 
-    python scripts/lookup.py <source_file>
+    revayat-subtitle lookup "source.txt"
 
-Full banks: `scripts/data/idioms.tsv` and `scripts/data/glossary.tsv` (seed sets; extend them, see
-`NOTICE`). Rule: translate the function, not the words. An English idiom maps to a Persian idiom or
-a recast clause, never a calque.
+Use `--json` for structured output or `--reverse` for Persian input. The CLI reads
+the bundled idiom and glossary tables. Render an English idiom with the Persian
+idiom or clause that does the same job in the scene.
 
 ## High-value idiom patterns
 - to my name → «دار و ندار»: «همهٔ دار و ندارم ده دلار بود» (P37)

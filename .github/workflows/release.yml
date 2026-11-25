@@ -4,9 +4,9 @@ name: Release & Sign
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build, sign, and publish (e.g. v2.0.0)'
+        description: 'Release tag to build, sign, and publish (e.g. v3.0.0)'
         type: string
-        default: 'v2.0.0'
+        default: 'v3.0.0'
         required: true
 
 permissions: {}
@@ -23,6 +23,7 @@ jobs:
     with:
       validation_id: ${{ github.run_id }}
   build:
+    name: Build release (${{ matrix.name }})
     needs: validate
     permissions:
       contents: read
@@ -33,7 +34,7 @@ jobs:
       matrix:
         include:
           - name: windows-x64
-            runner: windows-latest
+            runner: windows-2025
             target: x86_64-pc-windows-msvc
             ext: .exe
           - name: windows-arm64
@@ -60,7 +61,7 @@ jobs:
           export LC_ALL=C
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] ||
              ! git check-ref-format "refs/tags/$TAG"; then
-            printf '%s\n' 'Use a version tag such as v2.0.0 or v2.0.0-rc.1.' >&2
+            printf '%s\n' 'Use a version tag such as v3.0.0 or v3.0.0-rc.1.' >&2
             exit 1
           fi
 
@@ -68,47 +69,46 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install and verify native Rust toolchain
+      - name: Install the pinned native Rust toolchain
         shell: bash
         run: |
           rustup set default-host "$RUST_TARGET"
-          rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
-          rustup default 1.100.0
+          rustup toolchain install "1.100.0-$RUST_TARGET" --profile minimal
+          rustup default "1.100.0-$RUST_TARGET"
+
+      - name: Build and check both release binaries
+        shell: bash
+        run: |
           version=$(rustc --version --verbose)
           if [[ "$version" != 'rustc 1.100.0 '* ]] || ! grep -Fxq "host: $RUST_TARGET" <<< "$version"; then
             printf '%s\n' 'Expected Rust 1.100.0 on the matrix host target.' >&2
             exit 1
           fi
-
-      - name: Test, build, and check subsync help
-        working-directory: rust/subsync-rs
-        shell: bash
-        env:
-          CARGO_TARGET_DIR: target
-        run: |
-          cargo test --locked
-          cargo build --locked --release
-          mkdir -p ../../dist
-          binary="../../dist/subsync-${TAG}-${TARGET_NAME}${EXT}"
-          cp "target/release/subsync${EXT}" "$binary"
-          "$binary" --help
+          cargo build --workspace --release --locked --target "$RUST_TARGET" --bin revayat-subtitle --bin subsync
+          mkdir -p dist
+          for name in revayat-subtitle subsync; do
+            binary="dist/${name}-${TAG}-${TARGET_NAME}${EXT}"
+            cp "target/$RUST_TARGET/release/${name}${EXT}" "$binary"
+            "$binary" --help
+          done
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: subsync-${{ matrix.name }}
-          path: dist/subsync-*
+          name: release-binaries-${{ matrix.name }}
+          path: dist/
           if-no-files-found: error
           retention-days: 1
 
   sign-and-release:
+    name: Sign and publish release
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 20
     environment: revayat-subtitle-signing
     permissions:
-      contents: write
-      attestations: write
-      id-token: write
+      contents: write # Create the release and upload assets.
+      attestations: write # Publish build provenance.
+      id-token: write # Get the OIDC token for provenance.
     env:
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
@@ -119,7 +119,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: subsync-*
+          pattern: release-binaries-*
           path: release-assets/
           merge-multiple: true
 
@@ -132,12 +132,16 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $assets = Join-Path $env:GITHUB_WORKSPACE 'release-assets'
-          $prefix = "subsync-$env:RELEASE_TAG"
-          $windows = "$prefix-windows-x64.exe", "$prefix-windows-arm64.exe"
-          $linux = "$prefix-linux-x64", "$prefix-linux-arm64"
+          $windows = @()
+          $linux = @()
+          foreach ($name in 'revayat-subtitle', 'subsync') {
+            $prefix = "$name-$env:RELEASE_TAG"
+            $windows += "$prefix-windows-x64.exe", "$prefix-windows-arm64.exe"
+            $linux += "$prefix-linux-x64", "$prefix-linux-arm64"
+          }
           $binaries = $windows + $linux
           $downloaded = @(Get-ChildItem -LiteralPath $assets -Force)
-          if ($downloaded.Count -ne $binaries.Count) { throw 'Expected exactly four release binaries.' }
+          if ($downloaded.Count -ne $binaries.Count) { throw 'Expected exactly eight release binaries.' }
           foreach ($name in $binaries) {
             $file = Get-Item -LiteralPath (Join-Path $assets $name)
             if ($file.Name -cne $name -or $file.PSIsContainer -or $file.Length -le 0 -or
@@ -203,22 +207,36 @@ jobs:
             Remove-Item Env:WINDOWS_SIGNING_PFX_BASE64, Env:LINUX_SIGNING_ED25519_PRIVATE_PEM
           }
 
-          $tamperedExe = Join-Path $env:RUNNER_TEMP 'tampered-subsync.exe'
-          foreach ($name in $windows) {
-            $exe = Join-Path $assets $name
-            $null = & $signtool.FullName sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $pfx /p $env:WINDOWS_SIGNING_PFX_PASSWORD /d 'Revayat Subtitle subsync' /du 'https://github.com/KiaroSama/Revayat-Subtitle-Skill' $exe 2>&1
-            if ($LASTEXITCODE -ne 0) { throw "SignTool failed for $name (exit $LASTEXITCODE)." }
-            $signature = Get-AuthenticodeSignature -LiteralPath $exe
-            if (!$signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $thumbprint -or
-                !$signature.TimeStamperCertificate -or $signature.Status -notin 'Valid', 'UnknownError') {
-              throw "Authenticode verification failed for $name ($($signature.Status))."
+          $tamperedExe = Join-Path $env:RUNNER_TEMP 'tampered-release.exe'
+          $store = 'Cert:\CurrentUser\My'
+          if (Test-Path -LiteralPath "$store\$thumbprint") { throw 'The signing certificate is already installed.' }
+          $imported = @()
+          try {
+            $password = ConvertTo-SecureString $env:WINDOWS_SIGNING_PFX_PASSWORD -AsPlainText -Force
+            Remove-Item Env:WINDOWS_SIGNING_PFX_PASSWORD
+            $imported = @(Import-PfxCertificate -FilePath $pfx -CertStoreLocation $store -Password $password)
+            if (!($imported | Where-Object { $_.HasPrivateKey -and $_.Thumbprint -eq $thumbprint })) {
+              throw 'The PFX does not contain the expected signing key.'
             }
-            New-TamperedCopy $exe $tamperedExe -PeFile
-            if ((Get-AuthenticodeSignature -LiteralPath $tamperedExe).Status -ne 'HashMismatch') {
-              throw "Authenticode did not report a hash mismatch after changing $name."
+            foreach ($name in $windows) {
+              $exe = Join-Path $assets $name
+              $null = & $signtool.FullName sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 $thumbprint /d 'Revayat Subtitle' /du 'https://github.com/KiaroSama/Revayat-Subtitle-Skill' $exe 2>&1
+              if ($LASTEXITCODE -ne 0) { throw "SignTool failed for $name (exit $LASTEXITCODE)." }
+              $signature = Get-AuthenticodeSignature -LiteralPath $exe
+              if (!$signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $thumbprint -or
+                  !$signature.TimeStamperCertificate -or $signature.Status -notin 'Valid', 'UnknownError') {
+                throw "Authenticode verification failed for $name ($($signature.Status))."
+              }
+              New-TamperedCopy $exe $tamperedExe -PeFile
+              if ((Get-AuthenticodeSignature -LiteralPath $tamperedExe).Status -ne 'HashMismatch') {
+                throw "Authenticode did not report a hash mismatch after changing $name."
+              }
+            }
+          } finally {
+            foreach ($cert in $imported | Where-Object HasPrivateKey) {
+              Remove-Item -LiteralPath "$store\$($cert.Thumbprint)" -DeleteKey
             }
           }
-          Remove-Item Env:WINDOWS_SIGNING_PFX_PASSWORD
 
           function Sign-Ed25519($file) {
             & $openssl pkeyutl -sign -rawin -inkey $key -in $file -out "$file.sig"
@@ -226,7 +244,7 @@ jobs:
             & $openssl pkeyutl -verify -pubin -inkey $publicKey -rawin -in $file -sigfile "$file.sig"
             if ($LASTEXITCODE -ne 0) { throw "Ed25519 verification failed for $file." }
           }
-          $tamperedBin = Join-Path $env:RUNNER_TEMP 'tampered-subsync'
+          $tamperedBin = Join-Path $env:RUNNER_TEMP 'tampered-release'
           foreach ($name in $linux) {
             $bin = Join-Path $assets $name
             Sign-Ed25519 $bin
@@ -249,7 +267,7 @@ jobs:
         shell: pwsh
         run: |
           $failed = $false
-          foreach ($name in 'codesign.pfx', 'ed25519.pem', 'tampered-subsync.exe', 'tampered-subsync') {
+          foreach ($name in 'codesign.pfx', 'ed25519.pem', 'tampered-release.exe', 'tampered-release') {
             $path = Join-Path $env:RUNNER_TEMP $name
             if (!(Test-Path -LiteralPath $path)) { continue }
             try {
@@ -275,8 +293,9 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            release-assets/subsync-*
-            !release-assets/subsync-*.sig
+            release-assets/revayat-subtitle-${{ inputs.tag }}-*
+            release-assets/subsync-${{ inputs.tag }}-*
+            !release-assets/*.sig
 
       - name: Publish signed release
         shell: pwsh
@@ -308,6 +327,6 @@ jobs:
             gh release upload "$env:RELEASE_TAG" @assets --clobber
           } else {
             gh release create "$env:RELEASE_TAG" @assets --target "$env:GITHUB_SHA" `
-              --title "Revayat Subtitle $env:RELEASE_TAG" --notes 'Signed subsync binaries for Windows and Linux (x64 and arm64). See docs/signing/README.md for verification commands.'
+              --title "Revayat Subtitle $env:RELEASE_TAG" --notes 'Signed revayat-subtitle and subsync binaries for Windows and Linux (x64 and arm64). See docs/signing/README.md for verification commands.'
           }
           if ($LASTEXITCODE -ne 0) { throw 'GitHub CLI failed to publish the release assets.' }

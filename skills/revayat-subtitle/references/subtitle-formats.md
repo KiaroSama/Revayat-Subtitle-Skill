@@ -188,7 +188,7 @@ not permission to redistribute them. See [persian-typography.md](persian-typogra
 
 ## Default ASS output, watermarks and Translator Mode
 
-From v2.0, output defaults to ASS (`v4.00+`, `PlayResX: 1920`, `PlayResY: 1080`,
+Output defaults to ASS (`v4.00+`, `PlayResX: 1920`, `PlayResY: 1080`,
 `ScaledBorderAndShadow: yes`) with `B Koodak` bold styling and subtle black outline
 and shadow (`Outline=1.5`, `Shadow=0.8`), preserving italics, bold, underline,
 strikeout, alignment, color and positioning overrides. Pass `--output-format srt`
@@ -219,29 +219,17 @@ Mark a genuine multiword credit explicitly in its worksheet instead. A URL, site
 inside a sentence is not sufficient; mixed dialogue/advertising cues remain for
 editorial review. `--keep-watermarks` disables automatic removal for conversion.
 This detector is a conservative mechanical aid, not a semantic review certificate.
-The Python and native `watermark_reason` / `is_watermark_cue` APIs accept
-`kind="srt"` or `kind="ass"`; their one-argument default is SRT. Conversion,
-Translator Mode donor checks and workspace upgrades pass the actual source kind.
-The existing Subcore dispatch requires the exact compiled contract epoch
-`REVAYAT_NATIVE_CONTRACT = 1` for every operation. An entirely old installed
-Subcore package without that epoch uses current Python normalization, conversion,
-wrapping, direction handling and watermark classification instead. Current
-Subcore, markup and Persian-linter facades also reject an absent or mismatched
-compiled epoch with `ImportError`; this adds no new automatic markup/linter
-dispatch. A watermark-only gate would leave old wrapping or Unicode behavior
-active. `WATERMARK_FORMAT_API = 1` remains feature metadata, not compatibility
-authority. Mandatory native parity requires the current epoch on all three
-actual compiled extensions and does not count fallback as native success.
-When an accelerated API or its observable semantics becomes incompatible, advance
-the compiled epoch, facade/dispatcher checks and parity expectations together;
-changing only the wrapper version does not establish compatibility.
+The Rust CLI classifies credits in the source format during conversion, Translator
+Mode donor checks and workspace rebuilds. To review a conversion with credits
+intact, run `revayat-subtitle convert "input.srt" --out "retained.ass" --keep-watermarks`.
 Workspace review links must still resolve to emitted cues after normalization;
 linking to an automatically removed credit refuses the build until the coordinator
 repairs the editorial decision. A cue cannot link to itself.
 
 Translator Mode (`translator-ass` / `--translator-mode`) adds empty placeholder
 `Dialogue:` slots for uncovered donor spans, with optional `Comment:` source
-reference lines. A chronological index supports donor matching; final ASS rows
+references. Run `revayat-subtitle translator-ass "base.ass" --donor "donor.srt" --source-comments --out "worksheet.ass"`.
+A chronological index supports donor matching; final ASS rows
 retain original primary read order inside overlap components so layered effects
 and collision placement survive. Independent components and non-overlapping
 slots remain chronological.

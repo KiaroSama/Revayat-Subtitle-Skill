@@ -1,12 +1,12 @@
 # typography-and-rtl.md: Persian text mechanics
 
-The deterministic parts are enforced by `scripts/persian_lint.py`. This file explains the rules
-behind it and, more important, the cases the script leaves to your judgment. If you cannot run
-scripts (no code execution), apply sections 1 to 4 by hand; they are short.
+Use `revayat-subtitle lint` to check plain Persian UTF-8 text. Apply sections 1 to 4
+by hand if you cannot run the CLI. For subtitles, extract the readable cue text;
+leave ASS controls, timestamps and JSON out of the text you lint.
 
-    python scripts/persian_lint.py --check file.txt          # report
-    python scripts/persian_lint.py --fix   file.txt          # normalized text to stdout
-    python scripts/persian_lint.py --check --style file.txt  # also flag bureaucratic / AI phrases
+    revayat-subtitle lint --check "file.txt"          # report
+    revayat-subtitle lint --fix "file.txt"            # normalized text to stdout
+    revayat-subtitle lint --check --style "file.txt"  # also flag officialese and recurring AI phrases
 
 ## 1. Letters: Persian, not Arabic
 Persian and Arabic share a script but differ in a few letters. Mixed text is the most common
@@ -128,18 +128,9 @@ with the leading edge: `w:jc="start"` (docx-js `AlignmentType.START`). Never `ri
 This was confirmed on a real file: a `<w:bidi/>` paragraph with `w:jc="right"` rendered
 left-aligned in Word; changing it to `w:jc="start"` fixed it.
 
-**python-docx:** the alignment enum has no START, so set the XML directly:
-```python
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
-pPr = paragraph._p.get_or_add_pPr()
-pPr.append(OxmlElement('w:bidi'))                 # RTL
-jc = OxmlElement('w:jc'); jc.set(qn('w:val'), 'start'); pPr.append(jc)   # NOT 'right'
-rPr = run._r.get_or_add_rPr()
-rFonts = OxmlElement('w:rFonts')
-for k in ('w:ascii', 'w:hAnsi', 'w:cs'): rFonts.set(qn(k), 'Arial')
-rPr.append(rFonts); rPr.append(OxmlElement('w:rtl'))
-```
+If your DOCX toolkit lacks a logical start alignment, set `<w:bidi/>` and
+`<w:jc w:val="start"/>` in the paragraph properties. Set `<w:rtl/>` and
+`<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>` in the run properties.
 
 **HTML/CSS:**
 ```css

@@ -1,9 +1,9 @@
 {
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "revayat-subtitle",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "license": "GPL-3.0-or-later",
-  "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
+  "description": "Translate and review anime subtitles with a pure Rust CLI and no Python runtime. Check FFmpeg renders and sync to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
   "author": {
     "name": "Kiaro Sama",
     "email": "Kiaro.Sama.Dev@gmail.com"

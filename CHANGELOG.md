@@ -1,13 +1,22 @@
 # Changelog
 
-## Unreleased
+## 3.0.0 (2026-11-25)
 
-- Preserve literal HTML-looking ASS dialogue, overlapping ASS presentation order, and dialogue that mentions a link or subtitle service. Validate reviewed links against the cues that actually survive normalization. Advance generation/normalization recipes to `13`/`12` so changed editions require fresh review.
-- Bound malformed-comment scanning, preserve Persian linter code spans and literal NUL characters, and match native HTML-entity and Unicode behavior to the running Python interpreter.
-- Recover the install registry's legacy capacity overflow and authenticated terminal transactions without discarding active recovery records or their journals/backups. Retain cleanup authorization for restored transactions until owned disposal is complete, including legacy inactive bindings; cleanup retries leave later valid installations untouched.
-- Parse CR, LF, CRLF and mixed subtitle line endings consistently; refuse ambiguous SRT cue boundaries and audio without timing anchors; stage complete sync outputs before exclusive publication so ordinary write failures remain retryable.
-- Refuse an occupied package destination even when it is a dangling symlink. Add failure, race, native parity and actual FFmpeg regression coverage.
-- Run CI automatically on pull requests, main pushes and merge queues; gate releases on the same validation; require compiled Rust extensions across the supported OS/Python matrix. Keep the README version badge tied to repository tags.
+### Runtime and distribution
+
+- Move the runtime, installer and test suite to a pure Rust workspace using Rust `1.100.0`, edition `2024`. Ship no Python, PowerShell, or Bash scripts.
+- Build two standalone binaries: `revayat-subtitle` with 16 subcommands, and `subsync` for aligning SRT and ASS to dialogue audio. Use `revayat-subtitle install` for installation and recovery. Copy local release outputs to `bin/`.
+- Limit CI and releases to 64-bit Windows and Linux, each on x64 and arm64. CI builds both binaries for all four targets and runs workspace tests with FFmpeg and libass on x64 Windows and Linux. Media extraction and rendering still use external `ffmpeg` and `ffprobe`; rendering requires the libass `subtitles` filter.
+- Update all five plugin manifest formats to `3.0.0`. Both READMEs use live badges for CI, license, latest published release, latest Git tag, and repository size.
+- Use `GPL-3.0-or-later` across the Cargo workspace. Resolve symlinked video paths before rendering, sync new output directory entries on Unix, and skip regex compilation for glossary and idiom entries that cannot match.
+
+### Subtitle workflow
+
+- Document six sequential roles from initial translation to final delivery, with independent editorial and delivery reviews. Import `ffmpeg-skill` v4.7.1 guidance for checking audio tracks and timing. Update the bundled `humanizer` guide to v4.0.0 and retain the `persian` guide for natural phrasing and text mechanics.
+- Keep Persian ASS and the bundled `B Koodak` font as defaults. Preserve literal HTML-looking ASS dialogue, overlapping ASS presentation order, and dialogue that mentions a link or subtitle service. Check reviewed links against the cues that survive normalization. Use generation recipe `13` and normalization recipe `12`; changed editions require fresh review.
+- Bound malformed-comment scanning and preserve code spans and literal NUL characters during Persian linting.
+- Handle CR, LF, CRLF, and mixed subtitle line endings. Refuse ambiguous SRT cue boundaries and audio without timing anchors. Stage complete sync outputs before publishing them to new paths. Refuse occupied package destinations, including dangling symlinks.
+- Recover legacy installer registry overflow and authenticated interrupted transactions without discarding active records, journals, or backups. Cleanup retries leave later valid installations untouched.
 
 ## 2.0.0 (2026-11-24)
 

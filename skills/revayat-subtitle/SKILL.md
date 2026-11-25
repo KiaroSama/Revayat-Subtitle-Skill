@@ -3,27 +3,31 @@ name: revayat-subtitle
 description: Use when translating or editing anime subtitles, reconciling ASS or SRT releases, or checking subtitle presentation. Persian is the default output. Use the requested target language for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "2.0.0"
+  version: "3.0.0"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 
 # Revayat Subtitle
 
-Run the nine steps below in order. Each step names its action and the evidence
-needed to continue. On a resumed batch, load this file and the translation policy
-again, then continue from the first unfinished step.
+Follow the intake and verification checklist below. Every translation run also
+requires the [six-stage workflow and agent prompts](references/multi-agent-workflow.md):
+1. Initial Translation
+2. Typesetting & Layout
+3. Editorial Review
+4. Translation Applier & Edition Builder
+5. File Re-Check & Issue Fixer
+6. Final Review & Delivery
 
-Resolve three values once:
+Finish intake (steps 1 to 4) before dispatching stage 1. Use steps 5 to 9 as the
+shared checklist for the six stages. On resume, use the current edition and
+continue at the first incomplete stage with valid handoff evidence.
 
-- `SKILL_DIR`: the folder containing this file. In a Claude plugin it is
-  `${CLAUDE_PLUGIN_ROOT}/skills/revayat-subtitle`.
-- `WORK`: the working directory for this batch or season, separate from originals.
-- `PY`: a verified Python 3.11+ interpreter. Usually `python3` on Linux/macOS;
-  `python` or a working `py -3` launcher on Windows.
-
-Examples use `python` and quoted placeholder paths. Substitute the resolved
-values; use argument arrays when available. PowerShell invokes an executable
-variable with `& $PY`. Never assume `python3` exists on Windows.
+`SKILL_DIR` is the directory containing this file; in a Claude plugin it is
+`${CLAUDE_PLUGIN_ROOT}/skills/revayat-subtitle`. `WORK` is the workspace, separate
+from originals. `BUILD` is the current build directory returned by `build`.
+Run the Rust `revayat-subtitle` and `subsync` binaries from `PATH` or by verified
+absolute path (`.exe` on Windows). Replace quoted placeholders and pass each path
+as one argument.
 
 ## Required agent activity log
 
@@ -72,10 +76,10 @@ only subtitle files unless the user also asks to include the log.
 
 ---
 
-## Step 1 — Check the tools
+## Step 1: Check the tools
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" doctor
+revayat-subtitle doctor
 ```
 
 | Result | Action |
@@ -84,17 +88,17 @@ python "SKILL_DIR/scripts/revayat-subtitle.py" doctor
 | FFmpeg not found | Locate a libass-enabled build; pass `--ffmpeg PATH` or set `REVAYAT_FFMPEG`. |
 | Missing shell or image viewer | Report the unavailable stage; do not claim completed visual QA. |
 
-Python uses the standard library. FFmpeg with libass and a Persian-capable font
-are external prerequisites; do not silently install them. See
+Rendering needs FFmpeg with libass and a font covering the target script. Do not
+install prerequisites without asking. See
 [troubleshooting.md](references/troubleshooting.md) for tool and log failures.
 
-## Step 2 — Import the subtitles
+## Step 2: Import the subtitles
 
 Identify the anime, season and intended episode range from the user's request.
 Ask only when that identity or numbering cannot be established reliably. Then:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" prepare "attachments.zip" --work "WORK" --series "Anime title" --season 1
+revayat-subtitle prepare "attachments.zip" --work "WORK" --series "Anime title" --season 1
 ```
 
 For a sequel, also pass `--glossary previous/glossary.json` using the same canonical
@@ -125,7 +129,7 @@ embedded and the user has not already explicitly chosen for this batch, ask:
 editorial work, but resolve the choice before final delivery. Do not ask when
 there are no embedded fonts, and do not repeat an already answered question.
 
-## Step 3 — Research and lock the names
+## Step 3: Research and lock the names
 
 Read [glossary-and-voice.md](references/glossary-and-voice.md). Search the anime title
 online before editing. Prefer official sites, publishers, distributors and credits;
@@ -139,7 +143,7 @@ request it or prior outputs and disclose the continuity gap.
 **Continue when:** research is recorded, the series identity is confirmed, and
 the glossary is reviewed. Applying every name consistently is the editor's work.
 
-## Step 4 — Compare releases and assign episodes
+## Step 4: Compare releases and assign episodes
 
 Read [release-selection.md](references/release-selection.md) and fill `episodes`
 in `project.json`. Use `S01E01`, `S01OVA01`, `S02E01`, `S02OVA01`; never derive an
@@ -154,13 +158,12 @@ and time rather than row index. Preserve intentional overlaps and effect layers.
 **Continue when:** every source belongs to exactly one episode, each base has a
 reasoned comparison, and incompatible video cuts or canvases have been resolved.
 
-## Step 5 — Read every line and translate or edit
+## Step 5: Read every line and translate or edit
 
-Before starting, offer optional parallel translation/editing as described in
-[parallel-editorial.md](references/parallel-editorial.md). Ask once per batch unless
-already answered. Dispatch real subagents only after consent and only when the host
-supports them; otherwise continue sequentially. Shared worksheets and glossary have
-one writer: the coordinator. All existing cue and final-review requirements remain.
+Stages 1 to 3 draft, typeset and review the worksheet. Use separate stage copies;
+only the assigned writer may update the canonical worksheet. Ask before any
+optional [parallel editorial assignments](references/parallel-editorial.md) within
+a stage. Parallel work does not replace the six sequential handoffs.
 
 Read [translation-policy.md](references/translation-policy.md) and load the
 matching voice skill using [target-voice.md](references/target-voice.md). For
@@ -191,10 +194,10 @@ an explicit removal answer. This is independent of unused-style cleanup.
 complete, donor links are meaningful, and all timing/structural edits are explained.
 Never mark unread content reviewed to satisfy a count.
 
-## Step 6 — Build the merged edition
+## Step 6: Build the merged edition
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" build --work "WORK"
+revayat-subtitle build --work "WORK"
 ```
 
 | Result | Action |
@@ -215,13 +218,13 @@ subline with directional embeddings plus trailing `U+200F` after terminal punctu
 so players never move periods or commas onto the first line. Output defaults to ASS
 using bundled `B Koodak` (`assets/fonts/BKOODB.TTF`) with subtle black outline (`1.5`)
 and shadow (`0.8`) while preserving italics, bold, alignment, colors, positioning,
-animations and vector drawings; pass `--output-format srt` only when SRT is explicitly
-requested. Use `translator-ass` (or `--translator-mode`) to produce chronological
+animations and vector drawings. If the user asks for SRT from an SRT base, set
+`--output-format srt` on `prepare` so `status` and `build` match. Use `translator-ass` (or `--translator-mode`) to produce chronological
 Translator Mode ASS files with primary cues and missing donor timing slots, and use
-`revayat-subtitle sync` (or `skills/revayat-subtitle/sync/SKILL.md`) to synchronize
+`revayat-subtitle sync` (see [audio sync](references/audio-sync.md)) to synchronize
 subtitles against video audio via FFmpeg and the Rust `subsync` engine.
 
-## Step 7 — Check names, meaning and typography
+## Step 7: Check names, meaning and typography
 
 Read each complete resulting episode against its sources and glossary. Check
 all names, honorifics, references, negations, lyrics and signs. Check that dialogue
@@ -235,12 +238,12 @@ the logical string. Do not blindly move punctuation or alter commands/font data.
 **Continue when:** the whole edition has been checked. Fix worksheet text and
 repeat step 6 if anything changes; file-count checks are not semantic approval.
 
-## Step 8 — Render and run the quality gate
+## Step 8: Render and run the quality gate
 
 For every output episode:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" render --build "BUILD" --episode S01E01
+revayat-subtitle render --build "BUILD" --episode S01E01
 ```
 
 Use `--video episode.mkv` for matching supplied video and `--fonts-dir PATH` for
@@ -267,7 +270,7 @@ Only after inspection, mark the frame reviewed and record a concrete observation
 Then run the same gate that packaging uses:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" qa --build "BUILD"
+revayat-subtitle qa --build "BUILD"
 ```
 
 `ok: true` confirms coverage and matching source, subtitle, glossary and image
@@ -275,10 +278,10 @@ evidence. Resolve failures using [troubleshooting.md](references/troubleshooting
 then check again. No viewer, failed FFmpeg, stale image or missing review means
 visual QA is unfinished. `sync_verified: false` is not a sync certificate.
 
-## Step 9 — Export and report
+## Step 9: Export and report
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" package --build "BUILD" --out "out/Sub.zip"
+revayat-subtitle package --build "BUILD" --out "out/Sub.zip"
 ```
 
 Packaging repeats the gate and verifies the ZIP bytes. Its contents are only
@@ -298,15 +301,16 @@ left unreviewed is unfinished work, not a completed batch.
 
 Read each reference when its step or condition applies:
 
-- [source-languages.md](references/source-languages.md) — source identification, direct translation and language-specific meaning checks.
-- [research.md](references/research.md) — inspected upstream evidence and adaptation boundaries.
-- [translation-policy.md](references/translation-policy.md) — every-line fidelity, spoken Persian and narrow removals.
-- [parallel-editorial.md](references/parallel-editorial.md) — optional user-consented subagents, disjoint assignments and coordinator-owned integration.
-- [persian-typography.md](references/persian-typography.md) — RTL, mixed text, quotes, fonts and image inspection.
-- [glossary-and-voice.md](references/glossary-and-voice.md) — research, names, honorifics and sequel continuity.
-- [release-selection.md](references/release-selection.md) — candidate comparison, alignment and episode identity.
-- [subtitle-formats.md](references/subtitle-formats.md) — ASS/SRT structure, effects, comments, styles and fonts.
-- [workflow.md](references/workflow.md) — exact worksheet/configuration contracts and command examples.
-- [audio-sync.md](references/audio-sync.md) — FFmpeg audio extraction and Rust `subsync` alignment for shifted, drifted or cut subtitles.
-- [sync/SKILL.md](sync/SKILL.md) — standalone audio-to-subtitle synchronization workflow inside the primary skill tree.
-- [troubleshooting.md](references/troubleshooting.md) — refusals, recovery, missing tools and execution logs.
+- [source-languages.md](references/source-languages.md): source identification, direct translation and language-specific meaning checks.
+- [research.md](references/research.md): inspected upstream evidence and adaptation boundaries.
+- [translation-policy.md](references/translation-policy.md): every-line fidelity, spoken Persian and narrow removals.
+- [parallel-editorial.md](references/parallel-editorial.md): optional user-consented subagents, disjoint assignments and coordinator-owned integration.
+- [persian-typography.md](references/persian-typography.md): RTL, mixed text, quotes, fonts and image inspection.
+- [glossary-and-voice.md](references/glossary-and-voice.md): research, names, honorifics and sequel continuity.
+- [release-selection.md](references/release-selection.md): candidate comparison, alignment and episode identity.
+- [subtitle-formats.md](references/subtitle-formats.md): ASS/SRT structure, effects, comments, styles and fonts.
+- [workflow.md](references/workflow.md): exact worksheet/configuration contracts and command examples.
+- [audio-sync.md](references/audio-sync.md): Rust `subsync` alignment for shifted, drifted or cut subtitles.
+- [FFmpeg](ffmpeg/SKILL.md): probe media, select the dialogue track and check timestamps.
+- [multi-agent-workflow.md](references/multi-agent-workflow.md): six required roles, handoffs and copy-ready prompts.
+- [troubleshooting.md](references/troubleshooting.md): refusals, recovery, missing tools and execution logs.
