@@ -162,13 +162,24 @@ pub fn ass_document_to_ass(
             .collect(),
     );
     if !options.title.is_empty() {
+        let mut found = false;
         for (section, lines) in &mut result.sections {
             if document::ass_key(section) == "[script info]" {
+                found = true;
                 lines.retain(|line| {
                     !document::ass_key(document::ass_line_start(line)).starts_with("title:")
                 });
                 lines.insert(0, format!("Title: {}", options.title));
             }
+        }
+        if !found {
+            result.sections.insert(
+                0,
+                (
+                    "[Script Info]".into(),
+                    vec![format!("Title: {}", options.title)],
+                ),
+            );
         }
     }
     process(doc, result, style, options)
@@ -188,15 +199,7 @@ pub fn build_translator_ass(
     options: &Options<'_>,
 ) -> Result<(Document, Value), String> {
     let (mut edition, removed) = convert(primary_doc, options)?;
-    let raw = options.style.unwrap_or(document::DEFAULT_STYLE);
-    let style = document::ass_style_name(
-        raw.strip_prefix("Style:")
-            .unwrap_or(raw)
-            .split(',')
-            .next()
-            .unwrap_or(""),
-        false,
-    );
+    let (style, _) = document::generated_style(options.style)?;
     let mut primary: Vec<_> = edition.cues.iter().collect();
     primary.sort_by_key(|c| c.start);
     let mut by_end: Vec<_> = (0..primary.len()).collect();
@@ -275,7 +278,7 @@ pub fn build_translator_ass(
                             end,
                             text: String::new(),
                             fields: IndexMap::from([
-                                ("style".into(), style.into()),
+                                ("style".into(), style.clone()),
                                 ("layer".into(), "0".into()),
                                 ("marginl".into(), "0".into()),
                                 ("marginr".into(), "0".into()),

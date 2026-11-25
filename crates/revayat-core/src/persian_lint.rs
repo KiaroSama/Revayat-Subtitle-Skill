@@ -1,7 +1,7 @@
 //! Persian text normalization, style checks, and line-level changes.
 #![forbid(unsafe_code)]
 
-use fancy_regex::{Captures, Match, Regex};
+use fancy_regex::{Captures, Match, Regex, RegexOptionsBuilder};
 use serde_json::{Map, Value, json};
 use std::sync::OnceLock;
 
@@ -15,8 +15,9 @@ fn compile(pattern: &str) -> fancy_regex::Result<Regex> {
     // Python adds four controls to whitespace and excludes marks and joiners from \w.
     const SPACE: &str = r"\p{White_Space}\x1c-\x1f";
     const WORD: &str = r"[\p{L}\p{N}_]";
-    Regex::new(
-        &pattern
+    // Skip non-candidates before the VM scans rules that must see the whole document.
+    RegexOptionsBuilder::new().seek(true).build(
+        pattern
             .replace(r"[^\s", &format!("[^{SPACE}"))
             .replace(r"\s", &format!("[{SPACE}]"))
             .replace(r"\S", &format!("[^{SPACE}]"))
@@ -317,82 +318,81 @@ pub fn normalize(text: Value, digits: String) -> Result<Value, String> {
                 "space_after_punct"
             );
         }
+        sub!(
+            line,
+            &format!(r"(?<=[{PL}\u{{200c}}])\.{{3,}}"),
+            "…",
+            "ellipsis"
+        );
+        sub!(
+            line,
+            &format!(r"(?<![{PL}\u{{200c}}])(نمی|می)[ \t]+(?=[{PL}])"),
+            "${1}\u{200c}",
+            "zwnj_mi_prefix"
+        );
+        sub!(
+            line,
+            &format!(
+                r"(?<=[{PLD}])[ \t]+(هایشان|هایتان|هایمان|هایی|هایم|هایت|هایش|های|ها)(?![{PL}])(?! و هوی)"
+            ),
+            "\u{200c}$1",
+            "zwnj_plural_ha"
+        );
+        sub!(
+            line,
+            &format!(r"(?<=[{PLD}])[ \t]+(ترین)(?![{PL}])"),
+            "\u{200c}$1",
+            "zwnj_superlative"
+        );
+        // A failed enclitic test cannot succeed again from inside the same Persian word.
+        bump(
+            "zwnj_heh_enclitic",
+            rewrite(
+                &mut line,
+                regex!(&format!(
+                    r"(?<![{PL}])([{PL}]*ه)[ \t]+(اند|ایم|اید|ام|ات|اش|ای)(?![{PL}])"
+                )),
+                |captures, result| {
+                    let word = captures.get(1).map_or("", |m| m.as_str());
+                    if word == "ه"
+                        || matches!(
+                            word,
+                            "که" | "چه"
+                                | "نه"
+                                | "به"
+                                | "سه"
+                                | "بله"
+                                | "آنچه"
+                                | "چنانچه"
+                                | "اگرچه"
+                                | "گرچه"
+                        )
+                    {
+                        return false;
+                    }
+                    captures.expand("${1}\u{200c}$2", result);
+                    true
+                },
+            )?,
+        );
+        sub!(
+            line,
+            &format!(r"(?<=[{AR}])[ \t]+([،؛؟»])"),
+            "$1",
+            "space_before_punct"
+        );
+        sub!(line, r"«[ \t]+", "«", "space_after_openquote");
+        sub!(
+            line,
+            r"([،؛؟])(?=[^\s»)\]\x00،؛؟!.…])",
+            "$1 ",
+            "space_after_punct"
+        );
+        sub!(line, r"(?<=\S)[ \t]{2,}(?=\S)", " ", "collapsed_spaces");
+        sub!(line, r"[ \t]+\z", "", "trailing_space");
         lines.push(line);
     }
-    masked = lines.join("\n");
-
-    sub!(
-        masked,
-        &format!(r"(?<=[{PL}\u{{200c}}])\.{{3,}}"),
-        "…",
-        "ellipsis"
-    );
-    sub!(
-        masked,
-        &format!(r"(?<![{PL}\u{{200c}}])(نمی|می)[ \t]+(?=[{PL}])"),
-        "${1}\u{200c}",
-        "zwnj_mi_prefix"
-    );
-    sub!(
-        masked,
-        &format!(
-            r"(?<=[{PLD}])[ \t]+(هایشان|هایتان|هایمان|هایی|هایم|هایت|هایش|های|ها)(?![{PL}])(?! و هوی)"
-        ),
-        "\u{200c}$1",
-        "zwnj_plural_ha"
-    );
-    sub!(
-        masked,
-        &format!(r"(?<=[{PLD}])[ \t]+(ترین)(?![{PL}])"),
-        "\u{200c}$1",
-        "zwnj_superlative"
-    );
-    // A failed enclitic test cannot succeed again from inside the same Persian word.
-    bump(
-        "zwnj_heh_enclitic",
-        rewrite(
-            &mut masked,
-            regex!(&format!(
-                r"(?<![{PL}])([{PL}]*ه)[ \t]+(اند|ایم|اید|ام|ات|اش|ای)(?![{PL}])"
-            )),
-            |captures, result| {
-                let word = captures.get(1).map_or("", |m| m.as_str());
-                if word == "ه"
-                    || matches!(
-                        word,
-                        "که" | "چه"
-                            | "نه"
-                            | "به"
-                            | "سه"
-                            | "بله"
-                            | "آنچه"
-                            | "چنانچه"
-                            | "اگرچه"
-                            | "گرچه"
-                    )
-                {
-                    return false;
-                }
-                captures.expand("${1}\u{200c}$2", result);
-                true
-            },
-        )?,
-    );
-    sub!(
-        masked,
-        &format!(r"(?<=[{AR}])[ \t]+([،؛؟»])"),
-        "$1",
-        "space_before_punct"
-    );
-    sub!(masked, r"«[ \t]+", "«", "space_after_openquote");
-    sub!(
-        masked,
-        r"([،؛؟])(?=[^\s»)\]\x00،؛؟!.…])",
-        "$1 ",
-        "space_after_punct"
-    );
-    sub!(masked, r"(?<=\S)[ \t]{2,}(?=\S)", " ", "collapsed_spaces");
-    sub!(masked, r"[ \t]+(\n|\z)", "$1", "trailing_space");
+    let masked = lines.join("\n");
 
     Ok(json!({"$tuple": [unmask(&masked, spans), stats]}))
 }
@@ -453,8 +453,17 @@ const STYLE_FLAGS: &[(&str, &str)] = &[
     ),
 ];
 
-fn context<'a>(text: &'a str, found: Match<'_>, before: usize, after: usize) -> &'a str {
-    context_at(text, found.start(), found.end(), before, after)
+fn line_matches<'r, 't>(
+    pattern: &'r Regex,
+    text: &'t str,
+) -> impl Iterator<Item = (usize, fancy_regex::Result<Match<'t>>)> + use<'r, 't> {
+    text.split('\n')
+        .scan(0, |offset, line| {
+            let start = *offset;
+            *offset += line.len() + 1;
+            Some((start, line))
+        })
+        .flat_map(move |(offset, line)| pattern.find_iter(line).map(move |found| (offset, found)))
 }
 
 fn context_at(text: &str, start: usize, end: usize, before: usize, after: usize) -> &str {
@@ -474,16 +483,16 @@ pub fn suggestions(text: Value, style: bool) -> Result<Value, String> {
     let (masked, _) = mask(regex_text(&text)?)?;
     let mut out = Vec::new();
     let tar = regex!(&format!(r"(?<=[{PLD}])[ \t]+تر(?![{PL}])"));
-    for found in tar.find_iter(&masked) {
+    for (offset, found) in line_matches(tar, &masked) {
         let found = found.map_err(|e| regex_error(&e))?;
         out.push(json!({
             "type": "maybe_comparative_tar",
             "hint": "space+«تر»: join as «‌تر» if comparative; leave if it means 'wet'.",
-            "context": context(&masked, found, 12, 3)
+            "context": context_at(&masked, offset + found.start(), offset + found.end(), 12, 3)
         }));
     }
     let mi = regex!(&format!(r"(?<![{PL}\u{{200c}}])ن?می[{PL}]+"));
-    for found in mi.find_iter(&masked) {
+    for (offset, found) in line_matches(mi, &masked) {
         let found = found.map_err(|e| regex_error(&e))?;
         let word = found.as_str();
         let stem = word.strip_prefix('ن').unwrap_or(word);
@@ -495,7 +504,7 @@ pub fn suggestions(text: Value, style: bool) -> Result<Value, String> {
             out.push(json!({
                 "type": "maybe_glued_mi",
                 "hint": "«می» glued to verb: insert ZWNJ (می‌…); not auto-fixed (cf. «میمون», «میز»).",
-                "context": context(&masked, found, 3, 3)
+                "context": context_at(&masked, offset + found.start(), offset + found.end(), 3, 3)
             }));
         }
     }
@@ -517,13 +526,23 @@ pub fn suggestions(text: Value, style: bool) -> Result<Value, String> {
             })
             .as_ref()
             .map_err(regex_error)?;
-        for (pattern, (_, hint)) in patterns.iter().zip(STYLE_FLAGS) {
-            for found in pattern.find_iter(&masked) {
-                let found = found.map_err(|e| regex_error(&e))?;
+        for (pattern, (source, hint)) in patterns.iter().zip(STYLE_FLAGS) {
+            let mut report = |offset, found: Match<'_>| {
                 out.push(json!({
                     "type": "style", "hint": hint,
-                    "context": context(&masked, found, 15, 15).replace('\n', " ")
+                    "context": context_at(&masked, offset + found.start(), offset + found.end(), 15, 15)
+                        .replace('\n', " ")
                 }));
+            };
+            if source.contains(r"\s+") {
+                // These phrases may span line breaks; the seek filter skips unrelated text.
+                for found in pattern.find_iter(&masked) {
+                    report(0, found.map_err(|e| regex_error(&e))?);
+                }
+            } else {
+                for (offset, found) in line_matches(pattern, &masked) {
+                    report(offset, found.map_err(|e| regex_error(&e))?);
+                }
             }
         }
     }
@@ -625,6 +644,53 @@ mod tests {
                 {"line": 1, "before": "a\r", "after": "a"},
                 {"line": 2, "before": "b", "after": "B"}
             ]))
+        );
+    }
+
+    fn long_subtitle() -> String {
+        let row = "Dialogue: 0,0:00:01.00,0:00:02.00,DefaultSubtitleStyle,,0,0,0,,سلام دوست من حال شما خوب است\n";
+        [
+            row.repeat(999),
+            "خوب تر\nمیرود\n".into(),
+            row.repeat(997),
+            "این یک\nخانه است\n".into(),
+        ]
+        .concat()
+    }
+
+    #[test]
+    fn normalizes_long_subtitles_without_exhausting_backtracking() {
+        let input = long_subtitle().replace("خوب تر", "خوب ترین...");
+        let expected = input.replace("خوب ترین...", "خوب‌ترین…");
+        let normalized = normalize(json!(input), "keep".into()).unwrap();
+        assert_eq!(normalized["$tuple"][0], expected);
+        assert_eq!(
+            normalized["$tuple"][1],
+            json!({"ellipsis": 1, "zwnj_superlative": 1})
+        );
+    }
+
+    #[test]
+    fn suggests_on_long_subtitles_with_document_context() {
+        let input = long_subtitle();
+        assert_eq!(input.lines().count(), 2000);
+        let found = suggestions(json!(input), true).unwrap();
+        let found = found.as_array().unwrap();
+        assert_eq!(found.len(), 3);
+        assert_eq!(found[0]["type"], "maybe_comparative_tar");
+        assert!(
+            found[0]["context"]
+                .as_str()
+                .unwrap()
+                .ends_with("خوب تر\nمی")
+        );
+        assert_eq!(found[1]["context"], "تر\nمیرود\nDi");
+        assert_eq!(found[2]["type"], "style");
+        assert!(
+            found[2]["context"]
+                .as_str()
+                .unwrap()
+                .ends_with("این یک خانه است ")
         );
     }
 

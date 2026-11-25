@@ -57,6 +57,8 @@ cargo build --workspace --release --locked &&
 
 After checking the destinations, repeat the `install` command without `--dry-run`. The default install selects existing user-level agent roots. Use `revayat-subtitle install --agent codex` to select one host, or `revayat-subtitle install --agent codex --scope project --path .` to install into the current project. If you pass `--force`, the installer backs up the existing installation before replacing it. Keep `bin/` on the host's `PATH` and reload the agent. See [host paths and recovery](docs/platforms.md#agent-installation).
 
+Before reverting binaries, retain a compatible installer for existing journals and backups; see [installer downgrade compatibility](docs/platforms.md#installer-downgrade-compatibility).
+
 ### Plugin installation
 
 The same skill tree ships in five manifest formats: Claude Code, Cursor, Codex, Antigravity, and Agent Plugins 1.0. In Claude Code:
@@ -71,6 +73,8 @@ The plugin exposes `translate-subtitles`, `revayat-subtitle-resume`, `revayat-su
 ## Media tools
 
 For visual rendering and audio extraction, put `ffmpeg` and `ffprobe` on `PATH`. Rendering needs FFmpeg built with `libass` and the `subtitles` filter. Run `revayat-subtitle doctor` to check prerequisites; `ready: true` does not replace checking the actual rendered subtitles.
+
+`revayat-subtitle sync` and `subsync` align each dialogue cue individually with the spoken audio. A global shift is only the starting point.
 
 Use the [imported FFmpeg Skill guidance](skills/revayat-subtitle/ffmpeg/SKILL.md), adapted from `ffmpeg-skill` v4.7.1, to identify the matching release and dialogue track. If a video has several audio tracks, extract the selected track as 16 kHz mono PCM WAV and pass it with `--wav`. Keep the original subtitle and check results in playback near the beginning, middle, end, and any reported split.
 
@@ -153,7 +157,7 @@ An unrun stage stays pending. If an edit changes the build, rerender it and rene
 
 ## Logging
 
-CLI execution uses UTF-8 logs named `logs/<binary>_YYYY-MM-DD_HH-mm-ss_UTC.log`, with a suffix when a filename would collide. Each line uses `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message`. Logs record progress, failures, and exit status without subtitle bodies or secrets. The levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`; use `--log-level` for more detail where supported. Logs are not deleted automatically. Review local path information before sharing one with a bug report. Agent activity logs are separate from these CLI logs.
+`revayat-subtitle` execution uses UTF-8 logs named `logs/revayat-subtitle_YYYY-MM-DD_HH-mm-ss_UTC.log`, with a suffix when a filename would collide. Each line uses `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message`. Logs record progress, failures, and exit status without subtitle bodies or secrets. The levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`; use `--log-level` for more detail. Logs are not deleted automatically. Review local path information before sharing one with a bug report. Agent activity logs are separate from these CLI logs. The standalone `subsync` binary writes its JSON result to stdout and diagnostics to stderr; use `--json-report` to save its result, or run through `revayat-subtitle sync` for operational file logging.
 
 ## Verification
 

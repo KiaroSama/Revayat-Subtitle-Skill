@@ -22,9 +22,15 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       validation_id: ${{ github.run_id }}
+  secret_scan:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gitleaks.yml
+    with:
+      scan_id: ${{ github.run_id }}
   build:
     name: Build release (${{ matrix.name }})
-    needs: validate
+    needs: [validate, secret_scan]
     permissions:
       contents: read
     runs-on: ${{ matrix.runner }}
@@ -79,6 +85,32 @@ jobs:
       - name: Build and check both release binaries
         shell: bash
         run: |
+          release_version="${TAG#v}"
+          metadata=$(cargo metadata --no-deps --locked --format-version 1)
+          jq -e --arg version "$release_version" '.packages | length > 0 and all(.[]; .version == $version)' <<< "$metadata" > /dev/null || {
+            printf '%s\n' 'Release tag must match every workspace package version.' >&2
+            exit 1
+          }
+          for manifest in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json .cursor-plugin/plugin.json .antigravity-plugin/plugin.json; do
+            jq -e --arg version "$release_version" '.version == $version' "$manifest" > /dev/null || {
+              printf '%s: release tag does not match the plugin version\n' "$manifest" >&2
+              exit 1
+            }
+          done
+          marketplaces=$(git ls-files -- ':(glob)**/marketplace.json')
+          if [[ -z "$marketplaces" ]]; then
+            printf '%s\n' 'No tracked marketplace manifests found.' >&2
+            exit 1
+          fi
+          while IFS= read -r manifest; do
+            jq -e --arg version "$release_version" '
+              ((.metadata // {}) | if has("version") then .version == $version else true end)
+              and (.plugins | type == "array" and length > 0 and all(.[]; .version == $version))
+            ' "$manifest" > /dev/null || {
+              printf '%s: release tag does not match the marketplace versions\n' "$manifest" >&2
+              exit 1
+            }
+          done <<< "$marketplaces"
           version=$(rustc --version --verbose)
           if [[ "$version" != 'rustc 1.100.0 '* ]] || ! grep -Fxq "host: $RUST_TARGET" <<< "$version"; then
             printf '%s\n' 'Expected Rust 1.100.0 on the matrix host target.' >&2
@@ -90,6 +122,10 @@ jobs:
             binary="dist/${name}-${TAG}-${TARGET_NAME}${EXT}"
             cp "target/$RUST_TARGET/release/${name}${EXT}" "$binary"
             "$binary" --help
+            [[ "$("$binary" --version)" == "$name $release_version" ]] || {
+              printf '%s: binary version does not match the release tag\n' "$binary" >&2
+              exit 1
+            }
           done
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -99,9 +135,9 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  sign-and-release:
+  sign_and_publish:
     name: Sign and publish release
-    needs: build
+    needs: [build, secret_scan]
     runs-on: windows-2025
     timeout-minutes: 20
     environment: revayat-subtitle-signing

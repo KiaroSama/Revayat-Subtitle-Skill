@@ -35,8 +35,8 @@ pub struct RecipeVersion {
 }
 
 pub const RECIPE_VERSION: RecipeVersion = RecipeVersion {
-    normalization: 12,
-    generation: 13,
+    normalization: 13,
+    generation: 14,
 };
 
 pub fn utf8_path(path: &Path) -> Result<&str, String> {
@@ -172,6 +172,7 @@ pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
     }
     let temporary = tempfile::Builder::new()
         .prefix(prefix)
+        .rand_bytes(6)
         .disable_cleanup(true)
         .make_in(&parent, |path| {
             let name = path
@@ -194,6 +195,7 @@ pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
 pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
     let path = tempfile::Builder::new()
         .prefix(prefix)
+        .rand_bytes(6)
         .tempdir_in(parent)
         .map_err(io_error)?
         .keep();
@@ -561,9 +563,9 @@ pub fn assemble(work: &Path, output_format: Option<&str>) -> Result<Edition, Str
     }
     let recipe = json!({"version": RECIPE_VERSION.generation, "normalization": RECIPE_VERSION.normalization, "timing": "floor-centisecond"});
     let raw = json!([project, sheets, glossary]);
-    let input_identity = digest(super::contract_json::dump(&raw, true, false)?.as_bytes());
+    let input_identity = digest(super::contract_json::dump_json(&raw, true, false)?.as_bytes());
     let identity = digest(
-        super::contract_json::dump(&json!([input_identity, recipe, output]), true, true)?
+        super::contract_json::dump_json(&json!([input_identity, recipe, output]), true, true)?
             .as_bytes(),
     );
     let origins: Map<_, _> = items(&project["sources"])

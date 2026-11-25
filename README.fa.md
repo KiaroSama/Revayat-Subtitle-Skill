@@ -7,7 +7,7 @@
 [![GitHub Actions CI](https://img.shields.io/github/actions/workflow/status/KiaroSama/Revayat-Subtitle-Skill/ci.yml?style=flat-square&label=CI&color=1d4ed8)](.github/workflows/ci.yml)
 [![Repository license](https://img.shields.io/github/license/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=2563eb)](LICENSE)
 [![Latest published release](https://img.shields.io/github/v/release/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases)
-[![Latest Git tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&label=Tag&color=c2410c)](#انتشارها-و-تگها)
+[![Latest Git tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&label=Tag&color=c2410c)](#releases-and-tags)
 [![Rust workspace tests](https://img.shields.io/badge/Tests-Rust%20Workspace-0d9488?style=flat-square)](#verification)
 [![Pinned Rust version](https://img.shields.io/badge/Rust-1.100.0-8b5cf6?style=flat-square)](rust-toolchain.toml)
 [![64-bit Windows and Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20(64--bit)-0891b2?style=flat-square)](docs/platforms.md#supported-platforms)
@@ -65,6 +65,8 @@ cargo build --workspace --release --locked &&
 
 ‏⁧بعد از بررسی مسیرها، فرمان `install` را بدون `--dry-run` تکرار کنید. نصب‌کننده به‌طور پیش‌فرض پوشه‌های کاربری موجود را انتخاب می‌کند. برای نصب فقط در Codex از `revayat-subtitle install --agent codex` و برای نصب در پروژهٔ فعلی از `revayat-subtitle install --agent codex --scope project --path .` استفاده کنید. گزینهٔ `--force` پیش از جایگزینی نصب موجود از آن نسخهٔ پشتیبان می‌گیرد. `bin/` را در `PATH` میزبان بگذارید و ایجنت را دوباره باز کنید. [مسیرهای نصب و بازیابی](docs/platforms.md#agent-installation) را هم ببینید.⁩
 
+‏⁧پیش از بازگشت به برنامه‌های قدیمی، نصب‌کنندهٔ سازگار با سوابق بازیابی و نسخه‌های پشتیبان موجود را نگه دارید؛ [راهنمای سازگاری هنگام بازگشت نسخه](docs/platforms.md#installer-downgrade-compatibility) را ببینید.⁩
+
 ### ‏⁧نصب افزونه⁩
 
 ‏⁧فایل‌های اسکیل در پنج قالب مانیفست عرضه می‌شوند: Claude Code، Cursor، Codex، Antigravity و `Agent Plugins 1.0`. برای نصب در Claude Code این دو فرمان را وارد کنید:⁩
@@ -85,6 +87,8 @@ cargo build --workspace --release --locked &&
 ## ‏⁧ابزارهای صوت و تصویر⁩
 
 ‏⁧برای رندر و استخراج صدا، `ffmpeg` و `ffprobe` باید از `PATH` در دسترس باشند. رندر به نسخه‌ای از FFmpeg نیاز دارد که با `libass` و فیلتر `subtitles` ساخته شده باشد. `revayat-subtitle doctor` پیش‌نیازها را بررسی می‌کند. حتی با نتیجهٔ `ready: true`، زیرنویس رندرشده را روی تصویر ببینید.⁩
+
+‏⁧با `revayat-subtitle sync` و `subsync`، هر دیالوگ را جداگانه با صدای همان دیالوگ هماهنگ می‌کنید. جابه‌جایی یک‌دست همهٔ زیرنویس‌ها فقط نقطهٔ شروع است.⁩
 
 ‏⁧[راهنمای همگام‌سازی با FFmpeg](skills/revayat-subtitle/ffmpeg/SKILL.md) از `ffmpeg-skill` نسخهٔ `4.7.1` اقتباس شده و توضیح می‌دهد چطور نسخهٔ ویدئو و ترک دیالوگ را انتخاب کنید. اگر ویدئو چند ترک صدا دارد، ترک دلخواه را به‌صورت WAV تک‌کانالهٔ PCM با نرخ ۱۶ کیلوهرتز استخراج کنید و با `--wav` به برنامه بدهید. زیرنویس اصلی را نگه دارید و نتیجه را در ابتدا، میانه، پایان و دو طرف هر نقطهٔ برش گزارش‌شده ببینید.⁩
 
@@ -193,7 +197,7 @@ revayat-subtitle package --build "BUILD" --out "out/Sub.zip"
 
 ## ‏⁧گزارش اجرا⁩
 
-‏⁧ابزارهای خط فرمان گزارش UTF-8 را با نام `logs/<binary>_YYYY-MM-DD_HH-mm-ss_UTC.log` ثبت می‌کنند. اگر این نام از قبل وجود داشته باشد، به نام فایل تازه پسوند می‌دهند. قالب هر سطر `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message` است. گزارش شامل پیشرفت، خطا و وضعیت خروج است و متن زیرنویس یا اطلاعات محرمانه را ثبت نمی‌کند. سطح‌ها `DEBUG`، `INFO`، `WARNING`، `ERROR` و `CRITICAL` هستند. در فرمان‌هایی که `--log-level` دارند، با آن می‌توانید جزئیات بیشتری بگیرید. گزارش‌ها خودکار پاک نمی‌شوند. قبل از پیوست گزارش به گزارش خطا، مسیرهای محلی داخل آن را بررسی کنید. گزارش فعالیت ایجنت‌ها جداست.⁩
+‏⁧برنامهٔ `revayat-subtitle` گزارش UTF-8 را با نام `logs/revayat-subtitle_YYYY-MM-DD_HH-mm-ss_UTC.log` ثبت می‌کند. اگر این نام از قبل وجود داشته باشد، به نام فایل تازه پسوند می‌دهد. قالب هر سطر `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message` است. گزارش شامل پیشرفت، خطا و وضعیت خروج است و متن زیرنویس یا اطلاعات محرمانه را ثبت نمی‌کند. سطح‌ها `DEBUG`، `INFO`، `WARNING`، `ERROR` و `CRITICAL` هستند. با `--log-level` می‌توانید جزئیات بیشتری بگیرید. گزارش‌ها خودکار پاک نمی‌شوند. قبل از پیوست گزارش به گزارش خطا، مسیرهای محلی داخل آن را بررسی کنید. گزارش فعالیت ایجنت‌ها جداست. برنامهٔ مستقل `subsync` نتیجهٔ JSON را در stdout و خطاها را در stderr می‌نویسد؛ برای ذخیرهٔ نتیجه از `--json-report` و برای ثبت گزارش عملیاتی از `revayat-subtitle sync` استفاده کنید.⁩
 
 <a id="verification"></a>
 
@@ -209,7 +213,7 @@ cargo test --workspace --locked
 
 </div>
 
-‏⁧CI هر دو برنامه را برای هر چهار معماری و سیستم‌عامل می‌سازد و آزمون‌های فضای کاری را با FFmpeg و libass روی ویندوز x64 و لینوکس x64 اجرا می‌کند. [دامنهٔ آزمون‌ها](docs/verification.md) می‌گوید هر بررسی کجا اجرا می‌شود. آزمون Rust یا بررسی PNG دقت ترجمه و زمان‌بندی در پخش‌کنندهٔ شما را تأیید نمی‌کند؛ خود زیرنویس را بخوانید و آن را با رسانهٔ متناظر پخش کنید.⁩
+‏⁧آزمون‌های CI هر دو برنامه را روی ویندوز و لینوکس، برای x64 و ARM64، می‌سازند و آزمون‌های فضای کاری را با FFmpeg و libass روی هر 4 هدف اجرا می‌کنند. برنامه‌های Rust در مسیر Windows ARM64 به‌صورت بومی اجرا می‌شوند و FFmpeg تأییدشدهٔ x64 از شبیه‌سازی Windows 11 استفاده می‌کند. [دامنهٔ آزمون‌ها](docs/verification.md) جزئیات هر مسیر را توضیح می‌دهد. آزمون Rust یا بررسی PNG دقت ترجمه و زمان‌بندی در پخش‌کنندهٔ شما را تأیید نمی‌کند؛ خود زیرنویس را بخوانید و آن را با رسانهٔ متناظر پخش کنید.⁩
 
 <a id="documentation"></a>
 
@@ -228,6 +232,8 @@ cargo test --workspace --locked
 - ‏⁧`skills/` و `commands/`: دستورهای ایجنت، راهنمای گردش کار و لحن، و فایل‌های همراه.⁩
 - ‏⁧`docs/`: راهنمای پلتفرم‌ها، آزمون‌ها و اعتبارسنجی امضا.⁩
 - ‏⁧`bin/`: برنامه‌هایی که روی دستگاه خود می‌سازید و در Git ثبت نمی‌شوند.⁩
+
+<a id="releases-and-tags"></a>
 
 ## ‏⁧انتشارها و تگ‌ها⁩
 

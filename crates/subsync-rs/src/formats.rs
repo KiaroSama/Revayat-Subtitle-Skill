@@ -95,6 +95,28 @@ impl SubtitleDocument {
         Ok(result)
     }
 
+    /// Compare all source bytes outside cue timestamp fields, including their order.
+    pub fn has_same_untimed_content(&self, other: &Self) -> bool {
+        if self.format != other.format || self.fields.len() != other.fields.len() {
+            return false;
+        }
+        let (mut left, mut right) = (0, 0);
+        for (fields, other_fields) in self.fields.iter().zip(&other.fields) {
+            let mut fields = fields.each_ref();
+            let mut other_fields = other_fields.each_ref();
+            fields.sort_unstable_by_key(|field| field.start);
+            other_fields.sort_unstable_by_key(|field| field.start);
+            for (field, other_field) in fields.into_iter().zip(other_fields) {
+                if self.source[left..field.start] != other.source[right..other_field.start] {
+                    return false;
+                }
+                left = field.end;
+                right = other_field.end;
+            }
+        }
+        self.source[left..] == other.source[right..]
+    }
+
     fn push_cue(
         &mut self,
         text: &str,

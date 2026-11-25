@@ -17,7 +17,10 @@ use serde_json::{Map, Value, json};
 use std::collections::HashSet;
 
 pub fn bundled_fonts_dir() -> Result<Option<Value>, String> {
-    Ok(renderer::bundled_fonts_dir().as_deref().map(path_marker))
+    renderer::bundled_fonts_dir()
+        .as_deref()
+        .map(path_marker)
+        .transpose()
 }
 
 pub fn ffmpeg_path(r#override: Option<String>) -> Result<String, String> {

@@ -6,14 +6,16 @@ description: Use when existing SRT or ASS subtitles lead, lag, drift, or fall ou
 # Sync subtitles to audio
 
 1. Confirm the subtitle and audio come from the same episode and language track. Choose a new output path with the same subtitle format. Keep the source file unchanged.
-2. Run `revayat-subtitle sync` for supervised sync or `subsync` directly. Video input uses FFmpeg's automatic audio selection. If you need a different track, [probe and extract it](../ffmpeg/references/sync-and-probing.md) to a mono 16-bit PCM WAV and pass it with `--wav`.
+2. Run `revayat-subtitle sync` in process, add `--timeout 300` for a supervised whole-operation deadline, or use `subsync` directly. Video input uses FFmpeg's automatic audio selection and preserves initial audio delay and timestamp gaps during PCM extraction. If you need a different track, [probe and extract it](../ffmpeg/references/sync-and-probing.md) to a mono 16-bit PCM WAV and pass it with `--wav`.
 
    ```text
-   revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json"
+   revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json" --timeout 300
    subsync --wav "episode-dialogue.wav" --in "original.ass" --out "aligned-wav.ass" --json-report "wav-report.json"
    ```
 
-3. Read the JSON report. The Rust engine uses FFT correlation for global offset and FPS drift, split-penalty dynamic programming for mid-episode edits, and bounded speech-onset snapping for eligible cues. Check `fps_ratio`, `split_segments`, and the before/after speech overlap. A higher score is not proof of correct timing.
+   If music or effects dominate a 5.1/7.1 downmix, extract the Center (`FC`) dialogue channel with `pan=mono|c0=FC,aresample=async=1:first_pts=0` and pass the mono PCM WAV with `--wav`.
+
+3. Per-dialogue cue-by-cue alignment is mandatory. Align every dialogue cue with its own spoken audio segment. Refine its start and end individually within neighbor-safe bounds, then snap eligible starts to nearby speech onsets. Never rely solely on a uniform timeline shift. Check `fps_ratio`, `split_segments`, and speech overlap before and after. A higher score does not prove correct timing.
 4. Play the result at the beginning, middle, end, and on either side of every split. Check that dialogue starts with the correct speaker, SRT cues stay in order, and ASS signs, effects, and layers still render correctly. Report unreviewed regions and keep the original if alignment is ambiguous.
 
 See the [audio sync reference](../references/audio-sync.md) for alignment flags, file preservation, and cases that need manual timing. For FFmpeg stream selection and timing diagnosis, use the [FFmpeg skill](../ffmpeg/SKILL.md) and its [sync and probing reference](../ffmpeg/references/sync-and-probing.md).

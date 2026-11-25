@@ -30,7 +30,7 @@ const RLM: char = '\u{200f}';
 const RLE: char = '\u{202b}';
 const PDF: char = '\u{202c}';
 const BIDI: &str = "\u{061c}\u{200e}\u{200f}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069}";
-const ASS: &str = r"(?<!\\)\{[^{}]*\}";
+const ASS: &str = r"\{";
 const HTML: &str = r"</?[A-Za-z][^<>]*>";
 const WORD: &str = r"\p{L}\p{N}_";
 
@@ -67,6 +67,7 @@ fn segments<'a>(
     engine: &'static FancyRegex,
 ) -> impl Iterator<Item = Result<(&'a str, &'a str), String>> {
     let (mut cursor, mut search, mut missing_end, mut output) = (0, 0, false, Vec::new());
+    let (mut missing_ass_end, mut drawing) = (false, false);
     loop {
         let found = match engine.find_from_pos(text, search) {
             Ok(Some(found)) => found,
@@ -77,7 +78,27 @@ fn segments<'a>(
             }
         };
         search = found.end();
-        if found.as_str() == "<!--" {
+        if found.as_str() == "{" {
+            if missing_ass_end
+                || (!drawing && found.start() > 0 && text.as_bytes()[found.start() - 1] == b'\\')
+            {
+                continue;
+            }
+            if let Some(end) = text[search..].find('}') {
+                search += end + 1;
+                drawing = match drawing_mode(&text[found.start()..search], drawing) {
+                    Ok(next) => next,
+                    Err(error) => {
+                        output.push(Err(error));
+                        return output.into_iter();
+                    }
+                };
+            } else {
+                // A later opener cannot have a closer after this failed search.
+                missing_ass_end = true;
+                continue;
+            }
+        } else if found.as_str() == "<!--" {
             // Once a comment has no terminator, later openers cannot complete
             // one either. Preserve the suffix as prose without rescanning EOF.
             if !missing_end && let Some(end) = text[search..].find("-->") {

@@ -752,7 +752,7 @@ fn bounded_read_checks_numeric_limit_before_touching_missing_path() -> Check {
     let root = tempfile::tempdir().map_err(|e| e.to_string())?;
     let path = root.path().join("missing.json");
     err(
-        runtime::read_limited(revayat_core::workflow::contract::path_marker(&path), -1),
+        runtime::read_limited(revayat_core::workflow::contract::path_marker(&path)?, -1),
         "limit",
     );
     write(&path, b"123")?;

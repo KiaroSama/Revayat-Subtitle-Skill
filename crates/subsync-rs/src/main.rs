@@ -155,11 +155,19 @@ fn run() -> Result<(), SyncError> {
 }
 
 fn main() -> ExitCode {
-    match run() {
+    let result = ctrlc::set_handler(subsync_rs::request_cancel)
+        .map_err(|error| SyncError::io("Install cancellation handler", io::Error::other(error)))
+        .and_then(|()| run());
+    match result {
+        Ok(()) if subsync_rs::check_cancelled().is_err() => ExitCode::from(130),
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             let _ = writeln!(io::stderr().lock(), "subsync: {error}");
-            ExitCode::FAILURE
+            if subsync_rs::check_cancelled().is_err() {
+                ExitCode::from(130)
+            } else {
+                ExitCode::FAILURE
+            }
         }
     }
 }

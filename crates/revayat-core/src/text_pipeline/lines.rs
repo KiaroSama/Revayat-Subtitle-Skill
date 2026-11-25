@@ -1,4 +1,4 @@
-use crate::markup::bidi::{PDI, RTL_ISOLATE, starts_with_latin};
+use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate, starts_with_latin};
 use std::collections::HashSet;
 use unicode_bidi::{BidiClass, bidi_class};
 
@@ -275,13 +275,10 @@ pub(super) fn anchor(
             matches!(bidi_class(c), BidiClass::R | BidiClass::AL)
                 && alpha.is_match(c.encode_utf8(&mut [0; 4]))
         });
-        let mut spans = line
+        let spans = line
             .iter()
             .filter(|(part, show)| *show && !part.trim_matches(py_space).is_empty());
-        let already_isolated = spans.next().is_some_and(|(first, _)| {
-            let last = spans.next_back().map_or(first, |(last, _)| last);
-            first.starts_with(RTL_ISOLATE) && last.ends_with(PDI)
-        });
+        let already_isolated = has_outer_rtl_isolate(spans.flat_map(|(part, _)| part.chars()));
         if has_rtl && !already_isolated {
             let line_balanced = balanced(&raw, kind);
             if line_balanced || !whole_balanced {

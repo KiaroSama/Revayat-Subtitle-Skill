@@ -1,5 +1,6 @@
 use super::files::{
-    MAX_FILE, fingerprint, invalid, linked, manifest_name, metadata, safe_path, validate_manifest,
+    MAX_BYTES, MAX_ENTRIES, MAX_FILE, fingerprint, invalid, linked, manifest_name, metadata,
+    safe_path, validate_manifest,
 };
 use serde_json::{Value, json};
 use std::{
@@ -200,16 +201,34 @@ pub fn payloads(
     Ok(result)
 }
 
+#[cfg(unix)]
+fn bundled_binary(relative: &Path) -> bool {
+    relative.parent() == Some(Path::new("bin"))
+        && relative
+            .file_name()
+            .and_then(|leaf| leaf.to_str())
+            .is_some_and(|leaf| BINARIES.contains(&leaf))
+}
+
+pub(super) fn legacy_binary_modes_match(current: &Value, expected: &Value) -> bool {
+    #[cfg(unix)]
+    if expected.get("executables").is_none() {
+        // Bundled binaries were always installed as 0755, even before modes were recorded.
+        return BINARIES.iter().all(|name| {
+            let path = format!("bin/{name}");
+            expected["files"].get(&path).is_none() || current["executables"][&path] == 0o111
+        });
+    }
+    #[cfg(not(unix))]
+    let _ = (current, expected);
+    true
+}
+
 pub(super) fn set_binary_permissions(file: &std::fs::File, relative: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if relative.parent() == Some(Path::new("bin"))
-            && relative
-                .file_name()
-                .and_then(|leaf| leaf.to_str())
-                .is_some_and(|leaf| BINARIES.contains(&leaf))
-        {
+        if bundled_binary(relative) {
             file.set_permissions(std::fs::Permissions::from_mode(0o755))?;
         }
     }
@@ -221,12 +240,15 @@ pub(super) fn set_binary_permissions(file: &std::fs::File, relative: &Path) -> i
 pub fn distribution_manifest(files: &[(PathBuf, PathBuf)]) -> io::Result<Value> {
     let mut expected = BTreeMap::new();
     let mut directories = BTreeSet::new();
+    let mut total = 0;
+    #[cfg(unix)]
+    let mut executables = BTreeMap::new();
     for (source, relative) in files {
         let name = relative
             .to_str()
             .ok_or_else(|| invalid("Distribution path is not UTF-8"))?
             .replace(std::path::MAIN_SEPARATOR, "/");
-        if !manifest_name(&name) || expected.insert(name, fingerprint(source)?).is_some() {
+        if !manifest_name(&name) || expected.contains_key(&name) {
             return Err(invalid("Invalid or duplicate distribution relative path"));
         }
         for parent in relative
@@ -240,8 +262,35 @@ pub fn distribution_manifest(files: &[(PathBuf, PathBuf)]) -> io::Result<Value> 
                     .replace(std::path::MAIN_SEPARATOR, "/"),
             );
         }
+        if expected.len() + 1 + directories.len() > MAX_ENTRIES {
+            return Err(invalid(
+                "Distribution exceeds its complete-tree entry limit",
+            ));
+        }
+        let size = std::fs::symlink_metadata(source)?.len();
+        if size > MAX_FILE || size > MAX_BYTES - total {
+            return Err(invalid("Distribution exceeds its complete-tree byte limit"));
+        }
+        let fingerprint = fingerprint(source)?;
+        total += fingerprint[0]
+            .as_u64()
+            .ok_or_else(|| invalid("Invalid distribution fingerprint"))?;
+        if total > MAX_BYTES {
+            return Err(invalid("Distribution exceeds its complete-tree byte limit"));
+        }
+        #[cfg(unix)]
+        if bundled_binary(relative) {
+            executables.insert(name.clone(), 0o111);
+        }
+        expected.insert(name, fingerprint);
     }
     let manifest = json!({"files": expected, "directories": directories});
+    #[cfg(unix)]
+    let manifest = {
+        let mut manifest = manifest;
+        manifest["executables"] = json!(executables);
+        manifest
+    };
     validate_manifest(&manifest)?;
     Ok(manifest)
 }

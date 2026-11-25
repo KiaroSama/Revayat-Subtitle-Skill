@@ -5,8 +5,8 @@ use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 pub const MAX_FILE: u64 = 16 * 1024 * 1024;
-const MAX_BYTES: u64 = 256 * 1024 * 1024;
-const MAX_ENTRIES: usize = 10_000;
+pub(super) const MAX_BYTES: u64 = 256 * 1024 * 1024;
+pub(super) const MAX_ENTRIES: usize = 10_000;
 pub type Identity = [String; 2];
 
 pub fn invalid(message: &str) -> io::Error {
@@ -314,10 +314,11 @@ pub fn manifest_name(name: &str) -> bool {
 }
 
 pub fn validate_manifest(v: &Value) -> io::Result<()> {
-    if !v
-        .as_object()
-        .is_some_and(|m| m.len() == 2 && m.contains_key("files") && m.contains_key("directories"))
-    {
+    if !v.as_object().is_some_and(|m| {
+        m.contains_key("files")
+            && m.contains_key("directories")
+            && (m.len() == 2 || m.len() == 3 && m.contains_key("executables"))
+    }) {
         return Err(invalid("Invalid installation tree manifest"));
     }
     let limit = || invalid("Installation tree manifest exceeds its entry limit");
@@ -325,6 +326,18 @@ pub fn validate_manifest(v: &Value) -> io::Result<()> {
     let directories = v["directories"].as_array().ok_or_else(limit)?;
     if files.len() + directories.len() > MAX_ENTRIES {
         return Err(limit());
+    }
+    if let Some(modes) = v.get("executables") {
+        let invalid_modes = || invalid("Invalid installation execute-bit manifest");
+        let modes = modes.as_object().ok_or_else(invalid_modes)?;
+        if modes.len() > files.len()
+            || modes.iter().any(|(name, mode)| {
+                !files.contains_key(name)
+                    || !mode.as_u64().is_some_and(|n| n > 0 && n & !0o111 == 0)
+            })
+        {
+            return Err(invalid_modes());
+        }
     }
     let mut names = std::collections::HashSet::with_capacity(files.len() + directories.len());
     for n in files
@@ -373,6 +386,8 @@ pub(super) fn inspect_tree(root: &Path) -> io::Result<(Identity, Value)> {
     let root = safe_path(root, true)?;
     let initial = identity(&root)?;
     let mut files = std::collections::BTreeMap::new();
+    #[cfg(unix)]
+    let mut executables = std::collections::BTreeMap::new();
     let mut directories = Vec::new();
     let mut total = 0;
     for (i, entry) in walkdir::WalkDir::new(&root)
@@ -417,6 +432,14 @@ pub(super) fn inspect_tree(root: &Path) -> io::Result<(Identity, Value)> {
                     "Previous installation exceeds its complete-tree byte limit",
                 ));
             }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = m.permissions().mode() & 0o111;
+                if mode != 0 {
+                    executables.insert(name.clone(), mode);
+                }
+            }
             files.insert(name, fp);
         } else {
             return Err(invalid(
@@ -429,12 +452,28 @@ pub(super) fn inspect_tree(root: &Path) -> io::Result<(Identity, Value)> {
     }
     directories.sort();
     let result = json!({"files":files,"directories":directories});
+    #[cfg(unix)]
+    let result = {
+        let mut result = result;
+        result["executables"] = json!(executables);
+        result
+    };
     validate_manifest(&result)?;
     Ok((initial, result))
 }
 
 pub fn matches(path: &Path, owned: &Value, manifest: &Value) -> bool {
     valid_identity(owned)
-        && inspect_tree(path)
-            .is_ok_and(|(identity, current)| json!(identity) == *owned && current == *manifest)
+        && inspect_tree(path).is_ok_and(|(identity, current)| {
+            json!(identity) == *owned && manifest_matches(&current, manifest)
+        })
+}
+
+pub(super) fn manifest_matches(current: &Value, expected: &Value) -> bool {
+    // Legacy authenticated journals did not capture execute bits of arbitrary old trees.
+    current["files"] == expected["files"]
+        && current["directories"] == expected["directories"]
+        && expected
+            .get("executables")
+            .is_none_or(|modes| current.get("executables") == Some(modes))
 }

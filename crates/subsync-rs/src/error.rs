@@ -11,6 +11,7 @@ pub enum SyncError {
     Audio(String),
     Ffmpeg(String),
     Config(String),
+    Cancelled,
     NoSpeech,
     Json(serde_json::Error),
     ReportPublication {
@@ -36,6 +37,7 @@ impl fmt::Display for SyncError {
             Self::Audio(message) => write!(f, "Invalid audio: {message}"),
             Self::Ffmpeg(message) => write!(f, "FFmpeg failed: {message}"),
             Self::Config(message) => write!(f, "Invalid sync configuration: {message}"),
+            Self::Cancelled => f.write_str("Synchronization was cancelled"),
             Self::NoSpeech => f.write_str("No usable speech was detected in the audio"),
             Self::Json(error) => write!(f, "Could not encode the sync report: {error}"),
             Self::ReportPublication {

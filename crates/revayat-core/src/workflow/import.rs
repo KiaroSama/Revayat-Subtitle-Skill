@@ -4,7 +4,6 @@ use crate::publication::{publish_bytes, rename_noreplace};
 use crate::runtime::files::{read_json, write_json};
 use crate::subtitle_formats::document::parse;
 use crate::validation;
-use encoding_rs::Encoding;
 use serde_json::{Value, json};
 use std::fs::{self, File};
 use std::io::{ErrorKind, Read};
@@ -265,42 +264,7 @@ fn inputs(
 }
 
 pub(super) fn decode(raw: &[u8], label: &str) -> Result<String, String> {
-    let label = label.to_ascii_lowercase().replace('_', "-");
-    let invalid = || format!("UnicodeDecodeError: invalid {label} subtitle data");
-    match label.as_str() {
-        "utf-8" | "utf8" | "utf-8-sig" => {
-            let raw = if label == "utf-8-sig" {
-                raw.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(raw)
-            } else {
-                raw
-            };
-            std::str::from_utf8(raw)
-                .map(str::to_owned)
-                .map_err(|_| invalid())
-        }
-        "ascii" | "us-ascii" if raw.is_ascii() => Ok(String::from_utf8_lossy(raw).into_owned()),
-        "ascii" | "us-ascii" => Err(invalid()),
-        "latin-1" | "latin1" | "iso-8859-1" => Ok(raw.iter().map(|&b| char::from(b)).collect()),
-        "utf-16" | "utf16" => match raw {
-            [0xff, 0xfe, tail @ ..] => decode(tail, "utf-16le"),
-            [0xfe, 0xff, tail @ ..] => decode(tail, "utf-16be"),
-            _ => Err(invalid()),
-        },
-        "utf-16-le" | "utf16-le" => decode(raw, "utf-16le"),
-        "utf-16-be" | "utf16-be" => decode(raw, "utf-16be"),
-        _ => Encoding::for_label(label.as_bytes())
-            .or_else(|| {
-                label
-                    .strip_prefix("cp")
-                    .and_then(|suffix| Encoding::for_label(format!("windows-{suffix}").as_bytes()))
-            })
-            .ok_or_else(|| {
-                value_error("encoding: expected a supported text encoding, not a binary transform")
-            })?
-            .decode_without_bom_handling_and_without_replacement(raw)
-            .map(|s| s.into_owned())
-            .ok_or_else(invalid),
-    }
+    validation::encoding::decode(raw, label)
 }
 
 pub struct ImportOptions<'a> {
@@ -325,6 +289,7 @@ pub fn prepare(
         language,
         output_format,
     } = *options;
+    let work_label = utf8_path(work)?;
     super::workspace::format(output_format)?;
     validation::string(json!(series), "series".into(), false)?;
     validation::integer(json!(season), "season".into(), 1, Some(99))?;
@@ -394,7 +359,7 @@ pub fn prepare(
     write_json(&temporary.join("glossary.json"), &terms)?;
     rename_noreplace(&temporary, work).map_err(io_error)?;
     Ok(
-        json!({"work": utf8_path(work)?, "sources": sources, "next": "Read and fill every worksheet; map episodes in project.json"}),
+        json!({"work": work_label, "sources": sources, "next": "Read and fill every worksheet; map episodes in project.json"}),
     )
 }
 

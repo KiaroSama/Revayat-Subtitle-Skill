@@ -118,13 +118,26 @@ pub fn workspace_state(work: Value) -> Result<Value, String> {
 }
 
 pub fn bounded_report(report: Value) -> Result<Value, String> {
-    if crate::workflow::contract_json::dump(&report, false, false)?.len() > MAX_REPORT_BYTES {
+    if crate::workflow::contract_json::dump_json(&report, false, false)?.len() > MAX_REPORT_BYTES {
         return Err(value_error("Read-only report exceeds its 1 MiB byte limit"));
     }
     Ok(report)
 }
 
+fn is_build_staging_name(name: &str) -> bool {
+    name.strip_prefix(".build-").is_some_and(|suffix| {
+        suffix.len() == 6 && suffix.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    })
+}
+
 pub fn report(work: &Path) -> Result<Value, String> {
+    report_with_metadata(work, |path| fs::symlink_metadata(path))
+}
+
+fn report_with_metadata(
+    work: &Path,
+    inspect: impl Fn(&Path) -> std::io::Result<fs::Metadata>,
+) -> Result<Value, String> {
     let WorkspaceState {
         workspace:
             Workspace {
@@ -156,22 +169,34 @@ pub fn report(work: &Path) -> Result<Value, String> {
         && !items(&project["episodes"]).is_empty();
     let mut expected_by_format = HashMap::new();
     let mut editions = Vec::new();
+    let mut build_staging = 0;
     let root = local_path(work, "builds")?;
     let mut ready = false;
     if root.exists() {
         if !root.is_dir() {
             return Err(value_error("Edition inventory must be a directory"));
         }
-        for entry in fs::read_dir(&root).map_err(io_error)? {
-            let entry = entry.map_err(io_error)?;
-            let metadata = fs::symlink_metadata(entry.path()).map_err(io_error)?;
-            if editions.len() >= 1000 || !metadata.is_dir() || linked(&metadata) {
-                return Err(value_error(
-                    "Edition inventory exceeds its limit or contains a non-directory",
-                ));
+        for (index, entry) in fs::read_dir(&root).map_err(io_error)?.enumerate() {
+            let inventory_error =
+                || value_error("Edition inventory exceeds its limit or contains a non-directory");
+            if index >= 1000 {
+                return Err(inventory_error());
             }
+            let entry = entry.map_err(io_error)?;
             let name = entry.file_name();
             let name = utf8_path(Path::new(&name))?;
+            let staging = is_build_staging_name(name);
+            let metadata = match inspect(&entry.path()) {
+                Err(error) if staging && error.kind() == std::io::ErrorKind::NotFound => continue,
+                result => result.map_err(io_error)?,
+            };
+            if !metadata.is_dir() || linked(&metadata) {
+                return Err(inventory_error());
+            }
+            if staging {
+                build_staging += 1;
+                continue;
+            }
             let path = local_path(work, &format!("builds/{name}"))?;
             if !hash(&json!(name)) {
                 return Err(value_error(
@@ -265,7 +290,7 @@ pub fn report(work: &Path) -> Result<Value, String> {
     }
     editions.sort_by(|a, b| string(&a["identity"]).cmp(string(&b["identity"])));
     bounded_report(
-        json!({"version": 1, "ready": ready, "state": if ready {"complete"} else {"pending"}, "sources": docs.len(), "cues": docs.values().map(|doc| doc.cues.len()).sum::<usize>(), "pending_cues": pending, "first_pending": first_pending, "glossary": if glossary_ready {"complete"} else {"pending"}, "unassigned_sources": unassigned, "editions": editions, "linguistic_quality_certified": false}),
+        json!({"version": 1, "ready": ready, "state": if ready {"complete"} else {"pending"}, "sources": docs.len(), "cues": docs.values().map(|doc| doc.cues.len()).sum::<usize>(), "pending_cues": pending, "first_pending": first_pending, "glossary": if glossary_ready {"complete"} else {"pending"}, "unassigned_sources": unassigned, "editions": editions, "build_staging": build_staging, "linguistic_quality_certified": false}),
     )
 }
 
@@ -286,6 +311,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn only_vanished_build_stages_are_ignored() -> Result<(), String> {
+        use crate::workflow::import::{ImportOptions, prepare};
+
+        let dir = tempfile::tempdir().map_err(io_error)?;
+        let source = dir.path().join("authored.srt");
+        fs::write(&source, "1\n00:00:01,000 --> 00:00:02,000\nAuthored\n").map_err(io_error)?;
+        let work = dir.path().join("work");
+        prepare(
+            &[source],
+            &work,
+            &ImportOptions {
+                series: "Status staging fixture",
+                season: 1,
+                encoding: "utf-8",
+                glossary: None,
+                language: "en",
+                output_format: "srt",
+            },
+        )?;
+        let builds = work.join("builds");
+        fs::create_dir(&builds).map_err(io_error)?;
+        let baseline = report(&work)?;
+        let inspect = |path: &Path| {
+            fs::remove_dir(path)?;
+            fs::symlink_metadata(path)
+        };
+        let stage = builds.join(".build-Ab123z");
+        fs::create_dir(&stage).map_err(io_error)?;
+        assert_eq!(report_with_metadata(&work, inspect)?, baseline);
+        assert!(!stage.exists());
+
+        let unknown = builds.join("unexpected");
+        fs::create_dir(&unknown).map_err(io_error)?;
+        let expected = io_error(fs::symlink_metadata(builds.join("missing")).unwrap_err());
+        assert_eq!(report_with_metadata(&work, inspect), Err(expected));
+        assert!(!unknown.exists());
+        Ok(())
+    }
+
+    #[test]
     fn report_limit_counts_utf8_bytes_and_python_separators() -> Result<(), String> {
         let text = "گ".repeat((MAX_REPORT_BYTES - 2) / 2);
         assert_eq!(bounded_report(json!(text))?, text);
@@ -294,5 +359,11 @@ mod tests {
             Some("ValueError: Read-only report exceeds its 1 MiB byte limit")
         );
         Ok(())
+    }
+
+    #[test]
+    fn report_limit_counts_literal_marker_keys_and_structure() {
+        let text = "x".repeat(MAX_REPORT_BYTES - 4);
+        assert!(bounded_report(json!({"$tuple": [text]})).is_err());
     }
 }

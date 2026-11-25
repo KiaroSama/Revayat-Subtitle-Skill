@@ -24,6 +24,14 @@ pub fn decode_png(data: Vec<u8>) -> Result<serde_json::Value, String> {
 }
 
 pub fn decode_dimensions(data: &[u8]) -> Result<(u32, u32), String> {
+    let started = Instant::now();
+    decode_with_budget(data, || started.elapsed() > Duration::from_secs(20))
+}
+
+fn decode_with_budget(
+    data: &[u8],
+    mut expired: impl FnMut() -> bool,
+) -> Result<(u32, u32), String> {
     if data.len() > MAX_PNG_BYTES || !data.starts_with(SIGNATURE) {
         return Err(invalid("invalid signature or file size"));
     }
@@ -33,6 +41,9 @@ pub fn decode_dimensions(data: &[u8]) -> Result<(u32, u32), String> {
     let mut compressed = Vec::new();
     let (mut saw_idat, mut image_ended, mut palette_seen) = (false, false, false);
     let (width, height, channels) = loop {
+        if expired() {
+            return Err(invalid("decode exceeded its time budget"));
+        }
         if rest.is_empty() {
             return Err(invalid("missing header, image data or end marker"));
         }
@@ -114,32 +125,52 @@ pub fn decode_dimensions(data: &[u8]) -> Result<(u32, u32), String> {
 
     let stride = (width * channels + 1) as usize;
     let expected = stride * height as usize;
-    let mut pixels = vec![0; expected + 1];
+    let mut pixels = vec![0; 65_536];
     let mut decoder = Decompress::new(true);
-    let status = decoder
-        .decompress(&compressed, &mut pixels, FlushDecompress::Sync)
-        .map_err(|_| invalid("invalid compressed image data"))?;
-    if status != Status::StreamEnd
-        || decoder.total_in() != compressed.len() as u64
-        || decoder.total_out() != expected as u64
-    {
-        return Err(invalid("truncated, oversized or concatenated image stream"));
-    }
-    let start = Instant::now();
-    for row in pixels[..expected].chunks_exact(stride) {
-        if start.elapsed() > Duration::from_secs(20) {
+    loop {
+        if expired() {
             return Err(invalid("decode exceeded its time budget"));
         }
-        if row[0] > 4 {
-            return Err(invalid("unknown scanline filter"));
+        let consumed = decoder.total_in() as usize;
+        let produced = decoder.total_out() as usize;
+        let end = (consumed + 65_536).min(compressed.len());
+        let status = decoder
+            .decompress(
+                &compressed[consumed..end],
+                &mut pixels,
+                FlushDecompress::Sync,
+            )
+            .map_err(|_| invalid("invalid compressed image data"))?;
+        if expired() {
+            return Err(invalid("decode exceeded its time budget"));
+        }
+        let written = decoder.total_out() as usize - produced;
+        if decoder.total_out() > expected as u64 {
+            return Err(invalid("truncated, oversized or concatenated image stream"));
+        }
+        let first_filter = (stride - produced % stride) % stride;
+        for index in (first_filter..written).step_by(stride) {
+            if pixels[index] > 4 {
+                return Err(invalid("unknown scanline filter"));
+            }
+        }
+        if status == Status::StreamEnd {
+            if decoder.total_in() != compressed.len() as u64
+                || decoder.total_out() != expected as u64
+            {
+                return Err(invalid("truncated, oversized or concatenated image stream"));
+            }
+            return Ok((width, height));
+        }
+        if decoder.total_in() == consumed as u64 && written == 0 {
+            return Err(invalid("truncated, oversized or concatenated image stream"));
         }
     }
-    Ok((width, height))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::decode_png;
+    use super::{decode_png, decode_with_budget};
     use flate2::{Compression, write::ZlibEncoder};
     use serde_json::json;
     use std::io::Write;
@@ -203,6 +234,21 @@ mod tests {
             decode_png(png(2, &stream)),
             Err("ValueError: PNG evidence: unknown scanline filter".into())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn budget_covers_inflation_and_not_only_scanline_checks() -> std::io::Result<()> {
+        let image = png(2, &compress(&[0; 7])?);
+        let mut checks = 0;
+        let error = decode_with_budget(&image, || {
+            checks += 1;
+            // Four chunks, then the checks immediately before and after inflation.
+            checks >= 6
+        })
+        .expect_err("expired while inflating");
+        assert!(error.contains("time budget"));
+        assert_eq!(checks, 6);
         Ok(())
     }
 }

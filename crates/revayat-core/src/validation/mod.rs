@@ -1,6 +1,7 @@
 //! Typed validation with content-free diagnostics.
 #![forbid(unsafe_code)]
 use serde_json::Value;
+pub(crate) mod encoding;
 mod records;
 #[cfg(test)]
 mod tests;
@@ -68,43 +69,9 @@ fn text<'a>(v: &'a Value, loc: &str, empty: bool) -> Result<&'a str, String> {
 pub fn string(value: Value, r#where: String, empty: bool) -> Result<String, String> {
     text(&value, &r#where, empty).map(str::to_owned)
 }
-fn encoding(label: &str) -> bool {
-    let key = label.to_ascii_lowercase().replace('-', "_");
-    if label.trim() != label {
-        return false;
-    }
-    matches!(
-        key.as_str(),
-        "utf_8_sig"
-            | "utf8"
-            | "utf_16"
-            | "utf_16_le"
-            | "utf_16_be"
-            | "utf_32"
-            | "utf_32_le"
-            | "utf_32_be"
-            | "utf_7"
-            | "ascii"
-            | "us_ascii"
-            | "latin_1"
-            | "latin1"
-            | "iso8859_1"
-            | "cp1256"
-            | "cp1252"
-            | "unicode_escape"
-            | "raw_unicode_escape"
-            | "cp437"
-            | "cp850"
-            | "cp720"
-            | "cp864"
-    ) || (!matches!(
-        key.as_str(),
-        "replacement" | "x_user_defined" | "unicodefffe" | "unicodefeff"
-    ) && encoding_rs::Encoding::for_label(key.replace('_', "-").as_bytes()).is_some())
-}
 pub fn text_encoding(value: Value, r#where: String) -> Result<String, String> {
     let label = text(&value, &r#where, false)?;
-    if encoding(label) {
+    if encoding::resolve(label).is_some() {
         Ok(label.into())
     } else {
         Err(invalid(

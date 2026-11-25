@@ -96,7 +96,8 @@ pub(super) fn lint(args: LintArgs) -> Result<i32> {
                 if fixed != text {
                     replace_text(path, fixed, permissions)?;
                 }
-                eprintln!(
+                let _ = writeln!(
+                    io::stderr().lock(),
                     "fixed: {} ({total} changes)",
                     redact(&path.to_string_lossy())
                 );
@@ -104,7 +105,8 @@ pub(super) fn lint(args: LintArgs) -> Result<i32> {
                 io::stdout().lock().write_all(fixed.as_bytes())?;
             }
             if !suggestions.is_empty() {
-                eprintln!(
+                let _ = writeln!(
+                    io::stderr().lock(),
                     "\n{} item(s) need judgment (run --check for details)",
                     suggestions.len()
                 );
@@ -123,7 +125,7 @@ pub(super) fn lint(args: LintArgs) -> Result<i32> {
         } else {
             let mut stdout = io::stdout().lock();
             if inputs.len() > 1 {
-                writeln!(stdout, "{}:", path.display())?;
+                writeln!(stdout, "{}:", redact(&path.to_string_lossy()))?;
             }
             lint_report(&mut stdout, stats, total, &changes, suggestions)?;
         }
@@ -217,7 +219,14 @@ fn bundled_data() -> Option<PathBuf> {
                 root.join("voice/persian/data"),
             ]
         })
-        .find(|path| path.is_dir())
+        .find(|path| {
+            path.is_dir()
+                && BANKS.iter().any(|(_, filename, _)| {
+                    // An empty auto-discovery directory must not mask a later bank.
+                    // Existing invalid entries still reach lookup_dir's strict checks.
+                    !matches!(fs::symlink_metadata(path.join(filename)), Err(error) if error.kind() == ErrorKind::NotFound)
+                })
+        })
 }
 
 fn lookup_dir(text: &str, reverse: bool, path: &Path) -> Result<Value> {
@@ -266,7 +275,7 @@ pub(super) fn lookup(args: LookupArgs) -> Result<i32> {
             Err(error)
                 if matches!(
                     error.kind(),
-                    ErrorKind::NotFound | ErrorKind::InvalidFilename
+                    ErrorKind::NotFound | ErrorKind::InvalidFilename | ErrorKind::NotADirectory
                 ) =>
             {
                 input

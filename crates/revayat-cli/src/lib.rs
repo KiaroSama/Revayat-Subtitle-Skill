@@ -7,7 +7,10 @@ pub mod sync_bridge;
 
 use clap::Parser;
 use revayat_core::runtime::{LogLevel, OperationalLog, diagnostic::redact};
-use std::ffi::OsString;
+use std::{
+    ffi::OsString,
+    io::{self, Write},
+};
 
 /// Run the command using the process's argument list.
 pub fn run() -> i32 {
@@ -30,7 +33,7 @@ pub fn run_from(args: impl IntoIterator<Item = impl Into<OsString> + Clone>) -> 
             let mut lines = message.lines();
             let status = print_error(lines.next().unwrap_or("Invalid arguments"));
             for line in lines {
-                eprintln!("{}", redact(line));
+                let _ = writeln!(io::stderr().lock(), "{}", redact(line));
             }
             return status;
         }
@@ -40,15 +43,34 @@ pub fn run_from(args: impl IntoIterator<Item = impl Into<OsString> + Clone>) -> 
         Err(error) => return print_error(&error),
     };
     log.record(LogLevel::Info, &format!("Command={}", args.command.name()));
-    let status = match commands::execute(args.command) {
+    let mut status = match commands::execute(args.command) {
         Ok(status) => status,
-        Err(error) => print_error(&error.to_string()),
+        Err(error) => {
+            let message = bounded_error(&error.to_string());
+            let status = print_error(&message);
+            log.record(LogLevel::Error, &format!("Command failed: {message}"));
+            status
+        }
     };
+    if revayat_core::process_control::cancel_requested() {
+        status = 130;
+    }
     log.finish(status);
     status
 }
 
 fn print_error(error: &str) -> i32 {
-    eprintln!("ERROR: {}", redact(error));
+    let _ = writeln!(io::stderr().lock(), "ERROR: {}", bounded_error(error));
     2
+}
+
+fn bounded_error(error: &str) -> String {
+    // Redact before truncating so a cut credential cannot escape its matched value.
+    let redacted = redact(error);
+    let mut chars = redacted.chars();
+    let mut message: String = chars.by_ref().take(2048).collect();
+    if chars.next().is_some() {
+        message.push_str(" [truncated]");
+    }
+    message
 }

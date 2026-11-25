@@ -9,10 +9,18 @@ confirm a legacy encoding before passing `--encoding`. SSA, VTT, bitmap subtitle
 encrypted archives and malformed files need deliberate conversion or repair of a
 separate copy. Originals remain unchanged.
 
+Import also supports strict UTF-16/UTF-32 with a BOM or an explicit LE/BE label,
+ASCII, Latin-1 and supported legacy text codecs. Latin-1 aliases keep their C1
+bytes distinct from Windows-1252. Unsupported UTF-7, escape codecs and OEM pages
+are rejected during preflight; convert a separate copy with a confirmed decoder.
+Generic UTF-16/UTF-32 labels require a BOM, and malformed code units are refused.
+
 ASS `Format` rows define fields, with `Text` last in Events. Commas inside text
 are content. A physical line break would corrupt an ASS row; use literal `\N`.
 SRT block numbers are regenerated after a stable sort by start time. Equal-start
 events retain their order; overlap is not automatically an error.
+Any run of complete empty or space/tab-only separator lines separates SRT cues;
+adding one more blank separator must not change whether the file can be imported.
 
 SRT-to-ASS conversion floors each timestamp to a centisecond and records original,
 reviewed and emitted times. Durations that become zero are refused. Literal angle
@@ -90,8 +98,9 @@ Style reset `\r` does not leave drawing mode. Drawing assignments inside support
 same structural explanation and visual review as ordinary `\p` drawing changes.
 Transforms with more than three nonempty comma-terminated arguments before the
 backslash argument are ignored by libass; their nested tags do not change drawing
-state. Generation recipe 13 and normalization 12 include format-aware conversion,
-conservative watermark detection and final emitted-link checks. The renderer
+state. Generation recipe 14 and normalization 13 include format-aware conversion,
+conservative watermark detection, final emitted-link checks, matching outer bidi
+isolate scopes, and literal JSON input identities. The renderer
 requires fresh evidence for the new edition.
 Original sources, decisions and old editions stay intact; approvals do not transfer.
 Drawing-mode brace scanning uses raw vector boundaries, not prose escape rules.
@@ -103,6 +112,9 @@ space/tab after a tag backslash and signed-positive drawing scales stay supporte
 Remove non-displayed ASS Comment events, semicolon comments outside attachment
 sections, standalone `{inline comments}`, SRT HTML comments and genuinely empty
 cues. Remove empty display lines within a retained cue without losing its content.
+Comment removal must not create a new active tag or complete hidden comment from
+previously literal text. Such a join is refused before publication and requires an
+explicit worksheet adaptation; deleting the newly hidden content is not a repair.
 For `{note\i1}`, separate the comment from the real tag manually and document the
 structural change. A hidden override block may still control visible output.
 

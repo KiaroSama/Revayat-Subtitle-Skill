@@ -1,4 +1,4 @@
-use crate::{SyncError, publication::stage_file};
+use crate::{SyncError, check_cancelled, publication::stage_file};
 use process_wrap::std::{ChildWrapper, CommandWrap};
 use std::{
     fs::{self, File},
@@ -15,7 +15,9 @@ const MAX_FFMPEG_TIMEOUT: Duration = Duration::from_secs(86_400);
 const POLL: Duration = Duration::from_millis(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
 // Longer decoded audio cannot fit in the aligner's 2^22 10 ms frames.
-const MAX_PCM_BYTES: u64 = (1 << 22) * (VIDEO_SAMPLE_RATE as u64 / 100) * 2;
+const MAX_PCM_BYTES: u64 =
+    crate::align::MAX_TIMELINE_FRAMES as u64 * (VIDEO_SAMPLE_RATE as u64 / 100) * 2;
+pub const MAX_WAV_BYTES: u64 = MAX_PCM_BYTES + 4096;
 const MAX_DIAGNOSTIC_BYTES: u64 = 1024 * 1024;
 
 pub fn extract_pcm_via_ffmpeg(video_path: &Path, ffmpeg_bin: &str) -> Result<Vec<i16>, SyncError> {
@@ -27,6 +29,7 @@ pub fn extract_pcm_via_ffmpeg_with_timeout(
     ffmpeg_bin: &str,
     timeout: Duration,
 ) -> Result<Vec<i16>, SyncError> {
+    check_cancelled()?;
     if timeout.is_zero() || timeout > MAX_FFMPEG_TIMEOUT {
         return Err(SyncError::Config(
             "FFmpeg timeout must be greater than 0 and at most 86400 seconds".into(),
@@ -37,7 +40,18 @@ pub fn extract_pcm_via_ffmpeg_with_timeout(
     command
         .args(["-v", "error", "-nostdin", "-i"])
         .arg(video)
-        .args(["-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"]);
+        .args([
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-af",
+            "aresample=async=1:first_pts=0",
+            "-f",
+            "s16le",
+            "-",
+        ]);
     let (status, stdout, stderr) = run_ffmpeg(command, timeout)?;
     if !status.success() {
         let stderr = String::from_utf8_lossy(&stderr);
@@ -69,6 +83,7 @@ fn run_ffmpeg(
     #[cfg(unix)]
     command.wrap(process_wrap::std::ProcessGroup::leader());
     let deadline = Instant::now() + timeout;
+    check_cancelled()?;
     let mut child = command
         .spawn()
         .map_err(|e| SyncError::io("Start FFmpeg", e))?;
@@ -113,6 +128,7 @@ fn await_ffmpeg(
     timeout: Duration,
 ) -> Result<(), SyncError> {
     loop {
+        check_cancelled()?;
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(SyncError::Ffmpeg(format!(
@@ -196,7 +212,7 @@ fn terminate(child: &mut dyn ChildWrapper) -> io::Result<ExitStatus> {
 }
 
 pub fn read_wav_pcm16(path: &Path) -> Result<(u32, Vec<i16>), SyncError> {
-    let wav = fs::read(path).map_err(|e| SyncError::io("Read WAV input", e))?;
+    let wav = crate::input::read_bytes(path, MAX_WAV_BYTES, "Read WAV input")?;
     if wav.get(..4) != Some(b"RIFF") || wav.get(8..12) != Some(b"WAVE") {
         return Err(SyncError::Audio("expected a RIFF/WAVE file".into()));
     }

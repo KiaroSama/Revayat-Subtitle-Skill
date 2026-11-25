@@ -102,6 +102,6 @@ pub fn output_directory(parent: Value, prefix: String) -> Result<Value, String> 
     Ok(json!({"$path":files::output_directory(path(&parent,"resolve")?,&prefix)?}))
 }
 pub fn log_fallback(component: String, level: String, message: String) -> Result<Value, String> {
-    eprintln!("{}", diagnostic::line(&component, &level, &message));
+    logging::stderr_line(&diagnostic::line(&component, &level, &message));
     Ok(Value::Null)
 }

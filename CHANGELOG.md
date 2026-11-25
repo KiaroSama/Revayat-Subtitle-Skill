@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Repair the Rust v3 subtitle pipeline's comment/override preservation, bidi scopes, SRT separator runs, generated styles, codec validation and literal JSON edition identities. Use generation recipe `14` and normalization recipe `13`; historical workspaces keep their sources and reviews while new editions require fresh image evidence.
+- Preserve delayed/gapped audio timelines during sync, clean up owned processes on cancellation, bound standalone inputs, and replay external-worker endpoint transformations against the requested limits before publication.
+- Correct automatic uninstall discovery, authenticated Unix executable ownership, early distribution budgets and Windows recovery path aliases. Keep legacy journal compatibility and safe retry behavior.
+- Make diagnostic sink failures nonpanicking, log redacted failure causes, check supervised output delivery, preserve timeout/signal causes, and reject overflowing JSON integers and malformed public render timing.
+- Recognize legitimate build staging in read-only status, apply PNG deadlines during incremental inflation, execute media tests on all four supported native Rust hosts, and require release tags to match package, manifest and binary versions.
+- Document public adapter signature corrections and evidence in the [Rust v3 audit](docs/audit-rust-2026-11-25.md).
+
 ## 3.0.0 (2026-11-25)
 
 ### Runtime and distribution

@@ -49,16 +49,25 @@ fn write(path: &Path, data: &Value) -> Result<()> {
     files::write_json(path, data).map_err(|e| anyhow!(e))
 }
 
-fn snapshot(root: &Path) -> Result<BTreeMap<PathBuf, Vec<u8>>> {
+#[derive(Debug, PartialEq, Eq)]
+enum SnapshotEntry {
+    Directory,
+    File(Vec<u8>),
+    Link(PathBuf),
+}
+
+fn snapshot(root: &Path) -> Result<BTreeMap<PathBuf, SnapshotEntry>> {
     let mut result = BTreeMap::new();
     for entry in walkdir::WalkDir::new(root) {
         let entry = entry?;
-        if entry.file_type().is_file() {
-            result.insert(
-                entry.path().strip_prefix(root)?.into(),
-                fs::read(entry.path())?,
-            );
-        }
+        let value = if entry.file_type().is_symlink() {
+            SnapshotEntry::Link(fs::read_link(entry.path())?)
+        } else if entry.file_type().is_dir() {
+            SnapshotEntry::Directory
+        } else {
+            SnapshotEntry::File(fs::read(entry.path())?)
+        };
+        result.insert(entry.path().strip_prefix(root)?.into(), value);
     }
     Ok(result)
 }

@@ -43,13 +43,13 @@ jobs:
             test: true
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            test: false
+            test: true
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
             test: true
           - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            test: false
+            test: true
     env:
       RUST_TARGET: ${{ matrix.target }}
       REVAYAT_REQUIRE_FFMPEG: '1'
@@ -76,12 +76,13 @@ jobs:
         if: matrix.test
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Install Linux FFmpeg and fonts
-        if: matrix.runner == 'ubuntu-24.04'
+        if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - name: Install verified Windows FFmpeg
-        if: matrix.runner == 'windows-2025'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # The ARM64 lane runs native Rust binaries with this verified x64 FFmpeg under Windows emulation.
           $destination = Join-Path $env:RUNNER_TEMP 'ffmpeg'
           New-Item -ItemType Directory -Path $destination | Out-Null
           $archive = Join-Path $destination 'ffmpeg.zip'
