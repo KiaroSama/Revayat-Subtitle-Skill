@@ -7,6 +7,8 @@ use rustfft::{FftPlanner, num_complex::Complex};
 
 #[path = "align_cue.rs"]
 mod align_cue;
+#[path = "align_energy.rs"]
+mod align_energy;
 
 /// Playback speed candidates supported by the synchronization report protocol.
 pub const FPS_RATIOS: [f64; 5] = [1.0, 23.976 / 25.0, 25.0 / 23.976, 24.0 / 25.0, 25.0 / 24.0];
@@ -110,7 +112,7 @@ fn global_match(
         let subtitle = build_activity_with_check(&scaled, needed, frame_ms, check_cancelled)?;
         let (sum, energy) = stats(&subtitle, n);
         // A cue beyond the FFT window cannot add to the dot product, but still costs energy.
-        let tail_energy = activity_tail_energy(&scaled, needed as u64, frame_ms)?;
+        let tail_energy = align_energy::activity_tail_energy(&scaled, needed as u64, frame_ms)?;
         let norm = (audio_energy * (energy + tail_energy)).sqrt();
         if energy <= f64::EPSILON || norm <= f64::EPSILON {
             continue;
@@ -189,29 +191,6 @@ fn global_match(
         ));
     }
     Ok(solution)
-}
-
-fn activity_tail_energy(
-    cues: &[SubtitleCue],
-    frames: u64,
-    frame_ms: u32,
-) -> Result<f64, SyncError> {
-    let frame = u64::from(frame_ms);
-    let boundary = frames * frame;
-    let mut energy = 0.0;
-    for cue in cues.iter().filter(|cue| cue.end_ms > boundary) {
-        check_cancelled()?;
-        let start = cue.start_ms.max(boundary);
-        let end = cue.end_ms;
-        if start >= end {
-            continue;
-        }
-        let first = (frame - start % frame).min(end - start);
-        let remaining = end - start - first;
-        let fraction = |ms: u64| (ms as f64 / frame as f64).powi(2);
-        energy += fraction(first) + (remaining / frame) as f64 + fraction(remaining % frame);
-    }
-    Ok(energy)
 }
 
 fn stats(signal: &[f32], n: usize) -> (f64, f64) {
