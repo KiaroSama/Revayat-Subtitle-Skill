@@ -68,7 +68,7 @@ Plan ASS dialogue, signs, opening (OP), and ending (ED) styles and positions
 against the scene. Preserve usable canvas, relative placement and styles from an
 inherited ASS base. Use B Koodak (assets/fonts/BKOODB.TTF), the only bundled
 subtitle font, for default Persian ASS on a 1920x1080 canvas. Keep
-ScaledBorderAndShadow: yes, Outline=1.5 and Shadow=0.8. Check legibility on bright
+ScaledBorderAndShadow: yes, Fontsize=110, Outline=2, Shadow=2, and margins 10,10,10. Use Bold=0 unless the source ASS Default style is bold or the user overrides it. Check legibility on bright
 and dark frames. Keep approved embedded fonts. Preserve intentional bold and
 italic spans with complete ASS overrides or balanced SRT tags. Flag any effect
 the output format cannot retain.

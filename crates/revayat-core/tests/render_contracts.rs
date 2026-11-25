@@ -6,7 +6,7 @@ use revayat_core::{
     runtime::files::write_json,
     subtitle_formats::{
         conversion::{self, Options},
-        document::{ASS_FIELDS, DEFAULT_STYLE, STYLE_FIELDS, parse, serialize},
+        document::{ASS_FIELDS, STYLE_FIELDS, parse, serialize},
     },
     workflow::{
         import::{ImportOptions, prepare},
@@ -24,6 +24,8 @@ use std::{
 
 const EPISODE: &str = "S01E01";
 const STYLE: &str = "Default,Arial,42,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,30,30,35,1";
+// This authored style fits the fixture's 320×180 canvas, not the generated 1920×1080 canvas.
+const FIXTURE_STYLE: &str = "Default,B Koodak,52,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,1.5,0.8,2,20,20,24,1";
 const SRT: &str = "1\n00:00:01,001 --> 00:00:02,009\nx < 5 and y > 2\n";
 
 fn ass(style: &str, headers: &str, events: &str) -> String {
@@ -37,7 +39,7 @@ fn event(start: u32, end: u32, text: &str) -> String {
 }
 
 fn source(text: &str) -> String {
-    ass(DEFAULT_STYLE, "", &event(1, 3, text))
+    ass(FIXTURE_STYLE, "", &event(1, 3, text))
 }
 
 fn workspace(
@@ -363,7 +365,7 @@ fn renders_attested_png_from_unicode_and_space_paths() -> Result<(), String> {
 #[test]
 fn renders_every_cue_and_attests_the_all_cues_recipe() -> Result<(), String> {
     let text = &ass(
-        DEFAULT_STYLE,
+        FIXTURE_STYLE,
         "",
         &(0..4)
             .map(|i| event(i, i + 1, "VISIBLE"))
@@ -409,9 +411,9 @@ fn renders_literal_srt_delimiters_as_visible_content() -> Result<(), String> {
 
 #[test]
 fn renders_inline_font_and_reset_only_style_with_verified_font_bytes() -> Result<(), String> {
-    let reset = DEFAULT_STYLE.replacen("Default", "ResetOnly", 1);
+    let reset = FIXTURE_STYLE.replacen("Default", "ResetOnly", 1);
     let text = ass(
-        &format!("{DEFAULT_STYLE}\nStyle: {reset}"),
+        &format!("{FIXTURE_STYLE}\nStyle: {reset}"),
         "",
         &[
             event(0, 1, "Visible"),

@@ -36,22 +36,101 @@ pub fn extract_pcm_via_ffmpeg_with_timeout(
         ));
     }
     let video = fs::canonicalize(video_path).map_err(|e| SyncError::io("Open video input", e))?;
+    if probe_front_center(&video, ffmpeg_bin, timeout.min(Duration::from_secs(15))) {
+        match extract_stream(&video, ffmpeg_bin, timeout, true) {
+            Ok(pcm) if audible_center(&pcm) => return Ok(pcm),
+            Err(SyncError::Cancelled) => return Err(SyncError::Cancelled),
+            _ => {}
+        }
+    }
+    check_cancelled()?;
+    extract_stream(&video, ffmpeg_bin, timeout, false)
+}
+
+fn has_front_center_channel(channels: u32, layout: &str) -> bool {
+    channels >= 3
+        && (matches!(
+            layout,
+            "5.1"
+                | "5.1(side)"
+                | "7.1"
+                | "7.1(wide)"
+                | "6.1"
+                | "3.0"
+                | "3.1"
+                | "4.1"
+                | "5.0"
+                | "7.0"
+        ) || layout.contains("FC"))
+}
+
+fn audible_center(pcm: &[i16]) -> bool {
+    !pcm.is_empty()
+        && pcm
+            .iter()
+            .map(|&sample| f64::from(sample).powi(2))
+            .sum::<f64>()
+            >= 400.0 * pcm.len() as f64
+}
+
+fn probe_front_center(video: &Path, ffmpeg_bin: &str, timeout: Duration) -> bool {
+    let ffmpeg = Path::new(ffmpeg_bin);
+    let probe = ffmpeg.with_file_name(
+        if ffmpeg
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+        {
+            "ffprobe.exe"
+        } else {
+            "ffprobe"
+        },
+    );
+    let mut command = Command::new(probe);
+    command
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=channels,channel_layout",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(video);
+    let Ok((status, stdout, _)) = run_ffmpeg(command, timeout) else {
+        return false;
+    };
+    let text = String::from_utf8_lossy(&stdout);
+    status.success()
+        && text
+            .trim()
+            .split_once(',')
+            .is_some_and(|(channels, layout)| {
+                channels
+                    .parse()
+                    .is_ok_and(|channels| has_front_center_channel(channels, layout))
+            })
+}
+
+fn extract_stream(
+    video: &Path,
+    ffmpeg_bin: &str,
+    timeout: Duration,
+    center: bool,
+) -> Result<Vec<i16>, SyncError> {
     let mut command = Command::new(ffmpeg_bin);
     command
         .args(["-v", "error", "-nostdin", "-i"])
         .arg(video)
-        .args([
-            "-vn",
-            "-ac",
-            "1",
-            "-ar",
-            "16000",
-            "-af",
-            "aresample=async=1:first_pts=0",
-            "-f",
-            "s16le",
-            "-",
-        ]);
+        .args(["-map", "0:a:0", "-vn", "-ar", "16000"]);
+    let filter = if center {
+        "pan=mono|c0=FC,aresample=async=1:first_pts=0"
+    } else {
+        command.args(["-ac", "1"]);
+        "aresample=async=1:first_pts=0"
+    };
+    command.args(["-af", filter, "-f", "s16le", "-"]);
     let (status, stdout, stderr) = run_ffmpeg(command, timeout)?;
     if !status.success() {
         let stderr = String::from_utf8_lossy(&stderr);
@@ -419,4 +498,18 @@ mod tests {
             }
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn front_center_requires_a_supported_layout_and_audible_pcm() {
+    for (channels, layout) in [(6, "5.1"), (6, "5.1(side)"), (8, "7.1"), (3, "3.0")] {
+        assert!(has_front_center_channel(channels, layout));
+    }
+    for (channels, layout) in [(1, "mono"), (2, "stereo"), (4, "quad"), (3, "2.1")] {
+        assert!(!has_front_center_channel(channels, layout));
+    }
+    assert!(!audible_center(&[]));
+    assert!(!audible_center(&[0, 19, -19]));
+    assert!(audible_center(&[20, -20]));
 }

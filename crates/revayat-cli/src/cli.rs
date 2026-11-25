@@ -170,10 +170,22 @@ pub struct ConvertArgs {
     pub out: PathBuf,
     #[arg(long, default_value = "B Koodak")]
     pub font: String,
-    #[arg(long, default_value_t = 1.5, allow_negative_numbers = true)]
+    #[arg(long, default_value_t = 110, allow_negative_numbers = true)]
+    pub font_size: i64,
+    #[arg(long, default_value_t = 2.0, allow_negative_numbers = true)]
     pub outline: f64,
-    #[arg(long, default_value_t = 0.8, allow_negative_numbers = true)]
+    #[arg(long, default_value_t = 2.0, allow_negative_numbers = true)]
     pub shadow: f64,
+    #[arg(long, default_value_t = 10, allow_negative_numbers = true)]
+    pub margin_l: i64,
+    #[arg(long, default_value_t = 10, allow_negative_numbers = true)]
+    pub margin_r: i64,
+    #[arg(long, default_value_t = 10, allow_negative_numbers = true)]
+    pub margin_v: i64,
+    #[arg(long, conflicts_with = "no_bold")]
+    pub bold: bool,
+    #[arg(long)]
+    pub no_bold: bool,
     #[arg(long, default_value_t = 42, allow_negative_numbers = true)]
     pub max_chars: i64,
     #[arg(long)]

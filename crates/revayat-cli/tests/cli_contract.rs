@@ -59,7 +59,7 @@ fn help_lists_all_sixteen_commands_and_version() -> Result<()> {
     assert_code(&output, 0);
     assert_eq!(
         String::from_utf8(output.stdout)?.trim(),
-        "revayat-subtitle 3.0.1"
+        "revayat-subtitle 3.0.2"
     );
     Ok(())
 }
@@ -203,5 +203,80 @@ fn fix_can_normalize_utf8_in_place() -> Result<()> {
     );
     assert_eq!(fs::read_to_string(path)?, "کی\r\n");
     assert_code(&command(&scratch).args(args).output()?, 0);
+    Ok(())
+}
+
+#[test]
+fn ass_style_defaults_preserve_source_bold_and_accept_overrides() -> Result<()> {
+    let scratch = tempfile::tempdir()?;
+    fs::write(
+        scratch.path().join("input.srt"),
+        "1\n00:00:01,000 --> 00:00:02,000\nHello\n",
+    )?;
+    let convert = |subcommand, input, output, flags: &[&str]| {
+        command(&scratch)
+            .args([subcommand, input, "--out", output])
+            .args(flags)
+            .output()
+    };
+    let style = |file| -> Result<Vec<String>> {
+        let text = fs::read_to_string(scratch.path().join(file))?;
+        Ok(text
+            .lines()
+            .find_map(|line| line.strip_prefix("Style: Default,"))
+            .unwrap()
+            .split(',')
+            .map(str::to_owned)
+            .collect())
+    };
+    assert_code(&convert("convert", "input.srt", "plain.ass", &[])?, 0);
+    let plain = style("plain.ass")?;
+    assert_eq!(plain[0..2], ["B Koodak", "110"]);
+    assert_eq!(plain[6], "0");
+    assert_eq!(plain[15..21], ["2", "2", "2", "10", "10", "10"]);
+    let flags = [
+        "--font-size",
+        "90",
+        "--outline",
+        "3.5",
+        "--shadow",
+        "1",
+        "--margin-l",
+        "21",
+        "--margin-r",
+        "22",
+        "--margin-v",
+        "23",
+        "--bold",
+    ];
+    assert_code(
+        &convert("translator-ass", "input.srt", "bold.ass", &flags)?,
+        0,
+    );
+    let bold = style("bold.ass")?;
+    assert_eq!(bold[1], "90");
+    assert_eq!(bold[6], "-1");
+    assert_eq!(bold[15..21], ["3.5", "1", "2", "21", "22", "23"]);
+    for (source, override_flags, expected, out) in [
+        ("bold.ass", &[][..], "-1", "preserved.ass"),
+        ("plain.ass", &[][..], "0", "still-plain.ass"),
+        ("bold.ass", &["--no-bold"][..], "0", "forced-plain.ass"),
+    ] {
+        assert_code(&convert("convert", source, out, override_flags)?, 0);
+        assert_eq!(style(out)?[6], expected);
+    }
+    for flags in [
+        ["--font-size", "-1"],
+        ["--outline", "NaN"],
+        ["--shadow", "inf"],
+        ["--margin-l", "-1"],
+        ["--margin-r", "-1"],
+        ["--margin-v", "-1"],
+        ["--bold", "--no-bold"],
+    ] {
+        let output = convert("convert", "input.srt", "invalid.ass", &flags)?;
+        assert!(!output.status.success(), "{flags:?}");
+        assert!(!scratch.path().join("invalid.ass").exists());
+    }
     Ok(())
 }

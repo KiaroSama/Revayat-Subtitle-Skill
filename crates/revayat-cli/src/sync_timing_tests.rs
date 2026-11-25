@@ -276,6 +276,7 @@ fn real_engine_nonzero_snaps_obey_duration_without_a_new_onset_grid_restriction(
     let original = SubtitleDocument::parse(source, None).unwrap();
     let config = SyncConfig {
         snap_ms: 100,
+        lead_in_ms: 0,
         ..zero_limits()
     };
     // The detector emits 10 ms onsets, but the public VAD contract also accepts

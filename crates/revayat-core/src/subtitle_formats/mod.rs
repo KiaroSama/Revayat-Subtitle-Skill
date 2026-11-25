@@ -120,6 +120,36 @@ pub fn build_ass_style(
     alignment: i64,
     margin_v: i64,
 ) -> Result<String, String> {
+    build_ass_style_with_margins(
+        name,
+        fontname,
+        fontsize,
+        outline,
+        shadow,
+        outline_colour,
+        back_colour,
+        bold,
+        alignment,
+        10,
+        10,
+        margin_v,
+    )
+}
+
+pub fn build_ass_style_with_margins(
+    name: String,
+    fontname: Option<Value>,
+    fontsize: i64,
+    outline: Option<Value>,
+    shadow: Option<Value>,
+    outline_colour: Option<Value>,
+    back_colour: Option<Value>,
+    bold: Value,
+    alignment: i64,
+    margin_l: i64,
+    margin_r: i64,
+    margin_v: i64,
+) -> Result<String, String> {
     let invalid_name = |v: &str| v.trim().is_empty() || v.contains([',', '\r', '\n', '\0']);
     let name_error = || {
         invalid(
@@ -141,8 +171,8 @@ pub fn build_ass_style(
             .ok_or_else(|| format!("TypeError: must be real number, not {}", pytype(v)))
     };
     let font_size = fontsize as f64;
-    let outline = outline.as_ref().map_or(Ok(1.5), number)?;
-    let shadow = shadow.as_ref().map_or(Ok(0.8), number)?;
+    let outline = outline.as_ref().map_or(Ok(2.0), number)?;
+    let shadow = shadow.as_ref().map_or(Ok(2.0), number)?;
     if font_size <= 0.0 || [outline, shadow].iter().any(|n| !n.is_finite() || *n < 0.0) {
         return Err(invalid(
             "ASS font size must be positive and outline/shadow must be nonnegative finite numbers",
@@ -169,13 +199,17 @@ pub fn build_ass_style(
         (Some(n @ (-1 | 0)), _, _) => n.to_string(),
         (_, Some(n), _) if n == 0.0 || n == -1.0 => format!("{n:.1}"),
         (_, _, Some(false)) => String::from("False"),
-        _ => return Err(invalid("Invalid ASS bold, alignment or vertical margin")),
+        _ => return Err(invalid("Invalid ASS bold, alignment or margins")),
     };
-    if !(1..=9).contains(&alignment) || margin_v < 0 {
-        return Err(invalid("Invalid ASS bold, alignment or vertical margin"));
+    if !(1..=9).contains(&alignment)
+        || [margin_l, margin_r, margin_v]
+            .into_iter()
+            .any(|margin| margin < 0)
+    {
+        return Err(invalid("Invalid ASS bold, alignment or margins"));
     }
     Ok(format!(
-        "{name},{font},{},&H00FFFFFF,&H000000FF,{outline_colour},{back_colour},{bold},0,0,0,100,100,0,0,1,{},{},{alignment},20,20,{margin_v},1",
+        "{name},{font},{},&H00FFFFFF,&H000000FF,{outline_colour},{back_colour},{bold},0,0,0,100,100,0,0,1,{},{},{alignment},{margin_l},{margin_r},{margin_v},1",
         general(font_size),
         general(outline),
         general(shadow)

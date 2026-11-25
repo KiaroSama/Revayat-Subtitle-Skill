@@ -145,11 +145,21 @@ pub fn ass_document_to_ass(
         return Err(invalid("ASS document conversion requires ASS input"));
     }
     let template = document::ass_template(options.style, options.title, 1920, 1080)?;
-    let (style, row) = template
+    let (style, template_row) = template
         .styles
         .first()
         .ok_or_else(|| invalid("ASS style not found"))?;
-    let by_field: HashMap<_, _> = template.style_fields.iter().zip(row).collect();
+    let mut row = template_row.clone();
+    if options.style.is_none()
+        && document::source_default_style_is_bold(doc)
+        && let Some(index) = template
+            .style_fields
+            .iter()
+            .position(|field| field == "bold")
+    {
+        row[index] = "-1".into();
+    }
+    let by_field: HashMap<_, _> = template.style_fields.iter().zip(&row).collect();
     let mut result = doc.clone();
     result.cues.clear();
     result.source_comments.clear();

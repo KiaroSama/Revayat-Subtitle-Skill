@@ -140,6 +140,7 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
                 max_offset_ms: if zero_bounds { 0 } else { 60000 },
                 max_split_offset_ms: if zero_bounds { 0 } else { 15000 },
                 snap_ms: if zero_bounds { 0 } else { 350 },
+                lead_in_ms: 50,
                 ..subsync_rs::SyncConfig::default()
             },
         )?;

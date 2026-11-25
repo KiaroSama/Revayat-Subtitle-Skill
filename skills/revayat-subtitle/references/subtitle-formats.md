@@ -201,9 +201,13 @@ not permission to redistribute them. See [persian-typography.md](persian-typogra
 ## Default ASS output, watermarks and Translator Mode
 
 Output defaults to ASS (`v4.00+`, `PlayResX: 1920`, `PlayResY: 1080`,
-`ScaledBorderAndShadow: yes`) with `B Koodak` bold styling and subtle black outline
-and shadow (`Outline=1.5`, `Shadow=0.8`), preserving italics, bold, underline,
-strikeout, alignment, color and positioning overrides. Pass `--output-format srt`
+`ScaledBorderAndShadow: yes`) with `B Koodak` at size `110`, `Outline=2`,
+`Shadow=2`, and `MarginL=10`, `MarginR=10`, `MarginV=10`. The Default style is
+non-bold unless the ASS source Default is bold or the user sets `--bold`.
+Use `--no-bold` to override a bold source. Both `convert` and `translator-ass`
+accept `--font`, `--font-size`, `--outline`, `--shadow`, `--margin-l`, `--margin-r`,
+and `--margin-v` for custom styles.
+Preserve inline italics, bold, underline, strikeout, alignment, color, and positioning overrides. Pass `--output-format srt`
 only when SRT is explicitly required.
 
 Native ASS prose is never passed through the SRT markup decoder: literal `<i>`,

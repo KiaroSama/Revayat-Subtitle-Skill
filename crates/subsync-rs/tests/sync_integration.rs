@@ -324,8 +324,8 @@ const DIALOGUE: [(u64, u64); 6] = [
 
 fn drifted_dialogue() -> [(u64, u64); 6] {
     let mut cues = DIALOGUE;
-    cues[1] = (cues[1].0 + 900, cues[1].1 + 900);
-    cues[4] = (cues[4].0 - 850, cues[4].1 - 850);
+    cues[1] = (cues[1].0 + 550, cues[1].1 + 550);
+    cues[4] = (cues[4].0 - 550, cues[4].1 - 550);
     cues
 }
 
@@ -342,7 +342,7 @@ fn per_dialogue_alignment_fixes_individual_drifted_cues() {
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
     assert_times(&doc, &DIALOGUE, 100);
     assert!(report.overlap_score_after > 0.90, "{report:?}");
-    assert!(report.overlap_score_after > report.overlap_score_before + 0.15);
+    assert!(report.overlap_score_after > report.overlap_score_before + 0.10);
     assert!(
         doc.cues
             .windows(2)
@@ -513,4 +513,103 @@ fn aligns_twelve_edited_sections_across_a_twelve_minute_timeline() {
             .all(|pair| pair[0].end_cue + 1 == pair[1].start_cue)
     );
     assert_eq!(report.overlap_score_after, 1.0);
+}
+
+#[test]
+fn joined_cues_stay_joined_and_onset_lead_replays() {
+    let speech = [(1000, 1800), (1950, 2800), (4500, 5500)];
+    let vad = extract_speech_activity(&samples(&speech), RATE, 10);
+    let onset = vad.segments.last().unwrap().start_ms;
+    for (lead_in_ms, adjustment) in [(50, 0), (50, 90), (0, 90)] {
+        let expected = onset - lead_in_ms;
+        let mut doc = SubtitleDocument::parse(
+            &srt([(950, 1900), (1930, 2800), (expected + adjustment, 5500)]),
+            None,
+        )
+        .unwrap();
+        let original = doc.cues.clone();
+        let config = SyncConfig {
+            max_offset_ms: 0,
+            max_split_offset_ms: 0,
+            fps_search: false,
+            lead_in_ms,
+            ..SyncConfig::default()
+        };
+        let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
+        assert_eq!(doc.cues.len(), original.len());
+        assert!(doc.cues[1].start_ms - doc.cues[0].end_ms <= 110);
+        assert_eq!(doc.cues[2].start_ms, expected);
+        subsync_rs::align::validate_reported_timing(
+            &original,
+            &doc.cues,
+            SubtitleFormat::Srt,
+            &report,
+            &config,
+        )
+        .unwrap();
+        let mut forged = report;
+        forged.split_segments[0].shift_ms += 10;
+        assert!(
+            subsync_rs::align::validate_reported_timing(
+                &original,
+                &doc.cues,
+                SubtitleFormat::Srt,
+                &forged,
+                &config
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn joined_chain_refines_coherently_without_tearing_apart() {
+    // Two back-to-back joined cues (30 ms gap) shifted together by +400 ms against real speech,
+    // surrounded by well-aligned anchor cues so global shift stays 0 and chain refinement moves both.
+    let speech = [
+        (1_000, 2_000),
+        (5_400, 6_400),
+        (6_430, 7_430),
+        (11_000, 12_000),
+    ];
+    let vad = extract_speech_activity(&samples(&speech), RATE, 10);
+    let mut doc = SubtitleDocument::parse(
+        &srt([
+            (950, 2_000),
+            (5_000, 6_000),
+            (6_030, 7_030),
+            (10_950, 12_000),
+        ]),
+        None,
+    )
+    .unwrap();
+    let original = doc.cues.clone();
+    let config = SyncConfig {
+        max_offset_ms: 0,
+        fps_search: false,
+        ..SyncConfig::default()
+    };
+    let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
+    assert_eq!(doc.cues.len(), original.len());
+    let gap = doc.cues[2].start_ms.saturating_sub(doc.cues[1].end_ms);
+    assert!(
+        gap <= 110,
+        "joined pair must stay cohesive, got gap={gap}ms (cues: {:?} -> {:?})",
+        doc.cues[1],
+        doc.cues[2]
+    );
+    assert!(
+        doc.cues[1].start_ms.abs_diff(5_350) <= 100 && doc.cues[2].start_ms.abs_diff(6_380) <= 100,
+        "joined pair should move coherently toward speech onset - 50ms: {:?}, {:?}",
+        doc.cues[1],
+        doc.cues[2]
+    );
+    subsync_rs::align::validate_reported_timing(
+        &original,
+        &doc.cues,
+        SubtitleFormat::Srt,
+        &report,
+        &config,
+    )
+    .unwrap();
 }

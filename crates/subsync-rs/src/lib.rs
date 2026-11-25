@@ -42,6 +42,7 @@ pub struct SyncConfig {
     pub max_split_offset_ms: i64,
     pub split_penalty: f64,
     pub snap_ms: u64,
+    pub lead_in_ms: u64,
     pub fps_search: bool,
 }
 
@@ -52,6 +53,7 @@ impl Default for SyncConfig {
             max_split_offset_ms: 15_000,
             split_penalty: 7.0,
             snap_ms: 350,
+            lead_in_ms: 50,
             fps_search: true,
         }
     }
@@ -66,6 +68,9 @@ impl SyncConfig {
                 "offset bounds must be within 0..=600000 ms globally and 0..=60000 ms locally"
                     .into(),
             ));
+        }
+        if self.lead_in_ms > 500 {
+            return Err(SyncError::Config("lead-in must be at most 500 ms".into()));
         }
         if !self.split_penalty.is_finite() || self.split_penalty < 0.0 || self.snap_ms > 5000 {
             return Err(SyncError::Config(

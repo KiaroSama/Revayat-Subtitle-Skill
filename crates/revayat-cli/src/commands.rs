@@ -154,17 +154,21 @@ fn convert(args: ConvertArgs, translator_mode: bool) -> Result<Value> {
         args.outline.is_finite() && args.shadow.is_finite(),
         "Outline and shadow must be finite numbers"
     );
-    let style = subtitle_formats::build_ass_style(
+    let primary = load_subtitle(&args.input)?;
+    let bold = args.bold || (!args.no_bold && document::source_default_style_is_bold(&primary));
+    let style = subtitle_formats::build_ass_style_with_margins(
         "Default".into(),
         Some(json!(args.font)),
-        52,
+        args.font_size,
         Some(json!(args.outline)),
         Some(json!(args.shadow)),
         None,
         None,
-        json!(-1),
+        json!(if bold { -1 } else { 0 }),
         2,
-        24,
+        args.margin_l,
+        args.margin_r,
+        args.margin_v,
     )
     .map_err(core_error)?;
     let options = Options {
@@ -175,7 +179,6 @@ fn convert(args: ConvertArgs, translator_mode: bool) -> Result<Value> {
         max_chars: args.max_chars,
         ..Options::default()
     };
-    let primary = load_subtitle(&args.input)?;
     let (doc, stats) = if translator_mode {
         let donors = args
             .donor

@@ -109,10 +109,10 @@ leaves visual QA incomplete. [workflow.md](workflow.md) defines the review recor
 ## Default ASS font, outline, line wrapping and punctuation anchoring
 
 The only bundled subtitle font is `B Koodak` (`assets/fonts/BKOODB.TTF`).
-Default Persian ASS uses it,
-passed automatically to FFmpeg/libass through `fontsdir`, with subtle black
-outline (`Outline=1.5`, `OutlineColour=&H00000000`) and subtle black shadow
-(`Shadow=0.8`, `BackColour=&H80000000`) unless overridden by user style options.
+FFmpeg/libass loads it through `fontsdir`. The default size is `110`, the black
+outline and shadow are both `2`, and the left, right, and vertical margins are
+all `10`. The Default style is non-bold unless the source ASS Default is bold
+or the user overrides it. Preserve inline emphasis.
 
 To keep terminal punctuation on its own line in libass and players such as VLC,
 mpv and PotPlayer, the text pipeline balances lines over 42 visible characters

@@ -410,7 +410,7 @@ pub fn validate_reported_timing(
     plan.repair(&mut expected);
     let mut snapped = 0;
     let mut previous_end = 0;
-    for group in &plan.groups {
+    for (g, group) in plan.groups.iter().enumerate() {
         let indices = &plan.order[group.first..group.end];
         for &i in indices {
             let (before, after) = (expected[i], output[i]);
@@ -423,6 +423,7 @@ pub fn validate_reported_timing(
                     || before.end_ms - before.start_ms < 500
                     || after.start_ms.abs_diff(before.start_ms) > config.snap_ms
                     || after.start_ms < previous_end
+                    || after.start_ms > snap_join_limit(&plan, g, previous_end)
                     || after.end_ms - after.start_ms < 500
                     || after.start_ms >= report.audio_duration_ms
                     || !after.start_ms.is_multiple_of(plan.unit)
@@ -533,28 +534,42 @@ fn score<T: Copy + Into<f64>>(cues: &[SubtitleCue], speech: &Integral<'_, T>) ->
     (matched / total).clamp(0.0, 1.0)
 }
 
+fn snap_join_limit(plan: &TimingPlan, g: usize, previous_end: u64) -> u64 {
+    g.checked_sub(1)
+        .and_then(|prev| align_cue::joined_gap(plan.groups[prev].end_ms, plan.groups[g].start_ms))
+        .map_or(u64::MAX, |gap| previous_end.saturating_add(gap + 80))
+}
+
 fn snap_start(
     cue: &mut SubtitleCue,
     min_start: u64,
     vad: &VadResult,
-    binary: &Integral<'_, u8>,
-    distance: u64,
+    config: &SyncConfig,
+    max_start: u64,
     unit: u64,
 ) -> bool {
+    let distance = config.snap_ms;
     if distance == 0 || cue.end_ms - cue.start_ms < 500 {
         return false;
     }
     let low = cue.start_ms.saturating_sub(distance);
     let high = cue.start_ms.saturating_add(distance);
+    let lead = config.lead_in_ms;
     let first = vad.segments.partition_point(|span| span.start_ms < low);
-    let baseline = binary.fraction(cue.start_ms, cue.end_ms);
     let candidate = vad.segments[first..]
         .iter()
-        .take_while(|span| span.start_ms <= high)
-        .map(|span| span.start_ms / unit * unit)
-        .filter(|&start| start >= low && start >= min_start && start <= cue.end_ms - 500)
-        .filter(|&start| binary.fraction(start, cue.end_ms) > baseline + 1e-9)
-        .min_by_key(|&start| start.abs_diff(cue.start_ms));
+        .take_while(|span| span.start_ms <= high.saturating_add(lead))
+        .map(|span| span.start_ms.saturating_sub(lead) / unit * unit)
+        .filter(|&start| {
+            start >= low
+                && start <= high
+                && start >= min_start
+                && start <= max_start
+                && start <= cue.end_ms - 500
+                && start > 0
+        })
+        .min_by_key(|&start| start.abs_diff(cue.start_ms))
+        .filter(|&start| start < cue.start_ms || start - cue.start_ms > 20);
     if let Some(start) = candidate {
         cue.start_ms = start;
         true
@@ -625,7 +640,7 @@ pub(crate) fn align(
     plan.repair(&mut aligned);
     let mut cues_snapped = 0;
     let mut previous_end = 0;
-    for group in &plan.groups {
+    for (g, group) in plan.groups.iter().enumerate() {
         check_cancelled()?;
         let indices = &plan.order[group.first..group.end];
         if let [i] = indices {
@@ -633,8 +648,8 @@ pub(crate) fn align(
                 &mut aligned[*i],
                 previous_end,
                 vad,
-                &binary,
-                config.snap_ms,
+                config,
+                snap_join_limit(&plan, g, previous_end),
                 plan.unit,
             ));
         }

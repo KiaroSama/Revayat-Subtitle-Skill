@@ -9,7 +9,7 @@ use std::{collections::HashSet, fmt::Write};
 pub const ASS_FIELDS: &str =
     "Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text";
 pub const STYLE_FIELDS: &str = "Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding";
-pub const DEFAULT_STYLE: &str = "Default,B Koodak,52,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,1.5,0.8,2,20,20,24,1";
+pub const DEFAULT_STYLE: &str = "Default,B Koodak,110,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1";
 const NATIVE: [&str; 5] = [
     "[script info]",
     "[v4+ styles]",
@@ -509,6 +509,27 @@ pub fn serialize(doc: &Document, cues: &[Cue], remove_fonts: bool) -> Result<Str
     }
     Ok(out.join("\n"))
 }
+pub fn source_default_style_is_bold(doc: &Document) -> bool {
+    doc.kind == "ass"
+        && doc
+            .style_fields
+            .iter()
+            .position(|field| field == "bold")
+            .is_some_and(|index| {
+                doc.styles
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("Default"))
+                    .and_then(|(_, fields)| fields.get(index))
+                    .is_some_and(|value| {
+                        value.trim().eq_ignore_ascii_case("true")
+                            || value
+                                .trim()
+                                .parse::<f64>()
+                                .is_ok_and(|n| n.is_finite() && n != 0.0)
+                    })
+            })
+}
+
 pub fn ass_template(
     style_line: Option<&str>,
     title: &str,

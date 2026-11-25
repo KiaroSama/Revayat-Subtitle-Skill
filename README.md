@@ -24,7 +24,7 @@
 
 Revayat Subtitle is a skill for translating and reviewing subtitles, with tools to convert ASS and SRT, check rendered frames, and align cues to dialogue audio. Persian is the default translation language. The final ZIP contains the reviewed episode subtitles; the series glossary is delivered separately.
 
-Version `3.0.1` ships two standalone binaries written entirely in Rust: `revayat-subtitle` and `subsync`. The project uses Rust `1.100.0`, edition `2024`, and ships no Python, PowerShell, or Bash scripts. Releases and CI target 64-bit Windows and Linux only, on x64 and arm64.
+Version `3.0.2` ships two standalone binaries written entirely in Rust: `revayat-subtitle` and `subsync`. The project uses Rust `1.100.0`, edition `2024`, and ships no Python, PowerShell, or Bash scripts. Releases and CI target 64-bit Windows and Linux only, on x64 and arm64.
 
 ## Install
 
@@ -74,7 +74,7 @@ The plugin exposes `translate-subtitles`, `revayat-subtitle-resume`, `revayat-su
 
 For visual rendering and audio extraction, put `ffmpeg` and `ffprobe` on `PATH`. Rendering needs FFmpeg built with `libass` and the `subtitles` filter. Run `revayat-subtitle doctor` to check prerequisites; `ready: true` does not replace checking the actual rendered subtitles.
 
-`revayat-subtitle sync` and `subsync` align each dialogue cue individually with the spoken audio. A global shift is only the starting point.
+`revayat-subtitle sync` and `subsync` align each dialogue cue individually with the spoken audio. Back-to-back dialogue stays together, and eligible cues start 50 ms before speech by default (`--lead-in-ms 50`). Video sync automatically selects the Front Center (`FC`) dialogue channel on 5.1/7.1 tracks and falls back to a mono downmix when needed.
 
 Use the [imported FFmpeg Skill guidance](skills/revayat-subtitle/ffmpeg/SKILL.md), adapted from `ffmpeg-skill` v4.7.1, to identify the matching release and dialogue track. If a video has several audio tracks, extract the selected track as 16 kHz mono PCM WAV and pass it with `--wav`. Keep the original subtitle and check results in playback near the beginning, middle, end, and any reported split.
 
@@ -85,7 +85,7 @@ subsync --wav "Episode 01 dialogue.wav" --in "original.ass" --out "aligned-wav.a
 
 ## Subtitle formats
 
-The default Persian ASS style uses the bundled `B Koodak` Bold font on a 1920×1080 canvas, with an outline of `1.5` and shadow of `0.8`. The converter preserves supported ASS styling and effects, normalizes Persian letters and ZWNJ, and wraps at phrase boundaries without splitting tags. It logs unmistakable credit removals and keeps ambiguous dialogue. Use `--keep-watermarks` to retain credits.
+The default Persian ASS style uses `B Koodak` at size `110` on a 1920×1080 canvas, with outline and shadow `2` and left, right, and vertical margins of `10`. New styles are non-bold unless the source ASS Default style is bold or you set `--bold`; use `--no-bold` to override a bold source. The converter preserves supported ASS styling and effects, normalizes Persian letters and ZWNJ, and wraps at phrase boundaries without splitting tags. It logs unmistakable credit removals and keeps ambiguous dialogue. Use `--keep-watermarks` to retain credits.
 
 ```text
 revayat-subtitle convert "episode.srt" --out "episode.ass"

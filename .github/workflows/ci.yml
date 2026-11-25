@@ -136,8 +136,8 @@ jobs:
             END { exit !pinned }
           ' rust-toolchain.toml || { printf '%s\n' 'Expected Rust 1.100.0 in rust-toolchain.toml.' >&2; exit 1; }
           for manifest in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json .cursor-plugin/plugin.json .antigravity-plugin/plugin.json; do
-            jq -e '.version == "3.0.1"' "$manifest" > /dev/null || {
-              printf '%s: expected plugin version 3.0.1\n' "$manifest" >&2
+            jq -e '.version == "3.0.2"' "$manifest" > /dev/null || {
+              printf '%s: expected plugin version 3.0.2\n' "$manifest" >&2
               exit 1
             }
           done

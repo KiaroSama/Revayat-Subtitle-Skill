@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-- Keep optional Persian style lint working on long supported inputs and make FPS tail-energy scoring invariant to duplicate/overlapping ASS rows; retain exact Unicode matching and sparse, cancellable alignment in the [post-merge Rust recheck](docs/audit-rust-postmerge-2026-11-25.md).
+## 3.0.2 (2026-11-26)
+
+- Run Persian style and percent checks on inputs up to 16 MiB without exhausting the regex backtracking limit. Use a non-backtracking style matcher and a percent prepass that skips unrelated text (PR #36, F01).
+- Score FPS drift using sparse maximum cue coverage beyond the FFT window. Duplicate and overlapping ASS rows no longer inflate tail energy (PR #36, F02). See the [post-merge Rust recheck](docs/audit-rust-postmerge-2026-11-25.md).
+- Extract Front Center (`FC`) dialogue automatically on supported 5.1/7.1 tracks. Fall back to a mono downmix when the channel is unavailable or its RMS indicates silence.
+- Keep dialogue chains with gaps of 150 ms or less together. Penalize distant timing shifts and target a 50 ms speech lead-in by default, adjustable with `--lead-in-ms`.
+- Generate ASS with `B Koodak` at size `110`, outline and shadow `2`, and margins `10` on the left, right, and bottom. Default to non-bold, preserve a bold source ASS Default style, and allow `--bold`, `--no-bold`, and margin overrides. Bump the generation recipe to `15`.
 
 ## 3.0.1 (2026-11-25)
 

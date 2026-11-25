@@ -9,9 +9,9 @@ subsync --wav "episode-dialogue.wav" --in "original.ass" --out "aligned-from-wav
 
 These are alternatives. Choose the one that fits the available media. See [FFmpeg sync and probing](../ffmpeg/references/sync-and-probing.md) for choosing a dialogue stream, checking timestamps and extracting WAV audio.
 
-Video input needs FFmpeg. The binary asks FFmpeg for 16 kHz mono, signed 16-bit little-endian PCM and uses FFmpeg's automatic audio stream selection. To sync to a different track, supply it as a mono 16-bit PCM WAV with `--wav` instead of `--video`. Choose fresh output paths in existing directories; the tool never overwrites source or destination files.
+Video input needs FFmpeg. The binary asks FFmpeg for 16 kHz mono, signed 16-bit little-endian PCM from the selected stream. For 5.1/7.1 video it extracts Front Center (`FC`) automatically, falling back to a mono downmix when the channel is absent, cannot be checked, or is silent. To sync to a different track, supply it as a mono 16-bit PCM WAV with `--wav` instead of `--video`. Choose fresh output paths in existing directories; the tool never overwrites source or destination files.
 
-If music or effects dominate a 5.1/7.1 downmix, use the Center (`FC`) channel. In this example, `0:a:0` is the first audio track; change it to the matching dialogue track if needed.
+To select the Front Center (`FC`) channel manually when music or effects dominate a 5.1/7.1 downmix, use this command. In this example, `0:a:0` is the first audio track; change it to the matching dialogue track if needed.
 
 ```text
 ffmpeg -n -i "episode.mkv" -map 0:a:0 -af "pan=mono|c0=FC,aresample=async=1:first_pts=0" -ar 16000 -c:a pcm_s16le "episode-dialogue.wav"
@@ -33,8 +33,8 @@ Ctrl+C requests cooperative cancellation. The executables stop and reap owned FF
 
 1. **Global offset and FPS drift:** Normalized FFT cross-correlation compares speech activity with rasterized cues at the original speed and four ratios between 23.976 or 24 fps and 25 fps. FPS scoring includes the full subtitle energy, even for cues beyond the correlation window. The engine applies the chosen ratio before adding the signed offset.
 2. **Cuts and edits:** Split-penalty dynamic programming searches local offsets and correlation peaks. It compares speech overlap against silence and charges a penalty for changing offset.
-3. **Per-dialogue cue-by-cue alignment:** Every dialogue cue must be aligned with its own spoken audio. Refine each drifted cue's start and end individually, within neighbor-safe bounds and the local offset limit set by `--max-split-offset-ms`. The report records local alignment in `split_segments` for replay, using inclusive, one-based cue positions in time order. A uniform global shift alone does not meet the requirement.
-4. **Bounded speech-onset snapping:** The engine tries a nearby speech onset for an eligible start if it improves overlap, leaves at least 500 ms of cue duration, and does not collide with a neighbor. It skips snapping within intentional overlapping ASS groups.
+3. **Per-dialogue cue-by-cue alignment:** Every dialogue cue must be aligned with its own spoken audio. Refine each drifted cue's start and end individually, within neighbor-safe bounds and the local offset limit set by `--max-split-offset-ms`. The report records local alignment in `split_segments` for replay, using inclusive, one-based cue positions in time order. Keep back-to-back dialogue cues with original gaps of 150 ms or less together, without introducing artificial gaps or dropping cues. A uniform global shift alone does not meet the requirement.
+4. **Bounded speech-onset snapping:** The engine targets 50 ms before a nearby speech onset for an eligible start by default if it improves overlap, leaves at least 500 ms of cue duration, and does not collide with a neighbor. It skips snapping within intentional overlapping ASS groups.
 
 The global search follows the [FFsubsync approach](https://github.com/smacke/ffsubsync#how-does-it-work). The split penalty follows the principle described by [ALASS](https://github.com/kaegi/alass). The engine implements both in Rust and does not run either external tool.
 
@@ -47,6 +47,7 @@ The global search follows the [FFsubsync approach](https://github.com/smacke/ffs
 | `--max-split-offset-ms N` | `15000` | Search this far from the global offset for local shifts, from 0 to 60000. |
 | `--split-penalty N` | `7.0` | Raise it to discourage cuts; lower it if a known edit is missed. |
 | `--snap-ms N` | `350` | Limit changes to cue starts to this distance from the aligned position. Use `0` to disable. |
+| `--lead-in-ms N` | `50` | Start eligible cues this many milliseconds before detected speech, from 0 to 500. |
 | `--no-fps-search` | off | Keep the original subtitle speed. |
 | `--json-report PATH` | stdout only | Also save the JSON report to a new file. |
 | `--timeout SECONDS` | unset | Select supervision and bound the whole operation, including extraction, alignment and staging. Use with `revayat-subtitle sync`; allowed range is greater than 0 and at most 86400. Without this flag, in-process video extraction has a 300-second deadline. |

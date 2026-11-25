@@ -1,6 +1,6 @@
 # Verification scope
 
-## Automated checks for v3.0.1
+## Automated checks for v3.0.2
 
 Run these from the repository root with Rust `1.100.0`, `rustfmt`, and `clippy`:
 
@@ -42,7 +42,7 @@ The [2026-11-25 Rust audit](audit-rust-2026-11-25.md) records fresh v3 baseline 
 
 ### Earlier evidence
 
-The [2026-11-24 reliability audit](audit-2026-11-24.md) records the earlier release's 14 defect groups, reproductions, and checks. It covers ASS preservation, line endings, sync staging, installer cleanup and recovery, and package destination collisions. Those results belong to the revisions named in the audit and do not establish v3.0.1 results.
+The [2026-11-24 reliability audit](audit-2026-11-24.md) records the earlier release's 14 defect groups, reproductions, and checks. It covers ASS preservation, line endings, sync staging, installer cleanup and recovery, and package destination collisions. Those results belong to the revisions named in the audit and do not establish v3.0.2 results.
 
 On 2026-09-14, four real ASS candidates round-tripped 5,188 events without a structural difference. Reviewers read a 40-event excerpt and inspected render samples for its ten retained events over the original 10-bit video. They read back the delivery archive and confirmed the source subtitle hashes did not change. This was an excerpt check, not a review of all events or a full playback timing audit. Only authored fixtures are included in Git.
 
