@@ -7,6 +7,7 @@
 [![GitHub Actions CI](https://img.shields.io/github/actions/workflow/status/KiaroSama/Revayat-Subtitle-Skill/ci.yml?style=flat-square&label=CI&color=1d4ed8)](.github/workflows/ci.yml)
 [![Repository license](https://img.shields.io/github/license/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=2563eb)](LICENSE)
 [![Latest published release](https://img.shields.io/github/v/release/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases)
+[![Latest Git tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&label=Tag&color=c2410c)](#انتشارها-و-تگها)
 [![Rust workspace tests](https://img.shields.io/badge/Tests-Rust%20Workspace-0d9488?style=flat-square)](#verification)
 [![Pinned Rust version](https://img.shields.io/badge/Rust-1.100.0-8b5cf6?style=flat-square)](rust-toolchain.toml)
 [![64-bit Windows and Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20(64--bit)-0891b2?style=flat-square)](docs/platforms.md#supported-platforms)
@@ -230,7 +231,7 @@ cargo test --workspace --locked
 
 ## ‏⁧انتشارها و تگ‌ها⁩
 
-‏⁧نشان نسخه از آخرین [انتشار گیت‌هاب](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases) به‌روز می‌شود. [فهرست تگ‌ها](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags) نسخه‌هایی را هم نشان می‌دهد که هنوز فایل انتشار ندارند.⁩
+‏⁧نشان انتشار و نشان تگ خودکار به‌روز می‌شوند: اولی با [انتشارهای گیت‌هاب](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases) و دومی با [تگ‌های گیت](https://github.com/KiaroSama/Revayat-Subtitle-Skill/tags). تگ‌ها ممکن است پیش از انتشار فایل‌های نسخه در فهرست دیده شوند.⁩
 
 ## Author
 

@@ -661,6 +661,74 @@ fn rejects_non_regular_snapshot_directory_and_escape() -> Result<(), String> {
 
 #[cfg(unix)]
 #[test]
+fn renders_with_a_symlinked_video() -> Result<(), String> {
+    use revayat_core::{
+        render::renderer,
+        runtime::files::write_json,
+        workflow::{
+            import::{ImportOptions, prepare},
+            workspace::{build, read_record},
+        },
+    };
+    use std::{os::unix::fs::symlink, path::Path};
+
+    let root = tempfile::tempdir().map_err(io_error)?;
+    let source = root.path().join("S01E01.srt");
+    fs::write(
+        &source,
+        "1\n00:00:00,100 --> 00:00:00,900\nVisible subtitle.\n",
+    )
+    .map_err(io_error)?;
+    let work = root.path().join("work");
+    prepare(
+        &[source],
+        &work,
+        &ImportOptions {
+            series: "Symlink render fixture",
+            season: 1,
+            encoding: "utf-8",
+            glossary: None,
+            language: "en",
+            output_format: "ass",
+        },
+    )?;
+    let mut project = read_record(&work, "project.json")?;
+    project["episodes"] =
+        json!([{"id":"S01E01","base":"s0001","alternates":[],"comparison":"Single source"}]);
+    write_json(&work.join("project.json"), &project)?;
+    write_json(
+        &work.join("glossary.json"),
+        &json!({"series":"Symlink render fixture",
+        "terms_reviewed":true,"terms":[],"research":[{"url":"https://example.org/fixture","note":"Authored fixture"}]}),
+    )?;
+    let sheet = "worksheets/s0001.json";
+    let mut rows = read_record(&work, sheet)?;
+    rows[0]["action"] = json!("preserve");
+    rows[0]["reviewed"] = json!(true);
+    write_json(&work.join(sheet), &rows)?;
+    let built = build(&work, None)?;
+    let edition = Path::new(built["build"].as_str().ok_or("Missing build path")?);
+
+    let video = root.path().join("real video.y4m");
+    let mut clip = b"YUV4MPEG2 W32 H32 F10:1 Ip A1:1 C420jpeg\n".to_vec();
+    for _ in 0..15 {
+        clip.extend_from_slice(b"FRAME\n");
+        clip.extend_from_slice(&[128; 32 * 32 * 3 / 2]);
+    }
+    fs::write(&video, &clip).map_err(io_error)?;
+    let link = root.path().join("selected video.y4m");
+    symlink(&video, &link).map_err(io_error)?;
+    let receipt = renderer::render(edition, "S01E01", None, Some(&link), None, true)?;
+    assert!(
+        receipt["frames"]
+            .as_array()
+            .is_some_and(|frames| !frames.is_empty())
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
 fn rejects_fifo_snapshot_before_reading() -> Result<(), String> {
     let root = tempfile::tempdir().map_err(io_error)?;
     run_owned(

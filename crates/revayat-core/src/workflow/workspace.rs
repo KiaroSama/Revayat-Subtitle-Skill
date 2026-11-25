@@ -94,6 +94,8 @@ impl Drop for StagedDir {
         }
         #[cfg(not(unix))]
         if let Some(original) = &self.original
+            && fs::symlink_metadata(&self.path)
+                .is_ok_and(|metadata| metadata.is_dir() && !linked(&metadata))
             && Handle::from_path(&self.path).is_ok_and(|current| &current == original)
         {
             // shortcut: cleanup uses the path after verification; use relative handles when available.
@@ -144,6 +146,18 @@ fn remove_staging(
 }
 
 #[cfg(unix)]
+fn create_staging(
+    parent: &OwnedFd,
+    name: &std::ffi::OsStr,
+    open: impl FnOnce() -> UnixResult<OwnedFd>,
+) -> UnixResult<OwnedFd> {
+    mkdirat(parent, name, Mode::RWXU)?;
+    open().inspect_err(|_| {
+        let _ = unlinkat(parent, name, AtFlags::REMOVEDIR);
+    })
+}
+
+#[cfg(unix)]
 pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
     let parent = std::path::absolute(parent).map_err(io_error)?;
     let parent_fd =
@@ -164,8 +178,9 @@ pub fn stage(parent: &Path, prefix: &str) -> Result<StagedDir, String> {
                 .file_name()
                 .filter(|_| path.parent() == Some(parent.as_path()))
                 .ok_or(std::io::ErrorKind::InvalidInput)?;
-            mkdirat(&parent_fd, name, Mode::RWXU)?;
-            Ok(openat(&parent_fd, name, DIR_FLAGS, Mode::empty())?)
+            Ok(create_staging(&parent_fd, name, || {
+                openat(&parent_fd, name, DIR_FLAGS, Mode::empty())
+            })?)
         })
         .map_err(io_error)?;
     let (original, path) = temporary.keep().map_err(|error| io_error(error.error))?;
@@ -626,4 +641,27 @@ pub fn build(work: &Path, output_format: Option<&str>) -> Result<Value, String> 
         result.extend(manifest);
     }
     Ok(result)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_staging_open_removes_the_empty_directory_and_preserves_the_error()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let parent = openat(CWD, root.path(), DIR_FLAGS, Mode::empty())?;
+        let name = std::ffi::OsStr::new("staging");
+        let result = create_staging(&parent, name, || {
+            assert!(root.path().join(name).is_dir());
+            Err(Errno::ACCES)
+        });
+        assert!(matches!(result, Err(Errno::ACCES)));
+        assert!(matches!(
+            statat(&parent, name, AtFlags::SYMLINK_NOFOLLOW),
+            Err(Errno::NOENT)
+        ));
+        Ok(())
+    }
 }

@@ -402,11 +402,12 @@ pub fn render(
         .collect::<String>();
     let mut renderer = fingerprint.clone();
     renderer["version"] = json!(version);
+    let video_path = video.map(absolute).transpose()?;
+    let video = video_path.as_deref();
     let video_fingerprint = video
         .map(|path| file_fingerprint(path, MAX_VIDEO_BYTES))
         .transpose()?;
-    let video_path = video.map(absolute).transpose()?;
-    let video_arg = video_path.as_deref().map(utf8_path).transpose()?;
+    let video_arg = video.map(utf8_path).transpose()?;
     let default_fonts = fonts.is_none().then(bundled_fonts_dir).flatten();
     let fonts = fonts.or(default_fonts.as_deref());
     let mut recipe = json!({"sampler":SAMPLER_VERSION,"profile":"rgb24-v1","renderer":renderer,"fonts":[],"requested_fonts":requested_fonts(doc)?,"font_resolution":"system fallback requires visual inspection; selected system font files are not attested","video":video_fingerprint});

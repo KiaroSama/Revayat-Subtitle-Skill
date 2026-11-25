@@ -234,9 +234,36 @@ pub fn find_en(
         .filter(|word| !word.is_empty())
         .collect::<Vec<_>>()
         .join(" ");
+    // shortcut: narrow ASCII literals only; widen after rechecking the regex fold and error bounds.
+    let folded = (normalized.len() <= 64 * 1024).then(|| {
+        normalized
+            .chars()
+            .map(|c| match c {
+                'İ' | 'ı' => 'i',
+                'K' => 'k',
+                'ſ' => 's',
+                _ => c.to_ascii_lowercase(),
+            })
+            .collect::<String>()
+    });
     let mut hits = Vec::new();
     for row in iterable(&rows)? {
         let [en, fa, note] = triple(&row)?;
+        if let (Some(folded), Some(phrase)) = (&folded, en.as_str())
+            && phrase.len() <= 128
+            && phrase
+                .trim_matches(space)
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic() || byte.is_ascii_whitespace())
+        {
+            // Normalization leaves only one space per separator, so there is no branching across words.
+            let mut words = phrase.split(space).filter(|word| !word.is_empty());
+            if words.clone().count() <= 6
+                && words.any(|word| !folded.contains(&word.to_ascii_lowercase()))
+            {
+                continue;
+            }
+        }
         if compile_matcher(&en)?
             .is_match(&normalized)
             .map_err(|error| format!("RuntimeError: {error}"))?
@@ -388,6 +415,53 @@ mod tests {
         assert_eq!(
             result,
             json!([{"$tuple": ["business partner", "شریک", ""]}])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn english_lookup_preserves_exact_regex_matches_and_errors() -> Result<(), String> {
+        let phrases = [
+            "business partner",
+            "office",
+            "keep silent",
+            "AI",
+            "a+b (ok)",
+            "Straße",
+            "İstanbul",
+            "\u{1c}",
+            "foo bar",
+        ];
+        let rows = json!(phrases.map(|phrase| [phrase, "translation", "note"]));
+        for text in [
+            "Business\u{1c}Partners; offıce, OFFİCE; Keep ſilent; AI ai; a+b (ok)z STRAẞE İstanbul",
+            "xoffice keep; silent; business; partner; \u{a0}foo\u{ad}bar\u{202f}",
+            "",
+        ] {
+            let normalized = text
+                .split(space)
+                .filter(|word| !word.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let mut expected = Vec::new();
+            for phrase in phrases {
+                if compile_matcher(&json!(phrase))?
+                    .is_match(&normalized)
+                    .map_err(|e| e.to_string())?
+                {
+                    expected.push(json!({"$tuple": [phrase, "translation", "note"]}));
+                }
+            }
+            assert_eq!(find_en(rows.clone(), json!(text))?, json!(expected));
+        }
+        assert!(
+            find_en(json!([[null, "translation", "note"]]), json!(""))
+                .is_err_and(|error| error.contains("has no attribute 'strip'"))
+        );
+        let text = "x".repeat(1_000_001);
+        assert!(
+            find_en(json!([["absent", "translation", "note"]]), json!(text))
+                .is_err_and(|error| error.contains("backtracking"))
         );
         Ok(())
     }

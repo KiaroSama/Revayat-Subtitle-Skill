@@ -2,7 +2,7 @@ use super::sampling::{
     MAX_RENDER_FRAMES, SAMPLER_VERSION, changed_indices, requested_fonts, samples,
 };
 use crate::png_validation::{MAX_PNG_BYTES, decode_dimensions};
-use crate::publication::publish_bytes;
+use crate::publication::{create_dir_all_synced, publish_bytes};
 use crate::runtime::files::{local_path, parse_json, read_limited, read_limited_with_metadata};
 use crate::subtitle_formats::document::parse;
 use crate::validation;
@@ -432,7 +432,7 @@ pub fn package(build: &Path, output: &Path) -> Result<Value, String> {
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
-    fs::create_dir_all(parent).map_err(io_error)?;
+    create_dir_all_synced(parent).map_err(io_error)?;
     let temporary = stage(parent, ".package-")?;
     let path = temporary.path().join("edition.zip");
     let mut archive = ZipWriter::new(File::create_new(&path).map_err(io_error)?);

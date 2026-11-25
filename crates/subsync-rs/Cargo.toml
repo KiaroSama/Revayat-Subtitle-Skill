@@ -1,8 +1,10 @@
 [package]
 name = "subsync-rs"
-version = "3.0.0"
-edition = "2024"
-rust-version = "1.100.0"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [lib]
 name = "subsync_rs"

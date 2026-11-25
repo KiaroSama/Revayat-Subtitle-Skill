@@ -1,13 +1,14 @@
 # Changelog
 
-## 3.0.0
+## 3.0.0 (2026-11-25)
 
 ### Runtime and distribution
 
 - Move the runtime, installer and test suite to a pure Rust workspace using Rust `1.100.0`, edition `2024`. Ship no Python, PowerShell, or Bash scripts.
 - Build two standalone binaries: `revayat-subtitle` with 16 subcommands, and `subsync` for aligning SRT and ASS to dialogue audio. Use `revayat-subtitle install` for installation and recovery. Copy local release outputs to `bin/`.
 - Limit CI and releases to 64-bit Windows and Linux, each on x64 and arm64. CI builds both binaries for all four targets and runs workspace tests with FFmpeg and libass on x64 Windows and Linux. Media extraction and rendering still use external `ffmpeg` and `ffprobe`; rendering requires the libass `subtitles` filter.
-- Update all five plugin manifest formats to `3.0.0`. Both READMEs use live badges for CI, license, latest published release, and repository size.
+- Update all five plugin manifest formats to `3.0.0`. Both READMEs use live badges for CI, license, latest published release, latest Git tag, and repository size.
+- Use `GPL-3.0-or-later` across the Cargo workspace. Resolve symlinked video paths before rendering, sync new output directory entries on Unix, and skip regex compilation for glossary and idiom entries that cannot match.
 
 ### Subtitle workflow
 

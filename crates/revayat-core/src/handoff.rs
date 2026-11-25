@@ -226,6 +226,7 @@ pub fn review_handoff(
         .iter()
         .flat_map(|keys| keys.iter().map(move |&source| (source, keys.as_slice())))
         .collect();
+    let mut links_by_scope = HashMap::new();
     let mut pending_total = 0;
     for path in results {
         let result = read_envelope(path, RESULT, &required(RESULT, "activity_log"))?;
@@ -276,15 +277,17 @@ pub fn review_handoff(
             .get(source)
             .copied()
             .unwrap_or_else(|| std::slice::from_ref(&source));
-        let known_links: HashSet<_> = sources
-            .iter()
-            .flat_map(|key| {
-                docs[*key]
-                    .cues
-                    .iter()
-                    .map(move |cue| format!("{key}:{}", cue.id))
-            })
-            .collect();
+        let known_links = links_by_scope.entry(sources[0]).or_insert_with(|| {
+            sources
+                .iter()
+                .flat_map(|key| {
+                    docs[*key]
+                        .cues
+                        .iter()
+                        .map(move |cue| format!("{key}:{}", cue.id))
+                })
+                .collect::<HashSet<_>>()
+        });
         let mut count = 0;
         for row in &rows {
             let id = string(&row["id"]);
@@ -417,6 +420,90 @@ pub fn handoff(work: Value, assignments: Vec<Value>, results: Vec<Value>) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn result_links_stay_within_each_episode_scope() -> Result<(), String> {
+        use crate::{
+            runtime::files::write_json,
+            workflow::{
+                import::{ImportOptions, prepare},
+                workspace::read_record,
+            },
+        };
+
+        let root = tempfile::tempdir().map_err(io_error)?;
+        let sources: Vec<_> = (1..=3)
+            .map(|index| root.path().join(format!("source{index}.srt")))
+            .collect();
+        for (index, source) in sources.iter().enumerate() {
+            fs::write(
+                source,
+                format!("1\n00:00:01,000 --> 00:00:02,000\nSource {index}.\n"),
+            )
+            .map_err(io_error)?;
+        }
+        let work = root.path().join("work");
+        prepare(
+            &sources,
+            &work,
+            &ImportOptions {
+                series: "Handoff fixture",
+                season: 1,
+                encoding: "utf-8",
+                glossary: None,
+                language: "en",
+                output_format: "ass",
+            },
+        )?;
+        let mut project = read_record(&work, "project.json")?;
+        project["episodes"] = json!([
+            {"id":"S01E01","base":"s0001","alternates":["s0002"],"comparison":"Two sources"},
+            {"id":"S01E02","base":"s0003","alternates":[],"comparison":"Single source"},
+        ]);
+        write_json(&work.join("project.json"), &project)?;
+        let glossary = digest(&fs::read(work.join("glossary.json")).map_err(io_error)?);
+        let (mut assignments, mut results) = (Vec::new(), Vec::new());
+        for (index, (source, worker, episode, links)) in [
+            ("s0001", "worker-a", "S01E01", json!(["s0002:c000001"])),
+            ("s0002", "worker-b", "S01E01", json!(["s0001:c000001"])),
+            ("s0003", "worker-c", "S01E02", json!([])),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let checksum = &project["sources"][index]["sha256"];
+            let assignment = root.path().join(format!("{worker}-assignment.json"));
+            let result = root.path().join(format!("{worker}-result.json"));
+            let mut row = read_record(&work, &format!("worksheets/{source}.json"))?[0].clone();
+            row["action"] = json!("preserve");
+            row["reviewed"] = json!(true);
+            row["links"] = links;
+            write_json(
+                &assignment,
+                &json!({"version":1,"id":worker,"source":source,"episode":episode,
+                "source_sha256":checksum,"glossary_sha256":glossary,"assigned_ids":[row["id"]],"context_ids":[]}),
+            )?;
+            write_json(
+                &result,
+                &json!({"version":1,"assignment_id":worker,"status":"complete",
+                "source_sha256":checksum,"glossary_sha256":glossary,"rows":[row]}),
+            )?;
+            assignments.push(assignment);
+            results.push(result);
+        }
+        assert_eq!(
+            review_handoff(&work, &assignments, &results)?["ready"],
+            true
+        );
+        let mut foreign = read_envelope(&results[2], RESULT, &required(RESULT, "activity_log"))?;
+        foreign["rows"][0]["links"] = json!(["s0001:c000001"]);
+        write_json(&results[2], &foreign)?;
+        assert!(
+            review_handoff(&work, &assignments, &results)
+                .is_err_and(|error| error.contains("original cues in the same episode"))
+        );
+        Ok(())
+    }
 
     #[test]
     fn valid_envelope_rejects_wrong_version_and_unknown_fields() -> Result<(), String> {

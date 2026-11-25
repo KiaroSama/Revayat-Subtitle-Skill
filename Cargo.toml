@@ -6,7 +6,7 @@ members = ["crates/revayat-core", "crates/subsync-rs", "crates/revayat-cli"]
 version = "3.0.0"
 edition = "2024"
 rust-version = "1.100.0"
-license = "MIT"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 
 [workspace.lints.clippy]
