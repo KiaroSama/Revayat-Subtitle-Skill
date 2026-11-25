@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "sync_timing_tests.rs"]
+mod timing;
+
 fn valid_report() -> Value {
     json!({
         "audio_duration_ms": 1000,
@@ -88,6 +91,43 @@ fn timing_report(cues: usize, shift: u64) -> SyncReport {
     value["max_cue_delta_ms"] = json!(shift);
     value["median_cue_delta_ms"] = json!(shift as f64);
     parse_report(&value.to_string()).unwrap().1
+}
+
+fn zero_limits() -> SyncConfig {
+    SyncConfig {
+        max_offset_ms: 0,
+        max_split_offset_ms: 0,
+        split_penalty: 7.0,
+        snap_ms: 0,
+        fps_search: false,
+    }
+}
+
+#[test]
+fn zero_limits_refuse_shifted_endpoints_despite_truthful_delta_statistics() {
+    let original =
+        SubtitleDocument::parse("1\n00:00:01,000 --> 00:00:02,000\nAuthored\n", None).unwrap();
+    let output = "1\n01:00:00,000 --> 01:00:01,000\nAuthored\n";
+    let mut report = timing_report(1, 0);
+    report.max_cue_delta_ms = 3599000;
+    report.median_cue_delta_ms = 3599000.0;
+    assert!(validate_worker_output(output.as_bytes(), &original, &report, &zero_limits()).is_err());
+}
+
+#[test]
+fn zero_limits_refuse_an_end_only_change() {
+    let original =
+        SubtitleDocument::parse("1\n00:00:01,000 --> 00:00:02,000\nAuthored\n", None).unwrap();
+    let output = "1\n00:00:01,000 --> 01:00:01,000\nAuthored\n";
+    assert!(
+        validate_worker_output(
+            output.as_bytes(),
+            &original,
+            &timing_report(1, 0),
+            &zero_limits()
+        )
+        .is_err()
+    );
 }
 
 #[test]

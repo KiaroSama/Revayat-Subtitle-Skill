@@ -31,6 +31,12 @@ Run the installer from a checkout of the matching release. It reads the skill tr
 
 The installer puts new recovery data in the first selected agent root's `revayat-recovery/`, outside skill discovery. When setting `--destination`, pass `--recovery-dir` on the same filesystem and outside every configured skill or plugin discovery root. A single OS lock under `~/revayat-install-state/` serializes installs and recovery for the same account. This does not certify cross-account or network-filesystem use. Existing backups stay in place. See [interrupted installation recovery](../skills/revayat-subtitle/references/troubleshooting.md#installer-process-interruption).
 
+### Installer downgrade compatibility
+
+The current installer reads legacy journals. An older installer can refuse newer Unix journals containing authenticated executable permissions with `Invalid installation tree manifest`, even after successful uninstall or recovery because their retained history still uses the newer format. This refusal preserves the installed files and recovery state; it does not make the old executable compatible with that registry.
+
+Before reverting runtime binaries or skill payloads, retain the compatible newer installer and its matching checkout outside the installed trees. Use that installer for existing uninstall/recovery operations with the original destination and recovery paths, and resolve interrupted transactions before installing another payload. Its `--source OLDER_CHECKOUT` option can select an older payload that passes the installer's normal source validation. Keep the compatible installer available while newer registry records, journals or backups remain. Never strip permission evidence, edit authentication fields, or delete recovery history to force an older installer to proceed.
+
 ## Plugin manifests
 
 The five manifest formats share the `3.0.0` skill tree and provide `revayat-subtitle` and `revayat-subtitle-sync`:

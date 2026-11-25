@@ -65,6 +65,8 @@ cargo build --workspace --release --locked &&
 
 ‏⁧بعد از بررسی مسیرها، فرمان `install` را بدون `--dry-run` تکرار کنید. نصب‌کننده به‌طور پیش‌فرض پوشه‌های کاربری موجود را انتخاب می‌کند. برای نصب فقط در Codex از `revayat-subtitle install --agent codex` و برای نصب در پروژهٔ فعلی از `revayat-subtitle install --agent codex --scope project --path .` استفاده کنید. گزینهٔ `--force` پیش از جایگزینی نصب موجود از آن نسخهٔ پشتیبان می‌گیرد. `bin/` را در `PATH` میزبان بگذارید و ایجنت را دوباره باز کنید. [مسیرهای نصب و بازیابی](docs/platforms.md#agent-installation) را هم ببینید.⁩
 
+‏⁧پیش از بازگشت به برنامه‌های قدیمی، نصب‌کنندهٔ سازگار با سوابق بازیابی و نسخه‌های پشتیبان موجود را نگه دارید؛ [راهنمای سازگاری هنگام بازگشت نسخه](docs/platforms.md#installer-downgrade-compatibility) را ببینید.⁩
+
 ### ‏⁧نصب افزونه⁩
 
 ‏⁧فایل‌های اسکیل در پنج قالب مانیفست عرضه می‌شوند: Claude Code، Cursor، Codex، Antigravity و `Agent Plugins 1.0`. برای نصب در Claude Code این دو فرمان را وارد کنید:⁩

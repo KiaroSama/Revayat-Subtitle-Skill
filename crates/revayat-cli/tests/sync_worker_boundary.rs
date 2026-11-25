@@ -111,10 +111,19 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
         "negative-count",
         "wrong-count",
         "wrong-delta",
+        "zero-bounds-shift",
+        "zero-bounds-end",
     ] {
         let root = tempfile::tempdir()?;
         let root = root.path();
         authored_inputs(root)?;
+        let zero_bounds = defect.starts_with("zero-bounds");
+        if zero_bounds {
+            fs::write(
+                root.join("source.srt"),
+                "1\n00:00:01,000 --> 00:00:02,000\nAuthored\n",
+            )?;
+        }
         let original = fs::read(root.join("source.srt"))?;
         let reference = subsync_rs::sync_file_to_wav(
             &root.join("audio.wav"),
@@ -122,6 +131,9 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
             &root.join("reference.srt"),
             &subsync_rs::SyncConfig {
                 fps_search: false,
+                max_offset_ms: if zero_bounds { 0 } else { 60000 },
+                max_split_offset_ms: if zero_bounds { 0 } else { 15000 },
+                snap_ms: if zero_bounds { 0 } else { 350 },
                 ..subsync_rs::SyncConfig::default()
             },
         )?;
@@ -146,6 +158,12 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
                 report["max_cue_delta_ms"] = serde_json::json!(999999);
                 valid_bytes.clone()
             }
+            "zero-bounds-shift" => {
+                report["max_cue_delta_ms"] = serde_json::json!(3599000);
+                report["median_cue_delta_ms"] = serde_json::json!(3599000.0);
+                b"1\n01:00:00,000 --> 01:00:01,000\nAuthored\n".to_vec()
+            }
+            "zero-bounds-end" => b"1\n00:00:01,000 --> 01:00:01,000\nAuthored\n".to_vec(),
             _ => unreachable!(),
         };
         fs::write(root.join("worker-payload"), bytes)?;
@@ -177,12 +195,25 @@ cat "$REVAYAT_TEST_WORKER_REPORT"
                 root.join("worker-report").to_string_lossy().into_owned(),
             ),
         ]);
-        let args = [
+        let mut args = vec![
             "--subsync".into(),
             helper.to_string_lossy().into_owned(),
             "--timeout".into(),
             "5".into(),
         ];
+        if zero_bounds {
+            args.extend(
+                [
+                    "--max-offset-sec",
+                    "0",
+                    "--max-split-offset-ms",
+                    "0",
+                    "--snap-ms",
+                    "0",
+                ]
+                .map(str::to_owned),
+            );
+        }
         let result = command(root, &args, &env)?;
         assert!(!result.status.success(), "Accepted {defect}");
         assert!(
@@ -207,7 +238,7 @@ cat "$REVAYAT_TEST_WORKER_REPORT"
         );
         assert_eq!(fs::read(root.join("output.srt"))?, valid_bytes);
         let receipt: Value = serde_json::from_slice(&fs::read(root.join("receipt.json"))?)?;
-        assert_eq!(receipt["cues_total"], 4);
+        assert_eq!(receipt["cues_total"], if zero_bounds { 1 } else { 4 });
     }
     Ok(())
 }

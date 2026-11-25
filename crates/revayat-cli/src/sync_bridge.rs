@@ -473,22 +473,13 @@ fn validate_worker_output(
         original.has_same_untimed_content(&output),
         "Sync worker changed subtitle content outside timestamp fields"
     );
-    anyhow::ensure!(
-        subsync_rs::align::FPS_RATIOS
-            .iter()
-            .take(if config.fps_search {
-                subsync_rs::align::FPS_RATIOS.len()
-            } else {
-                1
-            })
-            .any(|ratio| (ratio - report.fps_ratio).abs() <= 1e-9)
-            && report.global_offset_ms.unsigned_abs() <= config.max_offset_ms as u64
-            && report.split_segments.iter().all(|segment| {
-                segment.shift_ms.abs_diff(report.global_offset_ms)
-                    <= config.max_split_offset_ms as u64
-            }),
-        "Sync worker exceeded the requested speed or offset search bounds"
-    );
+    subsync_rs::align::validate_reported_timing(
+        &original.cues,
+        &output.cues,
+        original.format,
+        report,
+        config,
+    )?;
     if original.format == SubtitleFormat::Srt {
         anyhow::ensure!(
             output

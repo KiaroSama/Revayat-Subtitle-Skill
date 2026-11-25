@@ -1,5 +1,5 @@
 use crate::{
-    SplitSegment, SyncConfig, SyncError, check_cancelled,
+    SplitSegment, SyncConfig, SyncError, SyncReport, check_cancelled,
     formats::{SubtitleCue, SubtitleFormat},
     vad::VadResult,
 };
@@ -266,6 +266,170 @@ fn groups(cues: &[SubtitleCue], order: &[usize], format: SubtitleFormat) -> Vec<
     groups
 }
 
+struct TimingPlan {
+    base: Vec<SubtitleCue>,
+    order: Vec<usize>,
+    groups: Vec<Group>,
+    format: SubtitleFormat,
+    unit: u64,
+}
+
+impl TimingPlan {
+    fn new(cues: &[SubtitleCue], format: SubtitleFormat, ratio: f64) -> Self {
+        let unit = format.precision();
+        let base: Vec<_> = cues
+            .iter()
+            .map(|cue| {
+                let scaled = scaled_cue(*cue, ratio);
+                let start_ms = scaled.start_ms / unit * unit;
+                SubtitleCue {
+                    start_ms,
+                    end_ms: (scaled.end_ms / unit * unit).max(start_ms + unit),
+                }
+            })
+            .collect();
+        let mut order: Vec<_> = (0..cues.len()).collect();
+        order.sort_unstable_by_key(|&i| (cues[i].start_ms, i));
+        let groups = groups(&base, &order, format);
+        Self {
+            base,
+            order,
+            groups,
+            format,
+            unit,
+        }
+    }
+
+    fn shift_group(
+        &self,
+        group: &Group,
+        shift: i64,
+        previous_end: u64,
+        aligned: &mut [SubtitleCue],
+    ) -> (i64, u64) {
+        let shift = shift.div_euclid(self.unit as i64) * self.unit as i64;
+        let actual = if self.format == SubtitleFormat::Ass {
+            shift.max(previous_end as i64 - group.start_ms as i64)
+        } else {
+            shift.max(-(group.start_ms as i64))
+        };
+        for &i in &self.order[group.first..group.end] {
+            aligned[i].start_ms = self.base[i].start_ms.saturating_add_signed(actual);
+            aligned[i].end_ms = self.base[i].end_ms.saturating_add_signed(actual);
+        }
+        (shift, group.end_ms.saturating_add_signed(actual))
+    }
+
+    fn repair(&self, aligned: &mut [SubtitleCue]) {
+        if self.format == SubtitleFormat::Srt {
+            for i in 1..aligned.len() {
+                let current = aligned[i].start_ms.max(aligned[i - 1].start_ms + self.unit);
+                aligned[i - 1].end_ms = aligned[i - 1].end_ms.min(current);
+                aligned[i].start_ms = current;
+                aligned[i].end_ms = aligned[i].end_ms.max(current + self.unit);
+            }
+        }
+    }
+}
+
+/// Verify both returned endpoints against the engine's reported transform and permitted snapping.
+pub fn validate_reported_timing(
+    cues: &[SubtitleCue],
+    output: &[SubtitleCue],
+    format: SubtitleFormat,
+    report: &SyncReport,
+    config: &SyncConfig,
+) -> Result<(), SyncError> {
+    config.validate()?;
+    validate_cues(cues, format)?;
+    let invalid = || {
+        SyncError::Subtitle(
+            "worker timestamps do not match the permitted reported transformation".into(),
+        )
+    };
+    if cues.len() != output.len()
+        || report.cues_total != cues.len()
+        || !FPS_RATIOS
+            .iter()
+            .take(if config.fps_search {
+                FPS_RATIOS.len()
+            } else {
+                1
+            })
+            .any(|ratio| (ratio - report.fps_ratio).abs() <= 1e-9)
+        || report.global_offset_ms.unsigned_abs() > config.max_offset_ms as u64
+        || report.split_segments.iter().any(|segment| {
+            segment.shift_ms.abs_diff(report.global_offset_ms) > config.max_split_offset_ms as u64
+                || segment.shift_ms % format.precision() as i64 != 0
+        })
+    {
+        return Err(invalid());
+    }
+    let mut shifts = Vec::with_capacity(cues.len());
+    for segment in &report.split_segments {
+        if shifts.len().checked_add(1) != Some(segment.start_cue)
+            || segment.end_cue < segment.start_cue
+            || segment.end_cue > cues.len()
+        {
+            return Err(invalid());
+        }
+        shifts.resize(segment.end_cue, segment.shift_ms);
+    }
+    if shifts.len() != cues.len() {
+        return Err(invalid());
+    }
+    let plan = TimingPlan::new(cues, format, report.fps_ratio);
+    let mut expected = plan.base.clone();
+    let mut previous_end = 0;
+    for group in &plan.groups {
+        let shift = shifts[group.first];
+        if shifts[group.first..group.end]
+            .iter()
+            .any(|&other| other != shift)
+        {
+            return Err(invalid());
+        }
+        previous_end = plan
+            .shift_group(group, shift, previous_end, &mut expected)
+            .1;
+    }
+    plan.repair(&mut expected);
+    let mut snapped = 0;
+    let mut previous_end = 0;
+    for group in &plan.groups {
+        let indices = &plan.order[group.first..group.end];
+        for &i in indices {
+            let (before, after) = (expected[i], output[i]);
+            if after.end_ms != before.end_ms || after.start_ms >= after.end_ms {
+                return Err(invalid());
+            }
+            if after.start_ms != before.start_ms {
+                if indices.len() != 1
+                    || config.snap_ms == 0
+                    || before.end_ms - before.start_ms < 500
+                    || after.start_ms.abs_diff(before.start_ms) > config.snap_ms
+                    || after.start_ms < previous_end
+                    || after.end_ms - after.start_ms < 500
+                    || after.start_ms >= report.audio_duration_ms
+                    || !after.start_ms.is_multiple_of(plan.unit)
+                {
+                    return Err(invalid());
+                }
+                snapped += 1;
+            }
+        }
+        previous_end = indices
+            .iter()
+            .map(|&i| expected[i].end_ms)
+            .max()
+            .unwrap_or(previous_end);
+    }
+    if snapped != report.cues_snapped {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
 fn local_shifts(
     cues: &[SubtitleCue],
     order: &[usize],
@@ -402,6 +566,79 @@ pub(crate) fn align(
     config: &SyncConfig,
 ) -> Result<Alignment, SyncError> {
     check_cancelled()?;
+    validate_cues(cues, format)?;
+    let weights: Vec<_> = vad
+        .probability
+        .iter()
+        .zip(&vad.activity)
+        .map(|(&p, &active)| if active == 0 { 0.0 } else { p.max(0.16) })
+        .collect();
+    let global = global_match(cues, &weights, vad.frame_ms, config)?;
+    let plan = TimingPlan::new(cues, format, global.ratio);
+    let speech = Integral::new(&weights, vad);
+    let binary = Integral::new(&vad.activity, vad);
+    let offsets = local_shifts(
+        &plan.base,
+        &plan.order,
+        &plan.groups,
+        &speech,
+        &global,
+        config.split_penalty,
+    )?;
+    let mut aligned = plan.base.clone();
+    let mut split_segments: Vec<SplitSegment> = Vec::new();
+    let mut previous_end = 0_u64;
+    for (group, shift) in plan.groups.iter().zip(offsets) {
+        check_cancelled()?;
+        let (shift, end) = plan.shift_group(group, shift, previous_end, &mut aligned);
+        if let Some(previous) = split_segments
+            .last_mut()
+            .filter(|segment| segment.shift_ms == shift)
+        {
+            previous.end_cue = group.end;
+        } else {
+            split_segments.push(SplitSegment {
+                start_cue: group.first + 1,
+                end_cue: group.end,
+                shift_ms: shift,
+            });
+        }
+        previous_end = end;
+    }
+    plan.repair(&mut aligned);
+    let mut cues_snapped = 0;
+    let mut previous_end = 0;
+    for group in &plan.groups {
+        check_cancelled()?;
+        let indices = &plan.order[group.first..group.end];
+        if let [i] = indices {
+            cues_snapped += usize::from(snap_start(
+                &mut aligned[*i],
+                previous_end,
+                vad,
+                &binary,
+                config.snap_ms,
+                plan.unit,
+            ));
+        }
+        previous_end = indices
+            .iter()
+            .map(|&i| aligned[i].end_ms)
+            .max()
+            .unwrap_or(previous_end);
+    }
+    Ok(Alignment {
+        overlap_score_before: score(cues, &binary),
+        overlap_score_after: score(&aligned, &binary),
+        cues: aligned,
+        fps_ratio: global.ratio,
+        global_offset_ms: global.shift,
+        split_segments,
+        cues_snapped,
+    })
+}
+
+fn validate_cues(cues: &[SubtitleCue], format: SubtitleFormat) -> Result<(), SyncError> {
     if cues.is_empty()
         || cues
             .iter()
@@ -420,105 +657,7 @@ pub(crate) fn align(
             "SRT cues must be in start-time order".into(),
         ));
     }
-    let weights: Vec<_> = vad
-        .probability
-        .iter()
-        .zip(&vad.activity)
-        .map(|(&p, &active)| if active == 0 { 0.0 } else { p.max(0.16) })
-        .collect();
-    let global = global_match(cues, &weights, vad.frame_ms, config)?;
-    let unit = format.precision();
-    let base: Vec<_> = cues
-        .iter()
-        .map(|cue| {
-            let scaled = scaled_cue(*cue, global.ratio);
-            let start_ms = scaled.start_ms / unit * unit;
-            SubtitleCue {
-                start_ms,
-                end_ms: (scaled.end_ms / unit * unit).max(start_ms + unit),
-            }
-        })
-        .collect();
-    let mut order: Vec<_> = (0..cues.len()).collect();
-    order.sort_unstable_by_key(|&i| (cues[i].start_ms, i));
-    let groups = groups(&base, &order, format);
-    let speech = Integral::new(&weights, vad);
-    let binary = Integral::new(&vad.activity, vad);
-    let offsets = local_shifts(
-        &base,
-        &order,
-        &groups,
-        &speech,
-        &global,
-        config.split_penalty,
-    )?;
-    let mut aligned = base.clone();
-    let mut split_segments: Vec<SplitSegment> = Vec::new();
-    let mut previous_end = 0_u64;
-    for (group, shift) in groups.iter().zip(offsets) {
-        check_cancelled()?;
-        let shift = shift.div_euclid(unit as i64) * unit as i64;
-        let actual = if format == SubtitleFormat::Ass {
-            shift.max(previous_end as i64 - group.start_ms as i64)
-        } else {
-            shift.max(-(group.start_ms as i64))
-        };
-        if let Some(previous) = split_segments
-            .last_mut()
-            .filter(|segment| segment.shift_ms == shift)
-        {
-            previous.end_cue = group.end;
-        } else {
-            split_segments.push(SplitSegment {
-                start_cue: group.first + 1,
-                end_cue: group.end,
-                shift_ms: shift,
-            });
-        }
-        for &i in &order[group.first..group.end] {
-            aligned[i].start_ms = base[i].start_ms.saturating_add_signed(actual);
-            aligned[i].end_ms = base[i].end_ms.saturating_add_signed(actual);
-        }
-        previous_end = group.end_ms.saturating_add_signed(actual);
-    }
-    if format == SubtitleFormat::Srt {
-        for i in 1..aligned.len() {
-            let current = aligned[i].start_ms.max(aligned[i - 1].start_ms + unit);
-            aligned[i - 1].end_ms = aligned[i - 1].end_ms.min(current);
-            aligned[i].start_ms = current;
-            aligned[i].end_ms = aligned[i].end_ms.max(current + unit);
-        }
-    }
-    let mut cues_snapped = 0;
-    let mut previous_end = 0;
-    for group in &groups {
-        check_cancelled()?;
-        let indices = &order[group.first..group.end];
-        if let [i] = indices {
-            cues_snapped += usize::from(snap_start(
-                &mut aligned[*i],
-                previous_end,
-                vad,
-                &binary,
-                config.snap_ms,
-                unit,
-            ));
-        }
-        previous_end = indices
-            .iter()
-            .map(|&i| aligned[i].end_ms)
-            .max()
-            .unwrap_or(previous_end);
-    }
-    Ok(Alignment {
-        overlap_score_before: score(cues, &binary),
-        overlap_score_after: score(&aligned, &binary),
-        cues: aligned,
-        fps_ratio: global.ratio,
-        global_offset_ms: global.shift,
-        split_segments,
-        cues_snapped,
-    })
+    Ok(())
 }
 
 #[cfg(test)]

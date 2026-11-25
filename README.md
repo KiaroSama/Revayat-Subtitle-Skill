@@ -57,6 +57,8 @@ cargo build --workspace --release --locked &&
 
 After checking the destinations, repeat the `install` command without `--dry-run`. The default install selects existing user-level agent roots. Use `revayat-subtitle install --agent codex` to select one host, or `revayat-subtitle install --agent codex --scope project --path .` to install into the current project. If you pass `--force`, the installer backs up the existing installation before replacing it. Keep `bin/` on the host's `PATH` and reload the agent. See [host paths and recovery](docs/platforms.md#agent-installation).
 
+Before reverting binaries, retain a compatible installer for existing journals and backups; see [installer downgrade compatibility](docs/platforms.md#installer-downgrade-compatibility).
+
 ### Plugin installation
 
 The same skill tree ships in five manifest formats: Claude Code, Cursor, Codex, Antigravity, and Agent Plugins 1.0. In Claude Code:
