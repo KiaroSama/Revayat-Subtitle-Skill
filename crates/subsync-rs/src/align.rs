@@ -5,6 +5,9 @@ use crate::{
 };
 use rustfft::{FftPlanner, num_complex::Complex};
 
+#[path = "align_cue.rs"]
+mod align_cue;
+
 /// Playback speed candidates supported by the synchronization report protocol.
 pub const FPS_RATIOS: [f64; 5] = [1.0, 23.976 / 25.0, 25.0 / 23.976, 24.0 / 25.0, 25.0 / 24.0];
 /// Largest supported timeline before additional offset padding is considered.
@@ -609,7 +612,7 @@ pub(crate) fn align(
     let plan = TimingPlan::new(cues, format, global.ratio);
     let speech = Integral::new(&weights, vad);
     let binary = Integral::new(&vad.activity, vad);
-    let offsets = local_shifts(
+    let mut offsets = local_shifts(
         &plan.base,
         &plan.order,
         &plan.groups,
@@ -617,6 +620,9 @@ pub(crate) fn align(
         &global,
         config.split_penalty,
     )?;
+    if config.max_split_offset_ms > 0 {
+        align_cue::refine_group_shifts(&plan, &speech, global.shift, config, &mut offsets)?;
+    }
     let mut aligned = plan.base.clone();
     let mut split_segments: Vec<SplitSegment> = Vec::new();
     let mut previous_end = 0_u64;

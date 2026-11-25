@@ -286,6 +286,18 @@ fn plugin_install_includes_all_manifests_commands_and_nested_skills() -> Result<
 }
 
 #[test]
+fn sync_docs_require_individual_dialogue_alignment() -> Result<()> {
+    for path in ["sync/SKILL.md", "references/audio-sync.md"] {
+        let doc = text(&format!("{SKILL}/{path}"))?;
+        assert!(doc.contains("cue-by-cue alignment"), "{path}");
+        assert!(
+            doc.contains("pan=mono|c0=FC,aresample=async=1:first_pts=0"),
+            "{path}"
+        );
+    }
+    Ok(())
+}
+#[test]
 fn distribution_manifest_does_not_ship_language_wrappers() -> Result<()> {
     let payloads = distribution::payloads(&root(), true, true)?;
     let manifest = distribution::distribution_manifest(&payloads["revayat-subtitle"])?;

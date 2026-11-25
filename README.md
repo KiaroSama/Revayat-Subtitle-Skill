@@ -74,6 +74,8 @@ The plugin exposes `translate-subtitles`, `revayat-subtitle-resume`, `revayat-su
 
 For visual rendering and audio extraction, put `ffmpeg` and `ffprobe` on `PATH`. Rendering needs FFmpeg built with `libass` and the `subtitles` filter. Run `revayat-subtitle doctor` to check prerequisites; `ready: true` does not replace checking the actual rendered subtitles.
 
+`revayat-subtitle sync` and `subsync` align each dialogue cue individually with the spoken audio. A global shift is only the starting point.
+
 Use the [imported FFmpeg Skill guidance](skills/revayat-subtitle/ffmpeg/SKILL.md), adapted from `ffmpeg-skill` v4.7.1, to identify the matching release and dialogue track. If a video has several audio tracks, extract the selected track as 16 kHz mono PCM WAV and pass it with `--wav`. Keep the original subtitle and check results in playback near the beginning, middle, end, and any reported split.
 
 ```text

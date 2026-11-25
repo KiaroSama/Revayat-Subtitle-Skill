@@ -237,6 +237,62 @@ fn noisy_feature_length_timeline_keeps_unity_fps() {
     assert_eq!(report.fps_ratio, 1.0, "{report:?}");
 }
 
+const DIALOGUE: [(u64, u64); 6] = [
+    (1520, 2470),
+    (4990, 6370),
+    (8020, 9150),
+    (13160, 13840),
+    (24530, 25640),
+    (31230, 32980),
+];
+
+fn drifted_dialogue() -> [(u64, u64); 6] {
+    let mut cues = DIALOGUE;
+    cues[1] = (cues[1].0 + 900, cues[1].1 + 900);
+    cues[4] = (cues[4].0 - 850, cues[4].1 - 850);
+    cues
+}
+
+#[test]
+fn per_dialogue_alignment_fixes_individual_drifted_cues() {
+    let vad = extract_speech_activity(&samples(&DIALOGUE), RATE, 10);
+    let mut doc = SubtitleDocument::parse(&srt(drifted_dialogue()), None).unwrap();
+    let config = SyncConfig {
+        max_offset_ms: 0,
+        fps_search: false,
+        snap_ms: 0,
+        ..SyncConfig::default()
+    };
+    let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
+    assert_times(&doc, &DIALOGUE, 100);
+    assert!(report.overlap_score_after > 0.90, "{report:?}");
+    assert!(report.overlap_score_after > report.overlap_score_before + 0.15);
+    assert!(
+        doc.cues
+            .windows(2)
+            .all(|pair| pair[0].end_ms <= pair[1].start_ms)
+    );
+    assert_eq!(report.split_segments.len(), 5);
+}
+
+#[test]
+fn per_dialogue_alignment_respects_zero_split_limit() {
+    let vad = extract_speech_activity(&samples(&DIALOGUE), RATE, 10);
+    let input = drifted_dialogue();
+    let mut doc = SubtitleDocument::parse(&srt(input), None).unwrap();
+    let config = SyncConfig {
+        max_offset_ms: 0,
+        max_split_offset_ms: 0,
+        fps_search: false,
+        snap_ms: 0,
+        ..SyncConfig::default()
+    };
+    let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
+    assert_times(&doc, &input, 0);
+    assert_eq!(report.split_segments.len(), 1);
+    assert_eq!(report.split_segments[0].shift_ms, 0);
+}
+
 #[test]
 fn detects_a_five_second_edit_and_aligns_both_halves() {
     let vad = extract_speech_activity(&samples(&SPEECH), RATE, 10);
