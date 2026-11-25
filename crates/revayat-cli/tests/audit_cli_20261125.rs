@@ -1,5 +1,7 @@
 //! Public CLI, diagnostic-sink, and strict JSON boundary regressions.
 
+#![forbid(unsafe_code)]
+
 use anyhow::Result;
 use revayat_core::runtime::files;
 use serde_json::{Value, json};
@@ -211,7 +213,17 @@ fn automatic_lookup_skips_empty_banks_but_explicit_empty_banks_stay_empty() -> R
         if explicit {
             child.arg("--data-dir").arg(&empty);
         }
-        let output = child.output()?;
+        // A sibling fork can briefly inherit the copied executable's write descriptor.
+        let mut retries = 20;
+        let output = loop {
+            match child.output() {
+                Err(err) if err.kind() == std::io::ErrorKind::ExecutableFileBusy && retries > 0 => {
+                    retries -= 1;
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                result => break result?,
+            }
+        };
         assert_eq!(
             output.status.code(),
             Some(0),
