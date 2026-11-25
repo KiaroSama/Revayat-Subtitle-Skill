@@ -57,6 +57,12 @@ fn command(root: &Path, extra: &[String], env: &BTreeMap<String, String>) -> Res
     ];
     argv.extend_from_slice(extra);
     let mut env = env.clone();
+    let tmp = root.join("tmp");
+    fs::create_dir_all(&tmp)?;
+    for key in ["TEMP", "TMP", "TMPDIR"] {
+        env.entry(key.into())
+            .or_insert_with(|| tmp.to_string_lossy().into_owned());
+    }
     env.insert(
         "REVAYAT_LOG_DIR".into(),
         root.join("logs").to_string_lossy().into_owned(),
