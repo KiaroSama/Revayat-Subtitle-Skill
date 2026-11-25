@@ -17,9 +17,8 @@ Two jobs:
 - **Mechanics.** The small things that make Persian look right regardless of word choice: RTL,
   ZWNJ, correct ی/ک, digits, punctuation, spacing.
 
-Mechanics are deterministic, so they live in a script (`scripts/persian_lint.py`). Craft is
-judgment, so it lives in this file and the references. Any Persian you emit should pass the linter
-and respect the craft rules.
+Use the Rust command `revayat-subtitle lint` for mechanics. Use this guide and its
+references for editorial judgment. Persian output needs both checks.
 
 ## Routing: pick the task first
 
@@ -27,9 +26,9 @@ and respect the craft rules.
 |---|---|---|
 | English → Persian translation | **A** | full workflow below |
 | Persian → English translation | **B** | reverse workflow |
-| "fix / clean up / normalize this Persian", RTL, نیم‌فاصله, encoding | **C** | `persian_lint.py` only, no translation |
+| "fix / clean up / normalize this Persian", RTL, نیم‌فاصله, encoding | **C** | `revayat-subtitle lint` only, no translation |
 | write, edit, or review Persian; "make it sound human / not like AI" | **D** | craft rules + `references/ai-tells.md`, then the linter |
-| "what's the natural Persian for X", an idiom or term | **E** | `lookup.py` and `references/lexicon.md` |
+| "what's the natural Persian for X", an idiom or term | **E** | `revayat-subtitle lookup` and `references/lexicon.md` |
 
 Routes C and D work standalone. You don't need a translation task to fix or improve Persian.
 
@@ -40,7 +39,7 @@ anything longer or important.
 
 **1. Prep.** Read the source. Name its register (literary, contemporary dialogue, nonfiction,
 official, children's) and audience; see `references/register-guide.md`. Build a terminology brief
-with `python scripts/lookup.py <source_file>` (`--json` for structured output); it surfaces only the
+with `revayat-subtitle lookup --json "source.txt"`; it surfaces only the
 idioms and collocations that occur in this text. If the text has measurements, settle the unit
 policy with the user before drafting (see Numbers and units).
 
@@ -48,19 +47,20 @@ policy with the user before drafting (see Numbers and units).
 tricky, open `references/pitfalls.md` (56 rules with worked EN↔FA exemplars).
 
 **3. Review.** Run the lenses in `references/review-lenses.md`: back-translation (fidelity),
-terminology, diction-grammar, ai-tells, fluency, modern standards, read-aloud. Parallel subagents if
-you have them, inline otherwise.
+terminology, diction and grammar, AI tells, fluency, modern standards and read-aloud.
+For subtitle jobs, run these checks in Stage 3. Split them among extra reviewers
+only with user consent and host support.
 
 **4. Synthesis.** Merge the feedback in this priority (highest wins): meaning fidelity →
 terminology → grammar → no AI tells → oral fluency → register → modern accessibility → taste.
 
-**5. Delivery.** Run `python scripts/persian_lint.py --fix` on the Persian. Run the verification
+**5. Delivery.** Run `revayat-subtitle lint --fix` on the Persian. Run the verification
 check. Deliver only the final translation plus two or three sentences on the choices that matter.
 No drafts, lens reports, or back-translations unless asked.
 
 **Route B (Persian → English)** reverses this: draft the English, review for English quality and
-fidelity, skip the linter (the output is English). Still run `lookup.py --reverse` for consistent
-terminology and still verify names and numbers.
+fidelity, and skip the Persian linter for English output. Run
+`revayat-subtitle lookup --reverse "source-fa.txt"` for terminology, and verify names and numbers.
 
 ## The machine-Persian checklist
 
@@ -89,9 +89,9 @@ The highest-frequency ways a draft betrays itself. Apply while drafting; the ful
 
 Finish every piece of Persian by running the linter:
 
-    python scripts/persian_lint.py --check  file.txt          # report issues
-    python scripts/persian_lint.py --fix    file.txt          # normalized text to stdout
-    python scripts/persian_lint.py --check --style file.txt   # also flag officialese / AI phrases
+    revayat-subtitle lint --check  file.txt          # report issues
+    revayat-subtitle lint --fix    file.txt          # normalized text to stdout
+    revayat-subtitle lint --check --style file.txt   # also flag officialese / AI phrases
 
 It fixes Arabic → Persian letters (ي→ی, ك→ک, ة→ه, ى→ی), kashida, digits, punctuation
 (, → «،», ; → «؛», ? → «؟», quotes → «…»), ZWNJ for می/نمی + ها + ترین + heh enclitics, and
@@ -100,7 +100,7 @@ where a Persian character sits next to it, so English inside a Persian document 
 is idempotent. Ambiguous cases (a bare «تر» that might mean "wet", a glued «میرود», an em dash) are
 reported, never auto-changed; resolve those with judgment.
 
-If you cannot run scripts, apply sections 1 to 4 of `references/typography-and-rtl.md` by hand:
+If you cannot run the CLI, apply sections 1 to 4 of `references/typography-and-rtl.md` by hand:
 ZWNJ for می‌/نمی‌، ‌ها، ‌تر/‌ترین and enclitics; «…» for quotes; «،» «؛» «؟»; Persian digits in prose.
 
 ### Numbers, digits, and units
@@ -144,6 +144,6 @@ Read on demand, not all up front.
 | `references/review-lenses.md` | Phase 3 lenses, priority order, verification checklist |
 | `references/lexicon.md` | idioms, collocations, never-soften list, opt-in house-style coinages |
 
-Paths are relative to the skill root (the folder holding this file); run scripts from there.
-Scripts: `scripts/persian_lint.py`, `scripts/lookup.py`. Data: `scripts/data/{idioms,glossary}.tsv`,
-never loaded into context. Tests: `python scripts/test_scripts.py`.
+Reference paths are relative to this skill. Run `revayat-subtitle lint` and
+`revayat-subtitle lookup` from `PATH` or by absolute executable path. Lookup
+returns only matching entries from the bundled idiom and glossary tables.

@@ -1,10 +1,13 @@
 # Subtitle audio sync
 
-Run the bridge from the repository root with Python 3.11 or newer. It looks for a release or debug binary under `rust/subsync-rs/target/`, then `subsync` on `PATH`. If neither exists, it uses Cargo to build the locked release from the checkout. An installed skill without Rust source needs `subsync` on `PATH`.
+Run `revayat-subtitle sync` for the supervised route, or the standalone Rust `subsync` binary for direct alignment.
 
 ```text
-python skills/revayat-subtitle/scripts/sync_bridge.py --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "report.json"
+revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json"
+subsync --wav "episode-dialogue.wav" --in "original.ass" --out "aligned-from-wav.ass" --json-report "wav-report.json"
 ```
+
+These are alternatives. Choose the one that fits the available media. See [FFmpeg sync and probing](../ffmpeg/references/sync-and-probing.md) for choosing a dialogue stream, checking timestamps and extracting WAV audio.
 
 Video input needs FFmpeg. The binary asks FFmpeg for 16 kHz mono, signed 16-bit little-endian PCM and uses FFmpeg's automatic audio stream selection. To sync to a different track, supply its downmix as a mono 16-bit PCM WAV. Use `--wav` in place of `--video` for this and for offline tests. Choose fresh output paths in existing directories; the tool never overwrites source or destination files.
 
@@ -30,7 +33,7 @@ The global search follows the [FFsubsync approach](https://github.com/smacke/ffs
 | `--snap-ms N` | `350` | Limit changes to cue starts to this distance from the aligned position. Use `0` to disable. |
 | `--no-fps-search` | off | Keep the original subtitle speed. |
 | `--json-report PATH` | stdout only | Also save the JSON report to a new file. |
-| `--timeout SECONDS` | `300` | Bound the engine subprocess. Python bridge only. |
+| `--timeout SECONDS` | `300` | Bound the supervised run. Use with `revayat-subtitle sync`, not standalone `subsync`. |
 
 ## What stays intact
 

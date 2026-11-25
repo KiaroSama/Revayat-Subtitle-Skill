@@ -77,3 +77,4 @@ perf.data.old
 /rust/*/extra-inputs.jsonl
 /bin/
 /.signing/
+/real test/

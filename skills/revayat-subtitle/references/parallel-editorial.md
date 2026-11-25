@@ -1,9 +1,10 @@
 # Optional parallel translation and editing
 
-Use this only when the host actually supports subagents and the user has agreed
-to parallel work for this batch. It applies to translation from any language and
-to subtitle correction. Every worker follows [voice by output language](target-voice.md)
-using the assigned target. The same fidelity and review rules apply.
+This optional procedure splits cue assignments within a role in the mandatory
+[six-stage workflow](multi-agent-workflow.md). Use it only when the host supports
+subagents and the user has agreed to parallel work for this batch. Each worker
+follows [voice by output language](target-voice.md). The same fidelity and review
+rules apply to translations and subtitle corrections.
 
 ## Ask before dispatch
 
@@ -85,8 +86,9 @@ names, tone, signs/lyrics and donor links across the complete edition.
 
 Read every returned cue against its source before accepting it and perform the final
 whole-episode fluency/continuity pass. Worker success messages are not quality evidence.
-The coordinator owns final building, physical rendering/image inspection, QA and
-packaging, and keeps the master activity log with the final outcome and worker coverage.
+The coordinator accepts worker proposals and owns integration. Stages 4 to 6 own
+building, visual checks and packaging as specified in the six-stage workflow.
+The coordinator keeps the master activity log with the outcome and worker coverage.
 The subtitle ZIP still contains only one subtitle per episode unless the user asks
 for logs or other extra files.
 

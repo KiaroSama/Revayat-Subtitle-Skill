@@ -6,7 +6,7 @@ argument-hint: <build directory>
 Check the `revayat-subtitle` build at **$ARGUMENTS**:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" qa --build "BUILD"
+revayat-subtitle qa --build "BUILD"
 ```
 
 Report source or output changes first, then missing cue/image reviews, incorrect

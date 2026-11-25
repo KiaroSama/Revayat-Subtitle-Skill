@@ -1,5 +1,0 @@
-# Development-only process-lifetime assertions, pytest runner, and bounded generated regressions.
-psutil==7.2.2
-pytest==9.2.0
-hypothesis==6.170.17
-sortedcontainers==2.4.0

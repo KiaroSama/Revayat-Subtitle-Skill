@@ -1,171 +1,47 @@
 # Verification scope
 
-## Reliability audit, 2026-11-24
+## Automated checks for v3.0.0
 
-The [audit report and reviewer instructions](audit-2026-11-24.md) map 14 defect
-groups to authored reproductions, implemented repairs and acceptance criteria.
-This includes content-preserving ASS conversion and credit detection, reviewed
-cue-link coverage, overlapping Translator Mode order, malformed-comment cost,
-Persian protected spans, interpreter-specific native parity, legacy install
-recovery, sync parsing and complete-file publication, and package symlink refusal.
+Run these from the repository root with Rust `1.100.0`, `rustfmt`, and `clippy`:
 
-The baseline was tested from a detached Git worktree at `8f003e5` with full
-history: 490 pytest cases passed, 44 skipped and 698 subtests passed; the separate
-bounded/render runner passed 463 tests with 8 skips. The repaired fallback suite
-passed on Python 3.11.18 and 3.14.10 with 614 tests and 720 subtests per run
-(51 skips); the Python 3.14.10 bounded/render run completed 491 tests (11 skips).
-Native results are a separate requirement: missing compiled modules must fail
-when `REVAYAT_REQUIRE_NATIVE=1`. Neither a fallback pass nor an import-only probe
-establishes native compatibility. The final compiled release run passed 619 tests
-and 2,051 subtests on Python 3.11.18 (46 skips); with actual rendering enabled,
-Python 3.14.10 passed 657 tests and 2,126 subtests (8 skips). The three accelerator
-crates passed 33 Rust unit tests in total. The malformed-comment regression also
-checks real Persian normalization after the 400 KB literal prefix; this caught
-and closed a native regex-budget failure during consolidated testing. Use the
-exact candidate's Actions results for hosted platform evidence.
+```text
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo build --workspace --release --locked
+```
 
-All three current native facades verify their compiled contract revision. The
-existing Subcore dispatcher rejects the whole old module when that revision is
-missing or unsupported, so old wrapping, anchoring, Unicode and normalization
-behavior cannot override the updated Python reference. Real baseline binaries
-reproduced these upgrade failures; old-package fallback and current-facade
-rejection were exercised separately, alongside compatible native delegation.
+Install `ffmpeg` and `ffprobe` for media integration checks. Rendering needs an FFmpeg build with libass and the `subtitles` filter. Set `REVAYAT_REQUIRE_FFMPEG=1` to match CI's media test environment. After building, stage the local executables in `bin/` as shown in the [source build instructions](../README.md#build-from-source). Run `--help` and `--version` on both `revayat-subtitle` and `subsync`; run `revayat-subtitle doctor` to check the media setup.
 
-The install-recovery closure also covers disposal cleanup after restoration:
-real process death, permission failure, actual 1,000-row pressure, old inactive
-bindings and the legacy 1,001-row overflow. Cleanup retries preserve a later
-valid installation, reject foreign disposal ownership, and retain unreadable or
-linked cleanup state. Four independent before/after capacity probes and the
-full installer suite passed. Terminal reconciliation and cleanup survive moved
-or symlink-replaced historical live parents while still rejecting changed
-recovery ancestry; completed history remains retireable after its former
-live-target parent is removed.
+The [CI workflow](../.github/workflows/ci.yml) runs on main pushes, pull requests, merge queue requests, and manual dispatch. Its 64-bit matrix separates builds from tests:
 
-The sync audit additionally passed 18 Rust tests plus doctests and 31 Python
-sync cases locally, including real-engine FFmpeg tests, with no local skips. It
-exercised a 12-minute, 192-cue authored alignment with 12 independently shifted
-sections; actual FFmpeg extraction and
-timeout cleanup; complete-file write failure and retry; report staging failure;
-and exclusive publication races. Two separate final paths are not an atomic
-transaction: a late report collision explicitly identifies the already complete
-subtitle and preserves the independent report. No power-loss guarantee follows.
+| Target | Both release binaries | Clippy and workspace tests with FFmpeg/libass |
+| --- | --- | --- |
+| Linux x64 | Build | Run |
+| Linux arm64 | Build | Not run in this lane |
+| Windows x64 | Build | Run |
+| Windows arm64 | Build | Not run in this lane |
 
-CI now runs automatically on PRs, main pushes and merge queues, with a required
-aggregate for every lane and mandatory native parity on Linux, Windows and macOS.
-Release builds reuse that validation; independent release runs have distinct
-validation concurrency identities. Platform success must be read from the
-corresponding hosted job, not inferred from this Linux audit host. The source
-document does not certify future commits or semantic correctness of real media.
+Linux x64 also runs formatting. Separate jobs check workflows, tracked files, and plugin manifest versions. Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions) for the exact commit under review. Check `CI required` and the individual jobs; a listed job or a build on another architecture does not establish a passing result. The [release workflow](../.github/workflows/release.yml) depends on validation and packages both binaries for each supported target. See [release signature verification](signing/README.md) before using a downloaded binary.
 
-## Automated checks
+The workspace suites check CLI contracts, subtitle parsing and preservation, Persian text mechanics, editorial state, installation recovery, process supervision, bounded rendering, sync, and no-clobber publication. PNG checks can show that a sample contains visible caption pixels and that a changed image invalidates its approval. They cannot judge what a cue means, whether a line reads naturally in Persian, or whether it sits in the right place over a particular shot.
 
-The bounded stdlib runner exercises the actual CLI and OS installer, complete cue
-accounting, candidate references, stale source/output/manifest/glossary refusal,
-safe ZIP import, explicit encoding failures, ASS reset styles, opaque embedded
-font blocks, drawing preservation, SRT sorting and OVA names, license inclusion,
-installation source protection and replacement backups. CI covers Python 3.11
-and 3.14 on Linux, and Python 3.14 on Windows and macOS.
+## Verify a subtitle delivery
 
-The Linux and Windows render tiers additionally check that subsecond samples contain actual
-caption pixels, 10-bit video produces viewable 8-bit PNGs, incomplete visual
-reviews prevent packaging, image modifications invalidate approval, and ZIP bytes
-match the reviewed edition. Automated signoffs in this test are deliberately
-labelled gate-contract fixtures, not human visual judgments. CodeQL analyzes
-Python and workflows. Dependency Review is triggered on pull requests; Dependabot
-maintains GitHub Actions and pinned development dependencies. Blocking actionlint
-and zizmor workflow checks use pinned releases; runtime remains stdlib.
+1. Import the source files, record their identities, and finish all six stages in the [translation workflow](../skills/revayat-subtitle/references/multi-agent-workflow.md). Check cue decisions, names, glossary, and episode mapping against the current sources.
+2. Render the current build and inspect its images. Record observations against the build you inspected. If a correction changes that build, rerender and review the replacement. For a sync job, play the same dialogue track used for alignment and check cues near the beginning, middle, end, and each reported split. See the [FFmpeg sync guidance](../skills/revayat-subtitle/ffmpeg/SKILL.md).
+3. Run `revayat-subtitle status --work WORK` and `revayat-subtitle qa --build BUILD`. Resolve pending or stale evidence before running `revayat-subtitle package --build BUILD --out out/Sub.zip` with a new output path. Read the archive back and confirm it contains one reviewed subtitle per episode under `Sub/`.
 
-Discovered regression modules cover publication write/flush/close/race failures,
-multi-target installation rollback and ancestor changes, malformed JSON/PNG records,
-literal markup, bidi idempotence, canonical identities, provenance, legacy migration,
-default sampler associations, and exited-leader/cancellation/output-limit processes.
-Hypothesis generates finite deterministic format examples; native checks use psutil
-only in development. Authored failure logs/images are size-limited CI artifacts;
-private real-media work is never uploaded. Native render fixtures bind a selected
-font file and prove visible pixels, not linguistic or shaping correctness by themselves.
+For a failed command, inspect the UTF-8 log in `logs/<binary>_YYYY-MM-DD_HH-mm-ss_UTC.log`. Report the failing step and exit status. Check local paths before sharing a log; do not upload private input media, source subtitles, worksheets, or review images.
 
-Deterministic owner-loop fixtures cover timely captured output waiting in the queue
-and output received during a timed wait. Output-idle progress is recorded by the
-capture readers, not when the owner later consumes it; a genuine expired output
-interval remains expired. Wall deadlines, output caps and process-tree cleanup
-stay independent. The pinned earlier owner must reproduce the named false-idle
-failures under the same authored timelines. This does not establish the cause of
-historical intermittent PowerShell startup timeouts.
+## Earlier evidence
 
-Owned deadline exceptions retain their original `TimeoutExpired` fields and add
-`deadline_snapshot`: elapsed/idle seconds, wall-or-idle reason, gate/stream/leader
-state, latched idle-gap state and owner-consumed byte counts. These counts are not
-all bytes already read by capture threads. Native fixtures print only validated
-finite snapshot fields after owner cleanup; no argv, environment, paths or output
-bodies are included. This is deadline-boundary evidence, not an OS wait diagnosis
-or a reconstruction of the historical timeout. Supervisor milestone logging stays
-DEBUG; no new child-output heartbeat is introduced.
+The [2026-11-24 reliability audit](audit-2026-11-24.md) records the earlier release's 14 defect groups, reproductions, and checks. It covers ASS preservation, line endings, sync staging, installer cleanup and recovery, and package destination collisions. Those results belong to the revisions named in the audit and do not establish v3.0.0 results.
 
-Use the [Actions results](https://github.com/KiaroSama/Revayat-Subtitle-Skill/actions)
-for the result on the commit being evaluated; configuration alone is not a pass.
-
-The text-boundary regressions additionally cover FFmpeg-compatible SRT break
-names, parenthesized ASS scalar spans and ignored prefixes, balanced bidi scopes
-crossing display lines, nontext codecs, regular-file reads, JSON expansion/short
-writes/cleanup failures, legacy Effect phases and ordered duplicate-section refusal.
-Pixel comparisons require a full nonblank RGB frame before equivalence is accepted.
-Their temporary artifacts stay inside the repository's test scratch directory.
-These are mechanical contracts; rendering equivalence does not establish meaning.
-
-## Improvement contracts, 2026-10-09
-
-New discovered fixtures cover opened fingerprint identity/count/caps, synchronized
-editable JSON acknowledgement and after-effect truth, comment activation/build
-retry, early SRT separator refusal, all five RGB/RGBA PNG filters, explicit child
-environments/status, native installer death/recovery/lock contention, PowerShell
-candidate fallback, read-only status/handoff and the finite AI rubric record.
-Their presence is not a passing result; use exact-revision Actions evidence.
-The final CI also compares pinned repository baseline behavior at the affected
-seams and repeated median PNG cost on identical authored320×180 frames. No local
-red/green, full1920×1080 speedup, power-loss or hostile-filesystem claim follows.
-
-Main push/PR/manual scheduling preserves four platform lanes; topic pushes without
-a PR can be checked manually. Historical3.10 results below/in dated audit documents
-are not rewritten into current support. Optional reports never dispatch workers,
-modify shared editorial state or replace coordinator/image review. AI calibration
-is actual finite disclosed AI review, not blind independent human qualification.
-
-## Real local media, 2026-09-14
-
-Four real ASS candidates, including two Persian releases and two English tracks
-extracted from their matching MKV, contained 3,559, 655, 370 and 604 events.
-All 5,188 passed parse/serialize/parse structural round trips. This checks file
-mechanics; it does not claim a semantic review of all those events.
-
-A bounded opening excerpt contained 40 source events across those candidates.
-Every sampled event was read and assigned a decision. Ten retained events kept
-intentional foreground/shadow layers and a moving translated sign. All ten
-rendered images were inspected over the actual 10-bit video, with corrected
-Persian/English order, punctuation, shaping and sign tracking. Packaging was read
-back and the source subtitle hashes remained unchanged. FFmpeg 9.0.1 and Python
-3.13.15 were used on Windows. Only authored fixtures are included in Git.
-
-The real case exposed and informed fixes for inherited owner-only Windows output
-permissions, fractional timestamp truncation and 16-bit PNG previews. Its source
-typography also required a Persian font, resetting inherited negative tracking,
-and libass whole-text layout for two sign layers with separately scaled numbers.
-The latter is a libass-specific adaptation; VSFilter compatibility was not tested.
-The skill documents these as decisions to make after actual image inspection.
-
-The newer instructions also request audio coverage before the first and after the
-last cue and player track selection when matching media exists. Those checks are
-not established by the earlier real-media run or by automated PNG validation;
-they require a fresh media-backed review to claim completion for a new batch.
+On 2026-09-14, four real ASS candidates round-tripped 5,188 events without a structural difference. Reviewers read a 40-event excerpt and inspected render samples for its ten retained events over the original 10-bit video. They read back the delivery archive and confirmed the source subtitle hashes did not change. This was an excerpt check, not a review of all events or a full playback timing audit. Only authored fixtures are included in Git.
 
 ## Limits
 
-- No full episode/season semantic certification or audiovisual synchronization audit.
-- No installation and execution inside every supported host application's UI.
-- Embedded font payload preservation/removal has mechanical fixtures; the real
-  selected ASS files had no embedded font sections. No claim of exhaustive
-  embedded-font renderer compatibility is made.
-- Codebase Memory enrollment was repaired for the exact project root. Its index
-  is local development tooling, separate from the distributed subtitle runtime.
-
-The private input media, extracted subtitles, review worksheets and image evidence
-stay local and are excluded from skill/plugin distributions and CI uploads.
+- Each release needs results on its own commit. Host support does not mean the skill was run inside every agent UI.
+- Mechanical render and timing checks do not establish translation quality or replace playback review. The earlier selected ASS files did not contain embedded fonts, so their renders do not establish compatibility with those payloads.
+- Recovery and exclusive publication tests do not certify arbitrary power loss or network filesystem behavior. The sync subtitle and optional JSON report have separate final paths; a late report collision can leave the already complete subtitle in place.

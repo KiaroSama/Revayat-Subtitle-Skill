@@ -24,290 +24,150 @@ concurrency:
 
 jobs:
   workflow-lint:
+    permissions:
+      contents: read
     uses: ./.github/workflows/workflow-lint.yml
-  check:
-    name: Check ${{ matrix.os }} / Python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 12
+
+  rust:
+    name: Rust (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            python: '3.11'
-          - os: ubuntu-latest
-            python: '3.14'
-          - os: windows-latest
-            python: '3.14'
-          - os: macos-latest
-            python: '3.14'
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            test: true
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            test: false
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            test: true
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            test: false
+    env:
+      RUST_TARGET: ${{ matrix.target }}
+      REVAYAT_REQUIRE_FFMPEG: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      - name: Install the pinned native Rust toolchain
+        shell: bash
+        run: |
+          rustup set default-host "$RUST_TARGET"
+          rustup toolchain install "1.100.0-$RUST_TARGET" --profile minimal --component rustfmt --component clippy
+          rustup default "1.100.0-$RUST_TARGET"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          python-version: ${{ matrix.python }}
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Install libass renderer and fonts
-        if: runner.os == 'Linux' && matrix.python == '3.14'
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Build both release binaries
+        shell: bash
+        run: cargo build --workspace --release --locked --target "$RUST_TARGET" --bin revayat-subtitle --bin subsync
+      - name: Check Rust formatting
+        if: matrix.runner == 'ubuntu-24.04'
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        if: matrix.test
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Install Linux FFmpeg and fonts
+        if: matrix.runner == 'ubuntu-24.04'
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg fonts-dejavu-core
-      - name: Install verified Windows renderer
-        if: runner.os == 'Windows'
+      - name: Install verified Windows FFmpeg
+        if: matrix.runner == 'windows-2025'
         shell: pwsh
         run: |
-          $destination = Join-Path $PWD '.scratch/ffmpeg'
-          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $destination = Join-Path $env:RUNNER_TEMP 'ffmpeg'
+          New-Item -ItemType Directory -Path $destination | Out-Null
           $archive = Join-Path $destination 'ffmpeg.zip'
           Invoke-WebRequest -TimeoutSec 120 -Uri 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip' -OutFile $archive
           if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba') { throw 'FFmpeg checksum mismatch' }
           Expand-Archive -LiteralPath $archive -DestinationPath $destination
-          $binary = Get-ChildItem -LiteralPath $destination -Recurse -Filter ffmpeg.exe | Select-Object -First 1
-          if (-not $binary) { throw 'FFmpeg executable missing' }
+          $binary = Get-ChildItem -LiteralPath $destination -Recurse -File -Filter ffmpeg.exe | Select-Object -First 1
+          if (!$binary) { throw 'FFmpeg executable missing' }
           $binary.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Check CLI, formats, installation and rendering
-        if: (runner.os == 'Linux' && matrix.python == '3.14') || runner.os == 'Windows'
-        run: python -X utf8 tests/check.py --render
-      - name: Check CLI, formats and native installation
-        if: runner.os == 'macOS' || matrix.python == '3.11'
-        run: python -X utf8 tests/check.py
-      - name: Retain authored failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: failure-${{ matrix.os }}-${{ matrix.python }}
-          path: .scratch/ci-artifacts/
-          if-no-files-found: ignore
-          retention-days: 7
-  pytest-suite:
-    name: Pytest ${{ matrix.os }} / Python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            python: '3.11'
-          - os: ubuntu-latest
-            python: '3.14'
-          - os: windows-latest
-            python: '3.14'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Run full Python pytest suite
-        run: python -X utf8 -m pytest tests/ --ignore=tests/test_subsync.py -q
-  plugin-manifests:
-    name: Plugin manifests and installer
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.14'
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Verify all five plugin manifests, bundled font, and installer
-        run: python -X utf8 -m pytest tests/test_plugin_manifests.py tests/test_installation.py tests/test_contracts.py tests/test_ci_policy.py -v
-  v2-pipeline:
-    name: Persian ASS, RTL, ZWNJ and Translator Mode
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.14'
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Verify v2 ASS pipeline and semantic contracts
-        run: python -X utf8 -m pytest tests/test_v2_pipeline.py tests/test_semantic_contracts.py tests/test_audit_boundaries.py -v
-  rust-subsync:
-    name: Rust subsync (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.14'
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Ensure Rust toolchain with rustfmt and clippy
+      - name: Test Rust workspace with FFmpeg and libass
+        if: matrix.test
         shell: bash
         run: |
-          toolchain=$(python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())["toolchain"]["channel"])')
-          rustup toolchain install "$toolchain" --profile minimal --component rustfmt --component clippy
-          rustc --version
-      - name: Format, lint, test, and build subsync-rs
-        shell: bash
-        working-directory: rust/subsync-rs
-        run: |
-          cargo fmt --check
-          cargo clippy --locked --all-targets -- -D warnings
-          cargo test --locked
-          cargo build --locked --release
-      - name: Install Linux audio extraction tool
-        if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
-      - name: Install macOS audio extraction tool
-        if: runner.os == 'macOS'
-        run: brew install ffmpeg
-      - name: Install verified Windows audio extraction tool
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $destination = Join-Path $PWD '.scratch/ffmpeg'
-          New-Item -ItemType Directory -Force -Path $destination | Out-Null
-          $archive = Join-Path $destination 'ffmpeg.zip'
-          Invoke-WebRequest -TimeoutSec 120 -Uri 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip' -OutFile $archive
-          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba') { throw 'FFmpeg checksum mismatch' }
-          Expand-Archive -LiteralPath $archive -DestinationPath $destination
-          $binary = Get-ChildItem -LiteralPath $destination -Recurse -Filter ffmpeg.exe | Select-Object -First 1
-          if (-not $binary) { throw 'FFmpeg executable missing' }
-          $binary.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Run Python subsync bridge tests
-        env:
-          REVAYAT_REQUIRE_FFMPEG: '1'
-        run: python -X utf8 -m pytest tests/test_subsync.py -v
-  rust-crates:
-    name: Native Rust parity (${{ matrix.os }} / Python ${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            python: '3.11'
-          - os: ubuntu-latest
-            python: '3.14'
-          - os: windows-latest
-            python: '3.14'
-          - os: macos-latest
-            python: '3.14'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install bounded test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Ensure pinned Rust toolchain with rustfmt and clippy
-        shell: bash
-        run: |
-          toolchain=$(python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())["toolchain"]["channel"])')
-          rustup toolchain install "$toolchain" --profile minimal --component rustfmt --component clippy
-          rustc --version
-      - name: Format, lint, test, and build all PyO3 extensions
-        shell: bash
-        run: |
-          PYO3_PYTHON=$(python -c 'import sys; print(sys.executable)')
-          export PYO3_PYTHON
-          for crate in subcore-rs persian-lint-rs markup-rs; do
-            (
-              cd "rust/$crate"
-              cargo fmt --check
-              cargo clippy --locked --lib -- -D warnings
-              cargo test --locked --no-default-features --lib
-              cargo build --locked --release
-            )
-          done
-      - name: Stage native extensions using this interpreter's ABI suffix
-        shell: bash
-        run: python tests/stage_native.py
-      - name: Run Python contracts with mandatory native parity
-        env:
-          REVAYAT_REQUIRE_NATIVE: '1'
-          REVAYAT_DISABLE_RUST: '0'
-        run: python -X utf8 -m pytest tests/ --ignore=tests/test_subsync.py -q
+          filters=$(ffmpeg -hide_banner -filters)
+          grep -Eq '[[:space:]]ass[[:space:]]' <<< "$filters"
+          cargo test --workspace --locked
+
   repo-hygiene:
-    name: Repo hygiene and code metrics
-    runs-on: ubuntu-latest
-    timeout-minutes: 6
+    name: Repo hygiene & code metrics
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.14'
-      - name: Check Python syntax, file-size ceiling, and Rust share
+          fetch-depth: 0
+      - name: Check tracked files, toolchain, and plugin versions
         shell: bash
         run: |
-          python -X utf8 -m compileall -q skills install tests evaluation
-          python -X utf8 - <<'PY'
-          import pathlib, subprocess, sys
-          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
-          oversized = []
-          py_bytes = rs_bytes = 0
-          for rel in tracked:
-              p = pathlib.Path(rel)
-              if not p.is_file():
-                  continue
-              if p.suffix == ".py":
-                  py_bytes += p.stat().st_size
-              elif p.suffix == ".rs":
-                  rs_bytes += p.stat().st_size
-              if p.suffix in (".py", ".rs"):
-                  lines = len(p.read_text(encoding="utf-8").splitlines())
-                  if lines > 800:
-                      oversized.append((rel, lines))
-          if oversized:
-              print("Oversized files (>800 lines):", oversized, file=sys.stderr)
-              sys.exit(1)
-          total = py_bytes + rs_bytes
-          share = (rs_bytes / total * 100.0) if total else 0.0
-          print(f"Rust code bytes: {rs_bytes} / {total} ({share:.1f}%)")
-          if share < 20.0:
-              print("Rust code share below 20% threshold", file=sys.stderr)
-              sys.exit(1)
-          PY
+          tracked_scripts=$(git ls-files '*.py' '*.ps1' '*.sh')
+          if [[ -n "$tracked_scripts" ]]; then
+            printf 'Unexpected tracked scripts:\n%s\n' "$tracked_scripts" >&2
+            exit 1
+          fi
+          git ls-files -z -- '*.rs' | (
+            failed=0
+            while IFS= read -r -d '' path; do
+              lines=$(awk 'END { print NR }' < "$path")
+              if (( lines > 800 )); then
+                printf '%s: %s lines exceeds 800\n' "$path" "$lines" >&2
+                failed=1
+              fi
+            done
+            exit "$failed"
+          )
+          awk '
+            /^[[:space:]]*\[/ { toolchain = ($0 ~ /^[[:space:]]*\[toolchain\][[:space:]]*$/) }
+            toolchain && /^[[:space:]]*channel[[:space:]]*=[[:space:]]*"1\.100\.0"[[:space:]]*(#.*)?$/ { pinned = 1 }
+            END { exit !pinned }
+          ' rust-toolchain.toml || { printf '%s\n' 'Expected Rust 1.100.0 in rust-toolchain.toml.' >&2; exit 1; }
+          for manifest in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json .cursor-plugin/plugin.json .antigravity-plugin/plugin.json; do
+            jq -e '.version == "3.0.0"' "$manifest" > /dev/null || {
+              printf '%s: expected plugin version 3.0.0\n' "$manifest" >&2
+              exit 1
+            }
+          done
+      - name: Check whitespace in the validated changes
+        shell: bash
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) base=$(jq -er '.pull_request.base.sha' "$GITHUB_EVENT_PATH") ;;
+            merge_group) base=$(jq -er '.merge_group.base_sha' "$GITHUB_EVENT_PATH") ;;
+            push) base=$(jq -er '.before' "$GITHUB_EVENT_PATH") ;;
+            *) base=$(git rev-parse --verify HEAD^ 2>/dev/null || git hash-object -t tree /dev/null) ;;
+          esac
+          if [[ "$base" == 0000000000000000000000000000000000000000 ]]; then
+            base=$(git hash-object -t tree /dev/null)
+          fi
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]]
+          git diff --check "$base" HEAD --
+
   required:
     name: CI required
     if: always()
-    needs: [workflow-lint, check, pytest-suite, plugin-manifests, v2-pipeline, rust-subsync, rust-crates, repo-hygiene]
-    runs-on: ubuntu-latest
+    needs: [workflow-lint, rust, repo-hygiene]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     timeout-minutes: 2
     steps:
-      - name: Require every validation lane to pass
+      - name: Require every validation job to pass
+        shell: bash
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          python3 - <<'PY'
-          import json
-          import logging
-          import os
-          import sys
-          logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
-          results = json.loads(os.environ["JOB_RESULTS"])
-          failed = [name for name, value in results.items() if value["result"] != "success"]
-          if failed:
-              logging.error("Required validation lanes did not pass: %s", ", ".join(sorted(failed)))
-              sys.exit(1)
-          logging.info("All %d validation lanes passed for this revision", len(results))
-          PY
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$JOB_RESULTS"
+          jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$JOB_RESULTS" > /dev/null

@@ -1,0 +1,43 @@
+[package]
+name = "revayat-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+caseless = "0.2.2"
+crc32fast = "1.5"
+encoding_rs = "0.8"
+fancy-regex = "0.20.2"
+flate2 = { version = "1.1.11", default-features = false, features = ["zlib-rs"] }
+hex = "0.4"
+html-escape = "0.3.1"
+idna = "1"
+indexmap = { version = "2", features = ["serde"] }
+jiff = "1"
+regex = "1"
+same-file = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "unbounded_depth"] }
+sha2 = "0.11"
+tempfile = "3.27"
+ttf-parser = { version = "0.25.1", default-features = false, features = ["std"] }
+unicode-bidi = "0.3.18"
+unicode-normalization = "0.1.26"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs", "bzip2", "lzma"] }
+
+[target.'cfg(windows)'.dependencies]
+process-wrap = { version = "11", default-features = false, features = ["std", "job-object", "creation-flags", "kill-on-drop"] }
+winsafe = { version = "0.0.29", default-features = false, features = ["kernel"] }
+
+[target.'cfg(unix)'.dependencies]
+process-wrap = { version = "11", default-features = false, features = ["std", "process-group"] }
+rustix = { version = "1.1", features = ["fs", "process"] }
+
+[dev-dependencies]
+proptest = "1.12"

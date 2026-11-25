@@ -1,16 +1,21 @@
 # Working files and commands
 
-The runtime requires Python 3.11+ and FFmpeg with libass. Python uses only the
-standard library. All text output is UTF-8; ASS uses logical Unicode, SRT numbering
-is regenerated, and source timestamps stay unchanged unless explicitly reviewed.
+Use the Rust `revayat-subtitle` CLI. Rendering requires FFmpeg with libass.
+All text output is UTF-8; ASS uses logical Unicode, SRT numbering is regenerated,
+and source timestamps stay unchanged unless explicitly reviewed.
 ASS output has 10 ms precision: SRT donor times are floored, original/reviewed/emitted
 values are recorded, and a conversion that collapses duration is refused.
+
+After intake, follow the [mandatory six-stage workflow and copy-ready prompts](multi-agent-workflow.md):
+Initial Translation, Typesetting & Layout, Editorial Review, Translation Applier
+& Edition Builder, File Re-Check & Issue Fixer, then Final Review & Delivery.
+Use this reference for the worksheet, handoff and delivery contracts at every stage.
 
 ## Import and resume
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" doctor
-python "SKILL_DIR/scripts/revayat-subtitle.py" prepare "season.zip" --work "work/season02" --series "Series title" --season 2 --glossary "previous/glossary.json"
+revayat-subtitle doctor
+revayat-subtitle prepare "season.zip" --work "work/season02" --series "Series title" --season 2 --glossary "previous/glossary.json"
 ```
 
 Use `--target-language LANG` only for an explicitly requested non-Persian target.
@@ -37,8 +42,8 @@ and import again when a file needs a structural repair.
 ## Read-only status and editorial handoffs
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" status --work "WORK"
-python "SKILL_DIR/scripts/revayat-subtitle.py" handoff --work "WORK" --assignment "assignment.json" --result "proposal.json"
+revayat-subtitle status --work "WORK"
+revayat-subtitle handoff --work "WORK" --assignment "assignment.json" --result "proposal.json"
 ```
 
 Both return version-1 JSON without subtitle bodies: exit 0 means mechanically
@@ -100,8 +105,12 @@ paths, hashes and encodings. `episodes` starts empty to prevent guessed numberin
 This is an example of fields to edit, **not a replacement project file**. Every
 source is assigned exactly once. Use `remove` instead of `keep` only for requested
 embedded-font removal. If embedded fonts exist and no choice was supplied for the
-batch, ask the user and record the answer before delivery. Base ASS plus donor SRT remains ASS; SRT-only episodes remain
-SRT. Ordinary SRT italic/bold/underline/strike markup is adapted for ASS donors.
+batch, ask the user and record the answer before delivery. ASS is the default even
+for SRT-only input. For requested SRT delivery from an SRT base, pass
+`--output-format srt` at import or set `project.json.output_format` to `srt` before
+review and build. The builder refuses SRT from an ASS base because it would lose
+presentation. The workspace format keeps `status` and `build` on the same edition.
+The builder adapts ordinary SRT italic, bold, underline and strike markup for ASS.
 More complex donor markup is refused for deliberate adaptation.
 
 ## Glossary
@@ -142,9 +151,9 @@ literal `\N`; actual newline characters would corrupt its event format.
 ## Build, visual evidence and deliver
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" build --work "work/season02"
-python "SKILL_DIR/scripts/revayat-subtitle.py" render --build "BUILD" --episode S02E01 --all-cues
-python "SKILL_DIR/scripts/revayat-subtitle.py" render --build "BUILD" --episode S02OVA01 --video "ova.mkv" --fonts-dir "fonts"
+revayat-subtitle build --work "work/season02"
+revayat-subtitle render --build "BUILD" --episode S02E01 --all-cues
+revayat-subtitle render --build "BUILD" --episode S02OVA01 --video "ova.mkv" --fonts-dir "fonts"
 ```
 
 Build paths are derived from project, worksheet and glossary content. Keep the
@@ -183,7 +192,7 @@ bound; a timeout kills its owned process tree and blocks the command. A failed
 render preserves earlier evidence and any diagnostic images; it never marks success.
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" package --build "BUILD" --out "out/Sub.zip"
+revayat-subtitle package --build "BUILD" --out "out/Sub.zip"
 ```
 
 The ZIP must not already exist. It contains only `Sub/SxxEyy.ass` or `.srt`, and
@@ -191,7 +200,7 @@ OVA equivalents. Logs, source candidates, review JSON and glossary stay outside 
 Attach `BUILD/glossary.json` separately for continuity. `sync_verified: false` is
 intentional: generated frames alone do not establish audiovisual synchronization.
 
-Run `qa --build BUILD` for the same delivery checks without creating a ZIP.
+Run `revayat-subtitle qa --build "BUILD"` for the same checks without creating a ZIP.
 Every agent must also keep its own activity log beside the translated files,
 as required by `SKILL.md`; the helper execution logs below do not replace it.
 
@@ -212,9 +221,9 @@ RGB/RGBA profile, at most 64 MiB, 16 million pixels and 8,192 pixels per dimensi
 Provided fonts are limited to 128 files/64 MiB total/32 MiB each; videos to 16 GiB.
 Split oversized jobs deliberately; a limit refusal does not approve partial output.
 
-Parallel editorial work requires the user's batch consent. Follow
-[parallel-editorial.md](parallel-editorial.md) for disjoint assignments, separate
-worker logs, glossary revision checks and coordinator-owned integration.
+The six roles hand off work in sequence. Parallel assignments within a role still
+require the user's batch consent. Follow [parallel-editorial.md](parallel-editorial.md)
+for disjoint ranges, separate worker logs and glossary revision checks.
 
 Semantic editing and image inspection need a capable agent with filesystem, shell,
 web search and image-viewing access. Missing capabilities leave the relevant stage

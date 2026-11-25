@@ -26,9 +26,20 @@ For mixed Persian/Latin or Persian/number lines it also uses balanced U+202B RLE
 and U+202C PDF. RLM alone left word groups in the wrong order in actual libass
 renders. This embeds direction without reversing the logical string. Preserve
 valid isolates, including scopes crossing display lines; those lines receive marks
-without an extra embedding wrapper. Repair accidental overrides only in editable prose. For a
-difficult Latin phrase, test U+2066 LRI with U+2069 PDI in the real renderer.
-Never use U+202E RLO as a substitute for correct logical text.
+without an extra embedding wrapper. Repair accidental overrides only in editable prose.
+
+When a Persian display line starts with a Latin or English word, an acronym, or a
+number-plus-Latin token, put Right-to-Left Isolate (`RLI`, `U+2067`) before the
+line's readable text and Pop Directional Isolate (`PDI`, `U+2069`) after the
+last character, including any trailing punctuation. If the renderer infers
+paragraph direction and needs an RTL base, put Right-to-Left Mark (`RLM`,
+`U+200F`) immediately before `RLI`, outside the isolate.
+Use the actual Unicode characters outside markup. Check word order and trailing
+punctuation in the target renderer (libass, VLC, mpv, or the web player). The
+punctuation should stay with the sentence; the left edge can be correct for RTL.
+
+For a difficult Latin phrase within a line, test `U+2066` LRI with `U+2069` PDI
+in the real renderer. Never use `U+202E` RLO to fix logical word order.
 
 ## Punctuation and quotation scope
 
@@ -59,6 +70,14 @@ This adapts the protected-token and idempotence checks in the MIT-licensed
 to subtitle structure; its linter and automatic numeral/unit conversions are not
 part of this workflow. Source evidence and the approved glossary decide meaning.
 
+## Bold and italic emphasis
+
+Keep intentional source emphasis on the corresponding Persian words. In ASS,
+use complete overrides such as `{\i1}...{\i0}` and `{\b1}...{\b0}`. Close every
+override block and restore the previous style at the end of the emphasized span.
+In SRT, keep `<i>...</i>` and `<b>...</b>` balanced and correctly nested. Flag any
+emphasis the target format or player cannot retain; never strip it silently.
+
 ## ASS styles and fonts
 
 Preserve positioning, animation, shadows and drawing data. Translate the readable
@@ -87,18 +106,18 @@ also show scene contrast, but neither alone certifies audiovisual synchronizatio
 Generating images is not the same as looking at them. A missing viewer or renderer
 leaves visual QA incomplete. [workflow.md](workflow.md) defines the review records.
 
-## Default v2.0 font, outline, line wrapping and punctuation anchoring
+## Default ASS font, outline, line wrapping and punctuation anchoring
 
-Default Persian ASS output uses bundled `B Koodak` (`assets/fonts/BKOODB.TTF`),
+The only bundled subtitle font is `B Koodak` (`assets/fonts/BKOODB.TTF`).
+Default Persian ASS uses it,
 passed automatically to FFmpeg/libass through `fontsdir`, with subtle black
 outline (`Outline=1.5`, `OutlineColour=&H00000000`) and subtle black shadow
 (`Shadow=0.8`, `BackColour=&H80000000`) unless overridden by user style options.
 
-To prevent video players (`libass`, VLC, mpv, PotPlayer) from moving trailing
-punctuation (`.`, `،`, `؟`, `!`, `…`, `:`, `؛`) to the first line when a long
-line auto-wraps, the text pipeline balances lines over 42 visible characters into
-explicit `\N` breaks (never splitting inside `{...}` override blocks or ZWNJ
-compounds) and anchors each physical RTL subline with `U+202B`...`U+202C` plus a
-trailing `U+200F` after terminal neutral punctuation. Tag-aware ZWNJ enforcement
+To keep terminal punctuation on its own line in libass and players such as VLC,
+mpv and PotPlayer, the text pipeline balances lines over 42 visible characters
+with explicit `\N` breaks. It does not split override blocks or ZWNJ compounds.
+It wraps each physical RTL line in `U+202B` and `U+202C` and puts `U+200F` after
+terminal neutral punctuation, before `U+202C`. Tag-aware ZWNJ enforcement
 normalizes `می‌`/`نمی‌`, `‌ها`/`‌های`, `‌تر`/`‌ترین`, and heh-final enclitics without
 altering tags or Latin spans.

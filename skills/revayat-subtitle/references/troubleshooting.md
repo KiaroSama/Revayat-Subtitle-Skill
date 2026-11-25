@@ -29,7 +29,7 @@ pending cue. Reuse completed decisions and the established series identity.
 If only visual review is pending, inspect those images. If text changes, follow
 the new build path printed by `build`; old reviews belong to old bytes.
 
-`qa --build BUILD` runs the delivery checks without creating a ZIP or changing
+`revayat-subtitle qa --build "BUILD"` checks delivery without creating a ZIP or changing
 editorial approvals. A failure is a finding, not an instruction to delete data.
 After a render timeout, inspect the failure and any diagnostic images before retrying;
 each FFmpeg child is bounded to 45 seconds and a timeout is not success.
@@ -40,7 +40,7 @@ budget and output cap still apply independently.
 
 ## Installer process interruption
 
-Python 3.11+ is required; prefer a currently upstream-maintained stable runtime.
+Use the Rust `revayat-subtitle install` command for installation and recovery.
 New standard-agent backups/journals live in the first selected agent root's
 `revayat-recovery/`, outside its `skills/`. A custom `--destination` requires
 explicit `--recovery-dir` outside all configured skill/plugin discovery roots on
@@ -61,7 +61,7 @@ fit the bounded complete inventory (10,000 entries, 16 MiB/file, 256 MiB total),
 or installation refuses before moving old targets. Journal size is at most16 MiB.
 
 ```text
-python install/install.py --recover "RECOVERY/transaction-ID/journal.json" --recovery-dir "RECOVERY"
+revayat-subtitle install --recover "RECOVERY/transaction-ID/journal.json" --recovery-dir "RECOVERY"
 ```
 
 Explicit recovery restores the complete old trees or original absence only for
@@ -82,8 +82,8 @@ Collisions receive a suffix. Entries use UTC `[timestamp] [LEVEL] [COMPONENT] Me
 Logs contain stage progress, error types and exit status, never subtitle bodies.
 `REVAYAT_LOG_LEVEL` accepts DEBUG, INFO (default), WARNING, ERROR and CRITICAL.
 DEBUG adds bounded lifecycle diagnostics. Invalid levels fail without echoing their
-contents. Native installer bootstrap logs cover missing Python; Windows supervisors
-also record their target's actual failure status. Automatic log deletion is disabled.
+contents. Windows supervisors record their target's actual failure status.
+Automatic log deletion is disabled.
 Inspect local path information
 before sharing logs and remove old files when no longer needed.
 

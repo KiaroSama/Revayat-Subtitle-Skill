@@ -8,7 +8,7 @@ Resume `revayat-subtitle` at **$ARGUMENTS** (default `work/`).
 Load the skill and its translation policy again. First run the read-only overview:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" status --work "WORK"
+revayat-subtitle status --work "WORK"
 ```
 
 Version-1 JSON uses exit 0 for mechanical completion, 1 for valid pending work and
@@ -26,14 +26,15 @@ For parallel work, read `references/parallel-editorial.md`: retain an explicit b
 choice, or ask before dispatch. Reconcile saved worker IDs, source/glossary revisions
 and disjoint ranges before retrying missing work; stop abandoned workers first.
 
-Continue from the corresponding numbered step in `SKILL.md`. Keep completed
+Continue with the first incomplete role in the [six-stage workflow](../skills/revayat-subtitle/references/multi-agent-workflow.md).
+Keep completed
 decisions and original cue IDs. `prepare` creates a new workspace and must not
 be run over this one. A sequel loads the previous glossary before any translation.
 
 For a completed build, check which delivery work remains:
 
 ```text
-python "SKILL_DIR/scripts/revayat-subtitle.py" qa --build "BUILD"
+revayat-subtitle qa --build "BUILD"
 ```
 
 Fix an incomplete worksheet in the worksheet, then build again. A changed build

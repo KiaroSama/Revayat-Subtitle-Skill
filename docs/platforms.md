@@ -1,43 +1,46 @@
 # Platform references
 
-Discovery paths and five plugin manifest formats were re-checked against current
-official documentation and `cloudflare/skills` on 2026-11-24. Distribution
-compatibility is not a claim that every host application was installed or exercised.
-A skill must run with the host's filesystem, shell, web and image-viewing permissions.
+## Supported platforms
 
-| Host | Official references |
-| --- | --- |
-| Claude Code | [Skills](https://code.claude.com/docs/en/skills), [Plugins](https://code.claude.com/docs/en/plugins-reference) |
-| Codex | [Skills](https://learn.chatgpt.com/docs/build-skills), [Plugins](https://learn.chatgpt.com/docs/build-plugins) |
-| Cursor | [Skills](https://cursor.com/docs/skills), [Plugins](https://cursor.com/docs/plugins) |
-| Kiro | [Skills](https://kiro.dev/docs/skills/), [Powers](https://kiro.dev/docs/powers/) |
-| Cline | [Skills](https://docs.cline.bot/customization/skills) |
-| Hermes | [Skills and trust](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills), [Plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins) |
-| OpenCode | [Skills](https://opencode.ai/docs/skills/) |
-| Antigravity IDE | [Skills](https://www.antigravity.google/docs/ide/skills/), [Plugins](https://www.antigravity.google/docs/ide/plugins/) |
-| Antigravity CLI | [CLI plugins and skills](https://www.antigravity.google/docs/cli/plugins/) |
+Revayat Subtitle `3.0.0` builds from Rust `1.100.0`, edition `2024`. The [CI workflow](../.github/workflows/ci.yml) and [release workflow](../.github/workflows/release.yml) target these 64-bit platforms only:
 
-The repository ships all five plugin manifest formats at version `2.0.0`, registering
-both `revayat-subtitle` and `revayat-subtitle-sync`:
+| OS | Architecture | Rust target | Local binaries |
+| --- | --- | --- | --- |
+| Windows | x64 | `x86_64-pc-windows-msvc` | `bin/revayat-subtitle.exe`, `bin/subsync.exe` |
+| Windows | arm64 | `aarch64-pc-windows-msvc` | `bin/revayat-subtitle.exe`, `bin/subsync.exe` |
+| Linux | x64 | `x86_64-unknown-linux-gnu` | `bin/revayat-subtitle`, `bin/subsync` |
+| Linux | arm64 | `aarch64-unknown-linux-gnu` | `bin/revayat-subtitle`, `bin/subsync` |
 
-- **Claude Code:** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (skills and four Markdown commands).
-- **Cursor:** `.cursor-plugin/plugin.json` and `.cursor-plugin/marketplace.json` (skills and four Markdown commands).
-- **Codex:** `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` (`./skills/` discovery).
-- **Antigravity:** `.antigravity-plugin/plugin.json` (skills and suggested prompts; Antigravity ignores `commands/`).
-- **Agent Plugins 1.0.0:** root `plugin.json` (convention discovery under `skills/`).
+The [source build instructions](../README.md#build-from-source) use PowerShell 7 on Windows and a POSIX shell on Linux. For media work, put `ffmpeg` and `ffprobe` on `PATH`. Use FFmpeg with libass and the `subtitles` filter for rendering. The project bundles the `B Koodak` subtitle font and does not bundle FFmpeg. See [verification scope](verification.md) for which checks run on each target.
 
-The installer supports a destination override for managed installations and future path
-changes. The installer requires Python 3.11 or newer (verified on 3.13.15).
-Rust 1.100.0 builds the
-`rust/subsync-rs` audio-to-subtitle synchronization CLI and the optional PyO3
-accelerators (`rust/subcore-rs`, `rust/persian-lint-rs`, and `rust/markup-rs`). Older
-dated 3.10 verification records remain historical, not current support.
+## Agent installation
 
-Standard agent installations place new recovery state in the first selected
-agent root's `revayat-recovery/`, outside skills/plugin discovery. Custom
-`--destination` requires explicit same-filesystem `--recovery-dir`; configure it
-outside every host scan, not merely a hidden sibling. Existing backups remain
-untouched. One retained native nonblocking lock under
-`~/revayat-install-state/` serializes same-account installs/recovery across all
-destinations/recovery roots. It is not cross-account or network-filesystem
-certification. See [recovery](../skills/revayat-subtitle/references/troubleshooting.md#installer-process-interruption).
+Run the installer from a checkout of the matching release. It reads the skill tree, commands, and manifests from the checkout. Run `revayat-subtitle install --dry-run` to see the destinations, then `revayat-subtitle install` to copy the skills into existing user roots. Use `--agent NAME` to select a host or `--agent NAME --scope project --path PATH` for an explicit project install. Reload the host after installing and make both binaries available on its `PATH`.
+
+| Host | User skills | Project skills | Host documentation |
+| --- | --- | --- | --- |
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` | [Skills](https://code.claude.com/docs/en/skills), [Plugins](https://code.claude.com/docs/en/plugins-reference) |
+| Codex | `~/.agents/skills/` | `.agents/skills/` | [Skills](https://learn.chatgpt.com/docs/build-skills), [Plugins](https://learn.chatgpt.com/docs/build-plugins) |
+| Cursor | `~/.cursor/skills/` | `.cursor/skills/` | [Skills](https://cursor.com/docs/skills), [Plugins](https://cursor.com/docs/plugins) |
+| Kiro | `~/.kiro/skills/` | `.kiro/skills/` | [Skills](https://kiro.dev/docs/skills/), [Powers](https://kiro.dev/docs/powers/) |
+| Cline | `~/.cline/skills/` | `.cline/skills/` | [Skills](https://docs.cline.bot/customization/skills) |
+| Hermes | `~/.hermes/skills/` | `.hermes/skills/` | [Skills and trust](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills), [Plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins) |
+| OpenCode | `~/.config/opencode/skills/` | `.opencode/skills/` | [Skills](https://opencode.ai/docs/skills/) |
+| Antigravity IDE | `~/.gemini/antigravity/skills/` | `.agents/skills/` | [Skills](https://www.antigravity.google/docs/ide/skills/), [Plugins](https://www.antigravity.google/docs/ide/plugins/) |
+| Antigravity CLI (`antigravity-cli`) | `~/.gemini/antigravity-cli/skills/` | `.agents/skills/` | [CLI plugins and skills](https://www.antigravity.google/docs/cli/plugins/) |
+
+The installer puts new recovery data in the first selected agent root's `revayat-recovery/`, outside skill discovery. When setting `--destination`, pass `--recovery-dir` on the same filesystem and outside every configured skill or plugin discovery root. A single OS lock under `~/revayat-install-state/` serializes installs and recovery for the same account. This does not certify cross-account or network-filesystem use. Existing backups stay in place. See [interrupted installation recovery](../skills/revayat-subtitle/references/troubleshooting.md#installer-process-interruption).
+
+## Plugin manifests
+
+The five manifest formats share the `3.0.0` skill tree and provide `revayat-subtitle` and `revayat-subtitle-sync`:
+
+- Claude Code: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (skills and four Markdown commands).
+- Cursor: `.cursor-plugin/plugin.json` and `.cursor-plugin/marketplace.json` (skills and four Markdown commands).
+- Codex: `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` (discovery under `skills/`).
+- Antigravity: `.antigravity-plugin/plugin.json` (skills and suggested prompts; Antigravity ignores `commands/`).
+- Agent Plugins 1.0: root `plugin.json` (discovery under `skills/`).
+
+To prepare a local plugin bundle, use `revayat-subtitle install --plugin --destination "PATH/revayat-subtitle" --recovery-dir "PATH/recovery"`. Keep the recovery path outside discovery and on the same filesystem as the destination.
+
+An install path or manifest describes how a host discovers the skill. It does not establish that the workflow has run inside every listed host. The host needs permission to read and write the selected workspace, run the CLI, research terminology, and view images for visual review.
