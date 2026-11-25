@@ -615,11 +615,16 @@ fn release_validation_is_scoped_to_its_run() -> Result<()> {
     let release = workflow("release")?;
     for token in [
         "validation_id: ${{ github.run_id }}",
-        "needs: validate",
+        "  secret_scan:\n    permissions:\n      contents: read\n    uses: ./.github/workflows/gitleaks.yml",
+        "  build:\n    name: Build release (${{ matrix.name }})\n    needs: [validate, secret_scan]",
+        "  sign_and_publish:\n    name: Sign and publish release\n    needs: [build, secret_scan]",
         "cancel-in-progress: false",
     ] {
-        assert!(release.contains(token));
+        assert!(release.contains(token), "missing release control: {token}");
     }
+    let scan = workflow("gitleaks")?;
+    assert!(scan.contains("\n  workflow_call:"));
+    assert!(scan.contains("workflow_dispatch|workflow_call)\n              log_opts+=' --all'"));
     Ok(())
 }
 
@@ -632,6 +637,9 @@ fn release_binds_tag_to_workspace_plugins_and_both_binary_versions() -> Result<(
         "all(.[]; .version == $version)",
         "'.version == $version' \"$manifest\"",
         "\"$binary\" --version",
+        "git ls-files -- ':(glob)**/marketplace.json'",
+        "if has(\"version\") then .version == $version else true end",
+        ".plugins | type == \"array\" and length > 0 and all(.[]; .version == $version)",
     ] {
         assert!(
             release.contains(required),
@@ -710,6 +718,11 @@ fn english_readme_badges_are_distinct_and_synchronized() -> Result<()> {
 }
 #[test]
 fn persian_readme_badges_are_distinct_and_synchronized() -> Result<()> {
+    let readme = text("README.fa.md")?;
+    assert!(readme.contains("<a id=\"releases-and-tags\"></a>\n\n## "));
+    assert!(readme.lines().any(|line| {
+        line.contains("/github/v/tag/") && line.ends_with(")](#releases-and-tags)")
+    }));
     badges("README.fa.md")
 }
 
@@ -735,17 +748,31 @@ fn persian_readme_keeps_required_ending_sections() -> Result<()> {
 #[test]
 fn generated_build_and_private_state_paths_are_ignored() -> Result<()> {
     let ignore = text(".gitignore")?;
-    let entries: BTreeSet<_> = ignore.lines().map(str::trim).collect();
-    for required in [
+    let universal = [
         "/.ai/",
         "/.specify/",
         "/specs/",
-        "/graphify-out/",
-        "/bin/",
-        "/target/",
         "/secrets.md",
-    ] {
-        assert!(entries.contains(required), "missing ignore rule {required}");
-    }
+        "/explain-AI.md",
+        "/reference.md",
+        "/CLAUDE.md",
+        "/AGENTS.md",
+        "/.agents/",
+        "/.claude/",
+        "/.kiro/",
+        "/.codex/",
+        "/.cursor/",
+        "/.cline/",
+        "/graphify-out/",
+        "/.codebase-memory/",
+        "/plans/",
+        ".ignoreme",
+        "**/.ignoreme",
+    ];
+    assert!(ignore.lines().take(universal.len()).eq(universal));
+    let rust = ["# Rust", "/target/", "**/target/", "/bin/"];
+    let entries: Vec<_> = ignore.lines().collect();
+    assert!(entries.windows(rust.len()).any(|block| block == rust));
+    assert!(!ignore.lines().any(|entry| entry.starts_with("/rust/*")));
     Ok(())
 }

@@ -7,7 +7,7 @@
 [![GitHub Actions CI](https://img.shields.io/github/actions/workflow/status/KiaroSama/Revayat-Subtitle-Skill/ci.yml?style=flat-square&label=CI&color=1d4ed8)](.github/workflows/ci.yml)
 [![Repository license](https://img.shields.io/github/license/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=2563eb)](LICENSE)
 [![Latest published release](https://img.shields.io/github/v/release/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&color=ea580c)](https://github.com/KiaroSama/Revayat-Subtitle-Skill/releases)
-[![Latest Git tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&label=Tag&color=c2410c)](#انتشارها-و-تگها)
+[![Latest Git tag](https://img.shields.io/github/v/tag/KiaroSama/Revayat-Subtitle-Skill?style=flat-square&label=Tag&color=c2410c)](#releases-and-tags)
 [![Rust workspace tests](https://img.shields.io/badge/Tests-Rust%20Workspace-0d9488?style=flat-square)](#verification)
 [![Pinned Rust version](https://img.shields.io/badge/Rust-1.100.0-8b5cf6?style=flat-square)](rust-toolchain.toml)
 [![64-bit Windows and Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20(64--bit)-0891b2?style=flat-square)](docs/platforms.md#supported-platforms)
@@ -230,6 +230,8 @@ cargo test --workspace --locked
 - ‏⁧`skills/` و `commands/`: دستورهای ایجنت، راهنمای گردش کار و لحن، و فایل‌های همراه.⁩
 - ‏⁧`docs/`: راهنمای پلتفرم‌ها، آزمون‌ها و اعتبارسنجی امضا.⁩
 - ‏⁧`bin/`: برنامه‌هایی که روی دستگاه خود می‌سازید و در Git ثبت نمی‌شوند.⁩
+
+<a id="releases-and-tags"></a>
 
 ## ‏⁧انتشارها و تگ‌ها⁩
 

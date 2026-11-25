@@ -1,4 +1,6 @@
 /.ai/
+/.specify/
+/specs/
 /secrets.md
 /explain-AI.md
 /reference.md
@@ -12,6 +14,7 @@
 /.cline/
 /graphify-out/
 /.codebase-memory/
+/plans/
 .ignoreme
 **/.ignoreme
 /.scratch/
@@ -40,16 +43,13 @@ Thumbs.db
 !/.env.template
 !/.env.dist
 
-/.specify/
-/specs/
-/plans/
-
 # Local real-media test samples (kept in project folder, excluded from public Git)
 /samples/
 
 # Rust
 /target/
 **/target/
+/bin/
 /debug/
 **/*.rs.bk
 *.pdb
@@ -69,12 +69,5 @@ perf.data
 perf.data.old
 /criterion/
 *.pyd
-/rust/*/.rust-anything/
-/rust/*/rust-anything.json
-/rust/*/recorded-from.json
-/rust/*/shadow/
-/rust/*/cases.jsonl
-/rust/*/extra-inputs.jsonl
-/bin/
 /.signing/
 /real test/

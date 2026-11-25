@@ -6,6 +6,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      scan_id:
+        type: string
+        default: ''
   schedule:
     - cron: '3 4 * * 3'
 
@@ -13,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: gitleaks-${{ github.workflow }}-${{ github.ref }}
+  group: gitleaks-${{ github.workflow }}-${{ github.ref }}-${{ inputs.scan_id || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -69,7 +74,7 @@ jobs:
               log_opts+=" $base..$head"
               scope='Pull request commits and merge diffs'
               ;;
-            push|schedule|workflow_dispatch)
+            push|schedule|workflow_dispatch|workflow_call)
               log_opts+=' --all'
               scope='All fetched history and merge diffs'
               ;;
