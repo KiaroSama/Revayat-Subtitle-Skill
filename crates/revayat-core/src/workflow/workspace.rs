@@ -655,9 +655,9 @@ mod tests {
         let name = std::ffi::OsStr::new("staging");
         let result = create_staging(&parent, name, || {
             assert!(root.path().join(name).is_dir());
-            Err(Errno::ACCES)
+            Err(Errno::ACCESS)
         });
-        assert!(matches!(result, Err(Errno::ACCES)));
+        assert!(matches!(result, Err(Errno::ACCESS)));
         assert!(matches!(
             statat(&parent, name, AtFlags::SYMLINK_NOFOLLOW),
             Err(Errno::NOENT)
