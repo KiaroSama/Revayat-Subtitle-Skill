@@ -5,6 +5,8 @@ use fancy_regex::{Captures, Match, Regex, RegexOptionsBuilder};
 use serde_json::{Map, Value, json};
 use std::sync::OnceLock;
 
+mod style;
+
 const PL: &str = "ء-يٮ-ەۺ-ۼۿ";
 const PLD: &str = "ء-يٮ-ەۺ-ۼۿ\u{064b}-\u{0652}\u{0670}";
 const AR: &str = "ء-يٮ-ەۺ-ۼۿ۰-۹٠-٩\u{200c}";
@@ -277,7 +279,9 @@ pub fn normalize(text: Value, digits: String) -> Result<Value, String> {
         {
             bump("digits_to_persian", persian_digits(&mut line)?);
         }
-        sub!(line, r"(?<=[۰-۹])%", "٪", "percent_to_persian");
+        // A digit cannot be another match's trailing percent, so consuming and
+        // restoring it preserves adjacent conversions without a lookbehind VM.
+        sub!(line, r"([۰-۹])%", "${1}٪", "percent_to_persian");
         bump("comma_to_persian", punctuation(&mut line, ',', '،', pl));
         bump("semicolon_to_persian", punctuation(&mut line, ';', '؛', pl));
         bump(
@@ -404,55 +408,6 @@ const MI_WORDS: &str = "میز میزان میزبان میان میانه می�
     میکروسکوپ میکروفر میلیمتر میلی‌متر میانی میدانها میوه‌ها میزها میلها میخها
     میسر میکائیل میناب میامی میگل میلان میکل میکی میترا میثاق‌نامه";
 
-const STYLE_FLAGS: &[(&str, &str)] = &[
-    (r"می‌باشد|می‌باشند|میباشد", "«می‌باشد» -> «است / هستند»"),
-    (
-        r"می‌گردد|می‌گردند",
-        "«می‌گردد» as a passive helper -> «می‌شود» or an active verb",
-    ),
-    (
-        r"مورد\s+\S+\s+قرار\s+(?:می‌گیرد|گرفت|گرفته|داد|می‌دهد)",
-        "«مورد … قرار گرفتن» -> plain verb (استفاده می‌شود، بررسی کردند)",
-    ),
-    (r"\bدارای\b", "«دارای X است» -> «X دارد»"),
-    (
-        r"\bتوسط\b",
-        "«توسط» agent passive -> active sentence (او نوشت)",
-    ),
-    (
-        r"\bبه عنوان\b|\bبه‌عنوان\b",
-        "«به عنوان» is often a calque of English 'as'; try dropping it",
-    ),
-    (
-        r"\bبه منظور\b|\bبه‌منظور\b|\bدر راستای\b|\bدر جهت\b",
-        "bureaucratic connector -> «برای»",
-    ),
-    (
-        r"لازم به ذکر است|شایان ذکر است|قابل ذکر است|قابل توجه است که",
-        "announcement filler; delete it and state the point",
-    ),
-    (
-        r"نه تنها .{0,60}? بلکه",
-        "«نه تنها … بلکه» is over-used by models; try a plain sentence",
-    ),
-    (
-        r"\bدر نهایت\b|\bدر پایان\b|\bبه طور کلی\b|\bدر مجموع\b",
-        "summary connector; usually delete",
-    ),
-    (
-        r"\bاین امر\b|\bاین موضوع\b|\bاین مسئله\b",
-        "abstract subject; name the concrete thing",
-    ),
-    (
-        r"\bایفا می‌کند\b|\bنقش (?:مهم|کلیدی|حیاتی)",
-        "«نقش مهمی ایفا می‌کند» is the Persian 'plays a crucial role'; say what it does",
-    ),
-    (
-        r"\bیک\s+\S+ی?\s+است\b",
-        "«یک X است» often calques English 'a'; Persian usually says «Xی است» or just «X است»",
-    ),
-];
-
 fn line_matches<'r, 't>(
     pattern: &'r Regex,
     text: &'t str,
@@ -516,35 +471,7 @@ pub fn suggestions(text: Value, style: bool) -> Result<Value, String> {
         }));
     }
     if style {
-        static STYLE: OnceLock<fancy_regex::Result<Vec<Regex>>> = OnceLock::new();
-        let patterns = STYLE
-            .get_or_init(|| {
-                STYLE_FLAGS
-                    .iter()
-                    .map(|(pattern, _)| compile(pattern))
-                    .collect()
-            })
-            .as_ref()
-            .map_err(regex_error)?;
-        for (pattern, (source, hint)) in patterns.iter().zip(STYLE_FLAGS) {
-            let mut report = |offset, found: Match<'_>| {
-                out.push(json!({
-                    "type": "style", "hint": hint,
-                    "context": context_at(&masked, offset + found.start(), offset + found.end(), 15, 15)
-                        .replace('\n', " ")
-                }));
-            };
-            if source.contains(r"\s+") {
-                // These phrases may span line breaks; the seek filter skips unrelated text.
-                for found in pattern.find_iter(&masked) {
-                    report(0, found.map_err(|e| regex_error(&e))?);
-                }
-            } else {
-                for (offset, found) in line_matches(pattern, &masked) {
-                    report(offset, found.map_err(|e| regex_error(&e))?);
-                }
-            }
-        }
+        out.extend(self::style::suggestions(&masked)?);
     }
     Ok(Value::Array(out))
 }

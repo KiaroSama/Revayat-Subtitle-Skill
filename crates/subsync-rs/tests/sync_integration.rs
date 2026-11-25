@@ -237,6 +237,82 @@ fn noisy_feature_length_timeline_keeps_unity_fps() {
     assert_eq!(report.fps_ratio, 1.0, "{report:?}");
 }
 
+#[test]
+fn duplicated_ass_tail_does_not_change_fps_or_visible_cue_timing() {
+    let ratio = 25.0 / 23.976;
+    let mut probability = vec![0.0_f32; 4500];
+    for &(start, end) in &SPEECH {
+        probability[start as usize / 10..end as usize / 10].fill(0.5);
+    }
+    for &(start, end) in &SPEECH {
+        let start = (start as f64 * ratio / 10.0).round() as usize;
+        let end = (end as f64 * ratio / 10.0).round() as usize;
+        for value in &mut probability[start..end] {
+            *value = (*value + 0.55).min(1.0);
+        }
+    }
+    let activity: Vec<_> = probability.iter().map(|&p| u8::from(p > 0.0)).collect();
+    let mut segments = Vec::new();
+    let mut index = 0;
+    while index < activity.len() {
+        if activity[index] == 0 {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        while index < activity.len() && activity[index] != 0 {
+            index += 1;
+        }
+        segments.push(TimeSpan {
+            start_ms: start as u64 * 10,
+            end_ms: index as u64 * 10,
+        });
+    }
+    let vad = VadResult {
+        frame_ms: 10,
+        duration_ms: 45_000,
+        probability,
+        activity,
+        segments,
+    };
+    let document = |tail_copies| {
+        let mut text = String::from("[Events]\nFormat: Start, End, Text\n");
+        for (start, end) in SPEECH
+            .into_iter()
+            .chain(std::iter::repeat_n((50_000, 51_000), tail_copies))
+        {
+            text.push_str(&format!(
+                "Dialogue: {},{},Dialogue\n",
+                ass_time(start),
+                ass_time(end)
+            ));
+        }
+        SubtitleDocument::parse(&text, None).unwrap()
+    };
+    let mut single = document(1);
+    let mut duplicated = document(100);
+    // Overlapping ASS rows represent the same capped activity, including outside the audio.
+    assert_eq!(
+        subsync_rs::align::build_subtitle_activity(&single.cues, 10_000, 10),
+        subsync_rs::align::build_subtitle_activity(&duplicated.cues, 10_000, 10)
+    );
+    let config = SyncConfig {
+        max_offset_ms: 0,
+        max_split_offset_ms: 0,
+        snap_ms: 0,
+        ..SyncConfig::default()
+    };
+    let first = sync_subtitles_with_vad(&mut single, &vad, &config).unwrap();
+    let repeated = sync_subtitles_with_vad(&mut duplicated, &vad, &config).unwrap();
+    assert_eq!(first.fps_ratio, ratio, "{first:?}");
+    assert_eq!(first.fps_ratio, repeated.fps_ratio, "{repeated:?}");
+    assert_eq!(first.global_offset_ms, repeated.global_offset_ms);
+    assert_eq!(
+        &single.cues[..SPEECH.len()],
+        &duplicated.cues[..SPEECH.len()]
+    );
+}
+
 const DIALOGUE: [(u64, u64); 6] = [
     (1520, 2470),
     (4990, 6370),

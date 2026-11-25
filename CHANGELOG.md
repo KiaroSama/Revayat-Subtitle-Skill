@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep optional Persian style lint working on long supported inputs and make FPS tail-energy scoring invariant to duplicate/overlapping ASS rows; retain exact Unicode matching and sparse, cancellable alignment in the [post-merge Rust recheck](docs/audit-rust-postmerge-2026-11-25.md).
+
 ## 3.0.1 (2026-11-25)
 
 - Close the Rust audit's R01-R27 findings across subtitle processing, sync, installation, and output validation.
