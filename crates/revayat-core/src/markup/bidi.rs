@@ -123,6 +123,29 @@ fn text_runs<'a>(text: &'a str, kind: &str) -> Result<Vec<Token<'a>>, String> {
 pub(crate) const RTL_ISOLATE: &str = "\u{200f}\u{2067}";
 pub(crate) const PDI: char = '\u{2069}';
 
+pub(crate) fn has_outer_rtl_isolate(mut text: impl Iterator<Item = char>) -> bool {
+    if text.next() != Some(RLM) || text.next() != Some('\u{2067}') {
+        return false;
+    }
+    let mut depth = 1;
+    while let Some(ch) = text.next() {
+        match ch {
+            '\u{2066}'..='\u{2068}' => depth += 1,
+            PDI => {
+                depth -= 1;
+                if depth == 0 {
+                    return text.next().is_none();
+                }
+            }
+            _ => (),
+        }
+        if depth > 125 {
+            return false;
+        }
+    }
+    false
+}
+
 pub(crate) fn starts_with_latin(mut text: impl Iterator<Item = char>) -> bool {
     let latin = pattern!(Regex, r"\A\p{Script=Latin}\z");
     text.find(|c| !python_space(*c) && !CONTROLS.contains(*c))
@@ -149,7 +172,14 @@ fn flush(
     if let (Some(&first), Some(&last)) = (indices.first(), indices.last())
         && (force || indices.iter().any(|&i| has_rtl(&line[i].1)))
     {
-        if rtl && line[first].1.starts_with(RTL_ISOLATE) && line[last].1.ends_with(PDI) {
+        if rtl
+            && has_outer_rtl_isolate(
+                line[first..=last]
+                    .iter()
+                    .filter(|(piece, _)| *piece == Text)
+                    .flat_map(|(_, value)| value.chars()),
+            )
+        {
             for (_, value) in line.drain(..) {
                 output.push_str(&value);
             }

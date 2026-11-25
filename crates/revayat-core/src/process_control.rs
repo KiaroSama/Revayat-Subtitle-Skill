@@ -6,16 +6,32 @@ use std::{
     io::{self, Read},
     path::Path,
     process::{Command, Output, Stdio},
-    sync::{Arc, Mutex, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
 
 const WALL_MAX: Duration = Duration::from_secs(86_400);
 const MAX_OUTPUT: usize = 256 * 1024 * 1024;
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Request cooperative cancellation without abandoning owned child processes.
+/// Executables install their own signal handler; embedded users retain control.
+pub fn request_cancel() {
+    CANCEL_REQUESTED.store(true, Ordering::Release);
+}
+
+pub fn cancel_requested() -> bool {
+    CANCEL_REQUESTED.load(Ordering::Acquire)
+}
 
 #[derive(Debug)]
 pub enum RunError {
+    Cancelled,
     Invalid(&'static str),
     Spawn(io::Error),
     Io(io::Error),
@@ -26,6 +42,7 @@ pub enum RunError {
 impl fmt::Display for RunError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cancelled => f.write_str("External tool cancelled; owned processes were stopped"),
             Self::Invalid(s) => f.write_str(s),
             Self::Spawn(e) | Self::Io(e) => e.fmt(f),
             Self::Timeout { wall, elapsed } => write!(
@@ -230,6 +247,9 @@ fn finish(
 }
 
 pub fn run_owned(command: &[String], options: &RunOptions<'_>) -> Result<Output, RunError> {
+    if cancel_requested() {
+        return Err(RunError::Cancelled);
+    }
     let idle = options.idle_timeout.unwrap_or(options.timeout);
     for (duration, message) in [
         (options.timeout, "timeout must be a finite positive number"),
@@ -305,6 +325,9 @@ pub fn run_owned(command: &[String], options: &RunOptions<'_>) -> Result<Output,
         let mut eof = 0;
         let mut size = 0;
         loop {
+            if cancel_requested() {
+                return Ok(Some(RunError::Cancelled));
+            }
             let progress = progress
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -348,6 +371,9 @@ pub fn run_owned(command: &[String], options: &RunOptions<'_>) -> Result<Output,
     })();
     drop(rx);
     let status = finish(&mut *child, readers).map_err(RunError::Io)?;
+    if cancel_requested() {
+        return Err(RunError::Cancelled);
+    }
     if let Some(error) = result.map_err(RunError::Io)? {
         return Err(error);
     }
@@ -430,6 +456,9 @@ pub fn run(
     };
     let output = match run_owned(&command, &options) {
         Ok(output) => output,
+        Err(RunError::Cancelled) => {
+            return Err("process_control.Cancelled: External tool cancelled".into());
+        }
         Err(RunError::Spawn(e)) if cfg!(windows) => {
             if e.raw_os_error() == Some(267) || cwd.is_some_and(|p| !p.is_dir()) {
                 return Err(format!("NotADirectoryError: {e}"));
@@ -448,8 +477,8 @@ pub fn run(
         }
         Err(RunError::Spawn(e) | RunError::Io(e)) => return Err(format!("OSError: {e}")),
         Err(RunError::Invalid(message)) => return Err(format!("ValueError: {message}")),
-        Err(RunError::Timeout { .. }) => {
-            return Err(format!("subprocess.TimeoutExpired: {timeout}"));
+        Err(error @ RunError::Timeout { .. }) => {
+            return Err(format!("subprocess.TimeoutExpired: {error}"));
         }
         Err(error @ RunError::Exit(_)) => {
             return Err(format!("process_control.ToolFailure: {error}"));

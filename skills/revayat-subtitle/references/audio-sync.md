@@ -1,9 +1,9 @@
 # Subtitle audio sync
 
-Run `revayat-subtitle sync` for the supervised route, or the standalone Rust `subsync` binary for direct alignment.
+Run `revayat-subtitle sync` for in-process alignment, add `--timeout 300` for a supervised whole-operation deadline, or use the standalone Rust `subsync` binary directly.
 
 ```text
-revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json"
+revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json" --timeout 300
 subsync --wav "episode-dialogue.wav" --in "original.ass" --out "aligned-from-wav.ass" --json-report "wav-report.json"
 ```
 
@@ -11,7 +11,13 @@ These are alternatives. Choose the one that fits the available media. See [FFmpe
 
 Video input needs FFmpeg. The binary asks FFmpeg for 16 kHz mono, signed 16-bit little-endian PCM and uses FFmpeg's automatic audio stream selection. To sync to a different track, supply its downmix as a mono 16-bit PCM WAV. Use `--wav` in place of `--video` for this and for offline tests. Choose fresh output paths in existing directories; the tool never overwrites source or destination files.
 
+Extraction uses `aresample=async=1:first_pts=0` to pad an initially delayed audio track and fill or trim material timestamp discontinuities. FFmpeg's normal container-start normalization stays enabled; a negative absolute container timestamp must not add a false delay. Raw PCM without this timestamp compensation would move delayed or gapped dialogue earlier than the picture. See the [FFmpeg resampler options](https://www.ffmpeg.org/ffmpeg-resampler.html) and [aresample filter](https://www.ffmpeg.org/ffmpeg-filters.html#aresample).
+
+Subtitle and WAV inputs must resolve to regular files. Subtitle input is limited to 32 MiB and WAV input to 1,342,181,376 bytes; reads also enforce the limit if a file grows after opening. Symlinks deliberately selected by the user may resolve to regular inputs. Directories, devices, and named pipes are refused before those reads. The engine still validates WAV structure, supported sample rates, positive cue durations, and bounded alignment timelines.
+
 The engine stages and flushes the complete subtitle and optional JSON report in their destination directories before publishing either path. A staging or write failure leaves those final names available for retry. Publication is exclusive for each individual file. If another writer claims the report name after staging, the subtitle may already have been committed; the error explicitly identifies that complete subtitle and preserves the other writer's report. Two different output paths are not an atomic transaction, so inspect that specific error before choosing a fresh report path.
+
+Ctrl+C requests cooperative cancellation. The executables stop and reap owned FFmpeg or worker processes before returning exit code `130`; detection and alignment also check cancellation between bounded work units. No new result is published after cancellation is observed. A cancellation between the two individual publications has the same explicit committed-subtitle boundary described above. Embedding the Rust library does not install signal handlers; a host may call `subsync_rs::request_cancel()` to request sticky, process-wide cancellation.
 
 ## How it estimates timing
 
@@ -33,7 +39,9 @@ The global search follows the [FFsubsync approach](https://github.com/smacke/ffs
 | `--snap-ms N` | `350` | Limit changes to cue starts to this distance from the aligned position. Use `0` to disable. |
 | `--no-fps-search` | off | Keep the original subtitle speed. |
 | `--json-report PATH` | stdout only | Also save the JSON report to a new file. |
-| `--timeout SECONDS` | `300` | Bound the supervised run. Use with `revayat-subtitle sync`, not standalone `subsync`. |
+| `--timeout SECONDS` | unset | Select supervision and bound the whole operation, including extraction, alignment and staging. Use with `revayat-subtitle sync`; allowed range is greater than 0 and at most 86400. Without this flag, in-process video extraction has a 300-second deadline. |
+| `--subsync PATH` / `--sibling-subsync` | in process | Select a compatible external executable. The supervised whole-operation deadline defaults to 300 seconds unless `--timeout` is supplied. |
+| `--ffmpeg-timeout SECONDS` | `300` | Standalone `subsync` only: bound FFmpeg extraction, not WAV processing or CPU alignment; greater than 0 and at most 86400. |
 
 ## What stays intact
 
@@ -44,6 +52,8 @@ CR, LF, CRLF and mixed line separators are preserved. A numbered or unnumbered S
 ## Check the result
 
 The report gives cue and speech segment counts, the FPS ratio, offset and split estimates, snapped cue count, and median and maximum start-time changes. `overlap_score_before` and `overlap_score_after` measure the fraction of cue time the detector marks as speech. They do not measure whether a line belongs to the person speaking.
+
+The supervised bridge validates the worker's JSON types and numeric bounds, contiguous split coverage, requested FPS and offset search limits, and agreement between input/output cue counts and the report's actual timing deltas. Duration cannot exceed the engine's 2^22-frame timeline, and speech segment count cannot exceed its number of 10 ms frames. Returned subtitles must parse as UTF-8 in the input format, preserve every byte outside timestamp fields after the parser's existing initial-BOM normalization, and keep SRT cues ordered without new overlap. These protocol failures are refused before either destination is published; both final paths remain available for a corrected retry. Compatible older helpers may omit optional path metadata, and additional report fields are retained. Executable overrides remain trusted programs with normal user permissions; this validation is a protocol check, not an execution sandbox or a certification of alignment quality.
 
 Silence and continuous detected activity both lack the timing anchors needed for alignment and are refused before output publication. A constant tone must not produce a successful FPS correction merely because every cue overlaps detected activity.
 

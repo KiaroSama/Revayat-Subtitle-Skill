@@ -13,6 +13,7 @@ pub(crate) struct StagedFile {
 
 impl StagedFile {
     pub(crate) fn publish(self) -> Result<(), SyncError> {
+        crate::check_cancelled()?;
         self.file
             .persist_noclobber(&self.destination)
             .map(|_| ())
@@ -29,6 +30,7 @@ pub(crate) fn stage_file(
     destination: &Path,
     write: impl FnOnce(&mut fs::File) -> io::Result<()>,
 ) -> Result<StagedFile, SyncError> {
+    crate::check_cancelled()?;
     match fs::symlink_metadata(destination) {
         Ok(_) => {
             return Err(SyncError::io(

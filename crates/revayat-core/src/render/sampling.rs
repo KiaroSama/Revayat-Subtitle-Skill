@@ -46,6 +46,11 @@ pub fn samples(doc: &Document, all_cues: bool, changed: &[i64]) -> Result<Vec<Va
     if cues.is_empty() {
         return Err(value_error("Render sampling requires at least one cue"));
     }
+    if doc.format().is_none() {
+        return Err(value_error(
+            "Render sampling requires an ASS or SRT document",
+        ));
+    }
     let (mut earliest, mut latest, mut ending) = (0, 0, 0);
     let mut styles = HashSet::new();
     let mut signatures = HashSet::new();
@@ -53,6 +58,8 @@ pub fn samples(doc: &Document, all_cues: bool, changed: &[i64]) -> Result<Vec<Va
     let mut animations = Vec::with_capacity(cues.len());
     let ass = doc.kind == "ass";
     for (index, cue) in cues.iter().enumerate() {
+        // Public callers can construct Document directly, bypassing the parser.
+        formats::document::effective_times(cue.start, cue.end, &doc.kind)?;
         if cue.start < cues[earliest].start {
             earliest = index;
         }
@@ -121,8 +128,12 @@ pub fn samples(doc: &Document, all_cues: bool, changed: &[i64]) -> Result<Vec<Va
         } else {
             &[0.5]
         };
+        let span = cue
+            .end
+            .checked_sub(cue.start)
+            .ok_or_else(|| value_error("Cue timing span exceeds the supported range"))?;
         for &fraction in fractions {
-            let seconds = (cue.start as f64 + (cue.end - cue.start) as f64 * fraction) / 1000.0;
+            let seconds = (cue.start as f64 + span as f64 * fraction) / 1000.0;
             let rounded = format!("{seconds:.4}")
                 .parse::<f64>()
                 .map_err(value_error)?;

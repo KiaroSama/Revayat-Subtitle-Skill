@@ -36,7 +36,7 @@ pub fn input_candidates(path: Value, excluded_root: Option<Value>) -> Result<Val
         import::input_candidates(&path, excluded.as_deref())?
             .iter()
             .map(|p| path_marker(p))
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>, _>>()?
     ))
 }
 
@@ -138,7 +138,7 @@ pub fn reviewed_cues(
 }
 
 pub fn merge_donor(
-    base: Value,
+    base: &mut Value,
     donor: Value,
     cues: Vec<Value>,
     source_id: String,
@@ -147,16 +147,18 @@ pub fn merge_donor(
     if cues.is_empty() {
         return Ok(Vec::new());
     }
-    let mut base: Document = decode("Document", base, "styles")?;
+    let mut updated: Document = decode("Document", base.clone(), "styles")?;
     let donor: Document = decode("Document", donor, "kind")?;
     let cues = cues
         .into_iter()
         .map(|cue| decode::<Cue>("Cue", cue, "fields"))
         .collect::<Result<Vec<_>, _>>()?;
-    review::donor(&mut base, &donor, cues, &source_id, keep_fonts)?
+    let merged = review::donor(&mut updated, &donor, cues, &source_id, keep_fonts)?
         .iter()
         .map(|cue| marked("Cue", cue))
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    *base = marked("Document", &updated)?;
+    Ok(merged)
 }
 
 pub fn assemble(work: Value, output_format: Option<String>) -> Result<Value, String> {

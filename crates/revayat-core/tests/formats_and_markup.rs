@@ -401,7 +401,7 @@ fn fingerprint_caps_are_checked_before_open() -> Check {
     let root = tempfile::tempdir().map_err(|e| e.to_string())?;
     let path = root.path().join("input.bin");
     err(
-        runtime::file_fingerprint(path_marker(&path), Some(-1)),
+        runtime::file_fingerprint(path_marker(&path)?, Some(-1)),
         "limit",
     );
     fs::write(&path, b"AB").map_err(|e| e.to_string())?;

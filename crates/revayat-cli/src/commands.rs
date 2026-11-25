@@ -219,14 +219,22 @@ fn supervise(timeout: f64, command: &[String]) -> Result<i32> {
     };
     match process_control::run_owned(command, &options) {
         Ok(output) => {
-            io::stdout().lock().write_all(&output.stdout)?;
-            io::stderr().lock().write_all(&output.stderr)?;
-            Ok(process_control::exit_code(&output))
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(&output.stdout)?;
+            stdout.flush()?;
+            let mut stderr = io::stderr().lock();
+            stderr.write_all(&output.stderr)?;
+            stderr.flush()?;
+            let status = process_control::exit_code(&output);
+            #[cfg(unix)]
+            let status = if status < 0 { 128 - status } else { status };
+            Ok(status)
         }
         Err(error @ RunError::Timeout { .. }) => {
             let _ = writeln!(io::stderr(), "ERROR: {}", redact(&error.to_string()));
             Ok(124)
         }
+        Err(RunError::Cancelled) => Ok(130),
         Err(error) => Err(error.into()),
     }
 }

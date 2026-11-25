@@ -4,6 +4,54 @@ use std::fmt::Write;
 
 // Edition IDs hash Python's JSON bytes, including spaces and exponent spelling.
 pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> {
+    dump_mode(value, sorted, ascii, true)
+}
+
+/// Serialize persisted JSON literally, without interpreting compatibility markers.
+pub fn dump_json(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> {
+    dump_mode(value, sorted, ascii, false)
+}
+
+fn compare_keys(left: &Value, right: &Value) -> Result<std::cmp::Ordering, String> {
+    use std::cmp::Ordering;
+    let integer = |value: &Value| {
+        value
+            .as_bool()
+            .map(i128::from)
+            .or_else(|| value.as_i64().map(i128::from))
+            .or_else(|| value.as_u64().map(i128::from))
+    };
+    let int_float = |integer: i128, float: f64| {
+        integer.cmp(&(float as i128)).then_with(|| {
+            if float.fract() == 0.0 {
+                Ordering::Equal
+            } else if float.is_sign_negative() {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        })
+    };
+    match (left, right) {
+        (Value::String(a), Value::String(b)) => Ok(a.cmp(b)),
+        (Value::Null, Value::Null) => Ok(Ordering::Equal),
+        _ => match (integer(left), integer(right), left.as_f64(), right.as_f64()) {
+            (Some(a), Some(b), _, _) => Ok(a.cmp(&b)),
+            (Some(a), None, _, Some(b)) => Ok(int_float(a, b)),
+            (None, Some(b), Some(a), _) => Ok(int_float(b, a).reverse()),
+            (None, None, Some(a), Some(b)) => a
+                .partial_cmp(&b)
+                .ok_or_else(|| value_error("Nonfinite dictionary key")),
+            _ => Err(format!(
+                "TypeError: '<' not supported between instances of '{}' and '{}'",
+                super::contract::python_type(left),
+                super::contract::python_type(right)
+            )),
+        },
+    }
+}
+
+fn dump_mode(value: &Value, sorted: bool, ascii: bool, bridge: bool) -> Result<String, String> {
     fn text(out: &mut String, value: &str, ascii: bool) -> Result<(), String> {
         let json = serde_json::to_string(value).map_err(value_error)?;
         for ch in json.chars() {
@@ -35,7 +83,13 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
         }
         Ok(())
     }
-    fn add(out: &mut String, value: &Value, sorted: bool, ascii: bool) -> Result<(), String> {
+    fn add(
+        out: &mut String,
+        value: &Value,
+        sorted: bool,
+        ascii: bool,
+        bridge: bool,
+    ) -> Result<(), String> {
         match value {
             Value::String(s) => text(out, s, ascii)?,
             Value::Number(n) if n.is_f64() => float(
@@ -48,11 +102,11 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
                     if i > 0 {
                         out.push_str(", ");
                     }
-                    add(out, item, sorted, ascii)?;
+                    add(out, item, sorted, ascii, bridge)?;
                 }
                 out.push(']');
             }
-            Value::Object(map) if map.len() == 1 && map.contains_key("$num") => {
+            Value::Object(map) if bridge && map.len() == 1 && map.contains_key("$num") => {
                 if map["$num"] != "-0" {
                     return Err(value_error(
                         "Out of range float values are not JSON compliant",
@@ -61,12 +115,16 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
                 out.push_str("-0.0");
             }
             Value::Object(map)
-                if map.len() == 1 && map.get("$int").and_then(Value::as_str).is_some() =>
+                if bridge
+                    && map.len() == 1
+                    && map.get("$int").and_then(Value::as_str).is_some() =>
             {
                 out.push_str(map["$int"].as_str().unwrap_or_default());
             }
             Value::Object(map)
-                if map.len() == 1 && map.get("$float").and_then(Value::as_str).is_some() =>
+                if bridge
+                    && map.len() == 1
+                    && map.get("$float").and_then(Value::as_str).is_some() =>
             {
                 float(
                     out,
@@ -78,15 +136,30 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
                 )?;
             }
             Value::Object(map)
-                if map.len() == 1 && map.get("$tuple").is_some_and(Value::is_array) =>
+                if bridge && map.len() == 1 && map.get("$tuple").is_some_and(Value::is_array) =>
             {
-                add(out, &map["$tuple"], sorted, ascii)?
+                add(out, &map["$tuple"], sorted, ascii, bridge)?
             }
             Value::Object(map)
-                if map.len() == 1 && map.get("$dict").is_some_and(Value::is_array) =>
+                if bridge && map.len() == 1 && map.get("$dict").is_some_and(Value::is_array) =>
             {
+                let mut pairs: Vec<_> = super::contract::items(&map["$dict"]).iter().collect();
+                if pairs
+                    .iter()
+                    .any(|pair| pair.as_array().is_none_or(|items| items.len() != 2))
+                {
+                    return Err(value_error("Dictionary marker requires key/value pairs"));
+                }
+                if sorted && let Some(first) = pairs.first() {
+                    for pair in &pairs {
+                        compare_keys(&first[0], &pair[0])?;
+                    }
+                    pairs.sort_by(|a, b| {
+                        compare_keys(&a[0], &b[0]).expect("validated comparable keys")
+                    });
+                }
                 out.push('{');
-                for (i, pair) in super::contract::items(&map["$dict"]).iter().enumerate() {
+                for (i, pair) in pairs.into_iter().enumerate() {
                     if i > 0 {
                         out.push_str(", ");
                     }
@@ -101,16 +174,18 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
                     if let Some(key) = key.as_str() {
                         raw.push_str(key);
                     } else {
-                        add(&mut raw, key, sorted, ascii)?;
+                        add(&mut raw, key, sorted, ascii, bridge)?;
                     }
                     text(out, &raw, ascii)?;
                     out.push_str(": ");
-                    add(out, &pair[1], sorted, ascii)?;
+                    add(out, &pair[1], sorted, ascii, bridge)?;
                 }
                 out.push('}');
             }
             Value::Object(map)
-                if map.len() == 1 && (map.contains_key("$bytes") || map.contains_key("$set")) =>
+                if bridge
+                    && map.len() == 1
+                    && (map.contains_key("$bytes") || map.contains_key("$set")) =>
             {
                 return Err(format!(
                     "TypeError: Object of type {} is not JSON serializable",
@@ -129,7 +204,7 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
                     }
                     text(out, key, ascii)?;
                     out.push_str(": ");
-                    add(out, item, sorted, ascii)?;
+                    add(out, item, sorted, ascii, bridge)?;
                 }
                 out.push('}');
             }
@@ -138,7 +213,7 @@ pub fn dump(value: &Value, sorted: bool, ascii: bool) -> Result<String, String> 
         Ok(())
     }
     let mut result = String::new();
-    add(&mut result, value, sorted, ascii)?;
+    add(&mut result, value, sorted, ascii, bridge)?;
     Ok(result)
 }
 

@@ -101,6 +101,65 @@ fn idle_cancellation_helper() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn compatibility_timeout(wall: f64, idle: f64, cause: &str) -> Result<(), Box<dyn Error>> {
+    let temp = tempfile::tempdir()?;
+    let command = vec![
+        std::env::current_exe()?
+            .to_str()
+            .ok_or("Non-UTF-8 test executable path")?
+            .to_owned(),
+        "--exact".into(),
+        IDLE_HELPER.into(),
+        "--nocapture".into(),
+    ];
+    let error = run(
+        command,
+        Some(json!({"$path": temp.path()})),
+        wall,
+        Some(idle),
+        None,
+        Some(json!({IDLE_ROLE: "leader"})),
+        false,
+    )
+    .expect_err("compatibility wrapper must retain timeout failures");
+    assert!(error.starts_with("subprocess.TimeoutExpired: "), "{error}");
+    assert!(
+        error.contains(&format!("{cause} deadline expired after ")),
+        "{error}"
+    );
+    let elapsed: f64 = error
+        .rsplit_once(" after ")
+        .ok_or("elapsed timeout diagnostic")?
+        .1
+        .strip_suffix(" seconds")
+        .ok_or("elapsed seconds suffix")?
+        .parse()?;
+    assert!((2.0..5.0).contains(&elapsed), "{error}");
+    assert!(temp.path().join("launched").is_file());
+    assert!(!temp.path().join("escaped").exists());
+    let lock = fs::OpenOptions::new()
+        .write(true)
+        .open(temp.path().join("descendant.lock"))?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    while let Err(error) = lock.try_lock() {
+        if std::time::Instant::now() >= deadline {
+            return Err(error.into());
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    Ok(())
+}
+
+#[test]
+fn compatibility_idle_timeout_preserves_cause_and_cleanup() -> Result<(), Box<dyn Error>> {
+    compatibility_timeout(5.0, 2.0, "idle")
+}
+
+#[test]
+fn compatibility_wall_timeout_preserves_cause_and_cleanup() -> Result<(), Box<dyn Error>> {
+    compatibility_timeout(2.0, 5.0, "wall")
+}
+
 #[test]
 fn migration_regression() -> Result<(), String> {
     assert_eq!(

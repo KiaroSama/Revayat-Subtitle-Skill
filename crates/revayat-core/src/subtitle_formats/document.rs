@@ -58,7 +58,7 @@ fn fields(row: &str) -> Vec<String> {
 }
 fn parse_srt(data: &str, doc: &mut Document) -> Result<(), String> {
     let breaks =
-        regex::Regex::new(r"\n[ \t]*\n").map_err(|_| invalid("Invalid SRT cue separator"))?;
+        regex::Regex::new(r"\n(?:[ \t]*\n)+").map_err(|_| invalid("Invalid SRT cue separator"))?;
     let digits = regex::Regex::new(r"\A[\p{Nd}²³¹⁰⁴-⁹₀-₉]+\z")
         .map_err(|_| invalid("Invalid SRT cue numbering pattern"))?;
     for block in breaks.split(data.trim()) {
@@ -517,19 +517,7 @@ pub fn ass_template(
 ) -> Result<Document, String> {
     let style_fields = fields(STYLE_FIELDS);
     let event_fields = fields(ASS_FIELDS);
-    let style: Vec<_> = style_line
-        .map_or(DEFAULT_STYLE, |s| {
-            s.strip_prefix("Style:").unwrap_or(s).trim_start()
-        })
-        .split(',')
-        .map(str::to_owned)
-        .collect();
-    if style.len() != style_fields.len()
-        || style[0].trim().is_empty()
-        || style.iter().any(|v| v.contains(['\r', '\n', '\0']))
-    {
-        return Err(invalid("ASS style must be a single V4+ Style row"));
-    }
+    let (name, style) = generated_style(style_line)?;
     if x <= 0 || y <= 0 {
         return Err(invalid("ASS script resolution requires positive integers"));
     }
@@ -546,7 +534,7 @@ pub fn ass_template(
         }
         info.insert(0, format!("Title: {title}"));
     }
-    let styles = IndexMap::from([(ass_style_name(&style[0], false).into(), style)]);
+    let styles = IndexMap::from([(name, style)]);
     Ok(Document {
         kind: "ass".into(),
         sections: vec![
@@ -559,6 +547,29 @@ pub fn ass_template(
         styles,
         ..Document::default()
     })
+}
+
+pub(crate) fn generated_style(style_line: Option<&str>) -> Result<(String, Vec<String>), String> {
+    let mut style: Vec<_> = style_line
+        .map_or(DEFAULT_STYLE, |s| {
+            s.strip_prefix("Style:")
+                .unwrap_or(s)
+                .trim_start_matches([' ', '\t'])
+        })
+        .split(',')
+        .map(str::to_owned)
+        .collect();
+    if style.len() != fields(STYLE_FIELDS).len()
+        || style[0].trim().is_empty()
+        || style.iter().any(|v| v.contains(['\r', '\n', '\0']))
+    {
+        return Err(invalid("ASS style must be a single V4+ Style row"));
+    }
+    // Generated definitions must use the same name the ASS renderer resolves
+    // from their event references; meaningful non-ASCII spaces remain literal.
+    let name = ass_style_name(ass_style_name(&style[0], false), true).to_owned();
+    style[0] = name.clone();
+    Ok((name, style))
 }
 pub fn ass_commands(text: &str) -> Result<Vec<(String, String)>, String> {
     markup::ass_commands(text)

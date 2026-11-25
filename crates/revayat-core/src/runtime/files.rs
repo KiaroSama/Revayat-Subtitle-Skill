@@ -198,6 +198,19 @@ fn number_budget(data: &[u8]) -> bool {
             if i - start > if fraction { 64 } else { 21 } {
                 return false;
             }
+            if !fraction {
+                let Ok(token) = std::str::from_utf8(&data[start..i]) else {
+                    return false;
+                };
+                // Serde otherwise converts out-of-range integer lexemes to rounded f64.
+                if if token.starts_with('-') {
+                    token.parse::<i64>().is_err()
+                } else {
+                    token.parse::<u64>().is_err()
+                } {
+                    return false;
+                }
+            }
             continue;
         }
         i += 1;

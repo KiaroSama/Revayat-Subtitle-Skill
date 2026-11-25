@@ -118,7 +118,7 @@ pub fn workspace_state(work: Value) -> Result<Value, String> {
 }
 
 pub fn bounded_report(report: Value) -> Result<Value, String> {
-    if crate::workflow::contract_json::dump(&report, false, false)?.len() > MAX_REPORT_BYTES {
+    if crate::workflow::contract_json::dump_json(&report, false, false)?.len() > MAX_REPORT_BYTES {
         return Err(value_error("Read-only report exceeds its 1 MiB byte limit"));
     }
     Ok(report)
@@ -156,22 +156,31 @@ pub fn report(work: &Path) -> Result<Value, String> {
         && !items(&project["episodes"]).is_empty();
     let mut expected_by_format = HashMap::new();
     let mut editions = Vec::new();
+    let mut build_staging = 0;
     let root = local_path(work, "builds")?;
     let mut ready = false;
     if root.exists() {
         if !root.is_dir() {
             return Err(value_error("Edition inventory must be a directory"));
         }
-        for entry in fs::read_dir(&root).map_err(io_error)? {
+        for (index, entry) in fs::read_dir(&root).map_err(io_error)?.enumerate() {
             let entry = entry.map_err(io_error)?;
             let metadata = fs::symlink_metadata(entry.path()).map_err(io_error)?;
-            if editions.len() >= 1000 || !metadata.is_dir() || linked(&metadata) {
+            if index >= 1000 || !metadata.is_dir() || linked(&metadata) {
                 return Err(value_error(
                     "Edition inventory exceeds its limit or contains a non-directory",
                 ));
             }
             let name = entry.file_name();
             let name = utf8_path(Path::new(&name))?;
+            // Build staging shares the filesystem with published editions. It is
+            // unpublished state, including after a process interruption, never an edition.
+            if name.strip_prefix(".build-").is_some_and(|suffix| {
+                suffix.len() == 6 && suffix.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            }) {
+                build_staging += 1;
+                continue;
+            }
             let path = local_path(work, &format!("builds/{name}"))?;
             if !hash(&json!(name)) {
                 return Err(value_error(
@@ -265,7 +274,7 @@ pub fn report(work: &Path) -> Result<Value, String> {
     }
     editions.sort_by(|a, b| string(&a["identity"]).cmp(string(&b["identity"])));
     bounded_report(
-        json!({"version": 1, "ready": ready, "state": if ready {"complete"} else {"pending"}, "sources": docs.len(), "cues": docs.values().map(|doc| doc.cues.len()).sum::<usize>(), "pending_cues": pending, "first_pending": first_pending, "glossary": if glossary_ready {"complete"} else {"pending"}, "unassigned_sources": unassigned, "editions": editions, "linguistic_quality_certified": false}),
+        json!({"version": 1, "ready": ready, "state": if ready {"complete"} else {"pending"}, "sources": docs.len(), "cues": docs.values().map(|doc| doc.cues.len()).sum::<usize>(), "pending_cues": pending, "first_pending": first_pending, "glossary": if glossary_ready {"complete"} else {"pending"}, "unassigned_sources": unassigned, "editions": editions, "build_staging": build_staging, "linguistic_quality_certified": false}),
     )
 }
 
@@ -294,5 +303,11 @@ mod tests {
             Some("ValueError: Read-only report exceeds its 1 MiB byte limit")
         );
         Ok(())
+    }
+
+    #[test]
+    fn report_limit_counts_literal_marker_keys_and_structure() {
+        let text = "x".repeat(MAX_REPORT_BYTES - 4);
+        assert!(bounded_report(json!({"$tuple": [text]})).is_err());
     }
 }

@@ -6,10 +6,10 @@ description: Use when existing SRT or ASS subtitles lead, lag, drift, or fall ou
 # Sync subtitles to audio
 
 1. Confirm the subtitle and audio come from the same episode and language track. Choose a new output path with the same subtitle format. Keep the source file unchanged.
-2. Run `revayat-subtitle sync` for supervised sync or `subsync` directly. Video input uses FFmpeg's automatic audio selection. If you need a different track, [probe and extract it](../ffmpeg/references/sync-and-probing.md) to a mono 16-bit PCM WAV and pass it with `--wav`.
+2. Run `revayat-subtitle sync` in process, add `--timeout 300` for a supervised whole-operation deadline, or use `subsync` directly. Video input uses FFmpeg's automatic audio selection and preserves initial audio delay and timestamp gaps during PCM extraction. If you need a different track, [probe and extract it](../ffmpeg/references/sync-and-probing.md) to a mono 16-bit PCM WAV and pass it with `--wav`.
 
    ```text
-   revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json"
+   revayat-subtitle sync --video "episode.mkv" --in "original.ass" --out "aligned.ass" --json-report "sync-report.json" --timeout 300
    subsync --wav "episode-dialogue.wav" --in "original.ass" --out "aligned-wav.ass" --json-report "wav-report.json"
    ```
 

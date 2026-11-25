@@ -9,11 +9,11 @@ use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-use subsync_rs::{SyncConfig, SyncError, audio};
+use subsync_rs::{SubtitleDocument, SubtitleFormat, SyncConfig, SyncError, SyncReport, audio};
 
 pub const SYNC_TIMEOUT: f64 = 300.0;
-const AUDIO_LIMIT: u64 = (1 << 22) * 160 * 2 + 4096;
-const SUBTITLE_LIMIT: u64 = 32 * 1024 * 1024;
+const AUDIO_LIMIT: u64 = audio::MAX_WAV_BYTES;
+const SUBTITLE_LIMIT: u64 = subsync_rs::MAX_SUBTITLE_BYTES;
 const REPORT_LIMIT: usize = 8 * 1024 * 1024;
 const WORKER_FLAG: &str = "--revayat-sync-worker";
 
@@ -184,13 +184,7 @@ fn new_destination(path: &Path) -> anyhow::Result<PathBuf> {
 }
 
 fn bounded_file(path: &Path, limit: u64) -> anyhow::Result<fs::File> {
-    let meta = fs::metadata(path)?;
-    anyhow::ensure!(
-        meta.is_file() && meta.len() <= limit,
-        "Sync input is not a regular file or exceeds its size limit: {}",
-        path.display()
-    );
-    Ok(fs::File::open(path)?)
+    Ok(subsync_rs::open_bounded_regular_file(path, limit)?)
 }
 
 pub fn sync_subtitle_to_video(
@@ -199,6 +193,7 @@ pub fn sync_subtitle_to_video(
     output: &Path,
     options: &SyncOptions<'_>,
 ) -> anyhow::Result<Value> {
+    subsync_rs::check_cancelled()?;
     let began = Instant::now();
     let timeout = duration(
         options.timeout,
@@ -282,7 +277,8 @@ pub fn sync_subtitle_to_video(
         text.len() as u64 <= SUBTITLE_LIMIT,
         "Sync subtitle input exceeds its size limit"
     );
-    let format = subsync_rs::SubtitleDocument::parse(&text, Some(&input))?.format;
+    let original = SubtitleDocument::parse(&text, Some(&input))?;
+    let format = original.format;
     anyhow::ensure!(
         output_format.is_none_or(|output| output == format),
         "Output extension does not match the input subtitle format"
@@ -357,23 +353,23 @@ pub fn sync_subtitle_to_video(
     )
     .map_err(|e| anyhow::anyhow!("Could not sync subtitles: {e}"))?;
     let stdout = std::str::from_utf8(&result.stdout)?;
-    let mut data = parse_report(stdout)?;
+    let (mut data, worker_report) = parse_report(stdout)?;
+    let worker_output = fs::symlink_metadata(&staged_output)?;
+    anyhow::ensure!(
+        worker_output.is_file() && !worker_output.file_type().is_symlink(),
+        "Sync worker did not produce a regular subtitle file"
+    );
+    let mut bytes = Vec::new();
+    bounded_file(&staged_output, SUBTITLE_LIMIT)?
+        .take(SUBTITLE_LIMIT + 1)
+        .read_to_end(&mut bytes)?;
+    validate_worker_output(&bytes, &original, &worker_report, &config)?;
     data["video_path"] = if is_video { json!(media) } else { Value::Null };
     data["wav_path"] = if is_video { Value::Null } else { json!(media) };
     data["subtitle_in"] = json!(input);
     data["subtitle_out"] = json!(output);
     let subtitle = stage_file(&checked_output, |file| {
-        let worker_output = fs::symlink_metadata(&staged_output)?;
-        anyhow::ensure!(
-            worker_output.is_file() && !worker_output.file_type().is_symlink(),
-            "Sync worker did not produce a regular subtitle file"
-        );
-        let mut input = bounded_file(&staged_output, SUBTITLE_LIMIT)?.take(SUBTITLE_LIMIT + 1);
-        let count = io::copy(&mut input, file)?;
-        anyhow::ensure!(
-            (1..=SUBTITLE_LIMIT).contains(&count),
-            "Sync worker returned invalid subtitle size"
-        );
+        file.write_all(&bytes)?;
         Ok(())
     })?;
     let receipt = report
@@ -389,8 +385,13 @@ pub fn sync_subtitle_to_video(
         })
         .transpose()?;
     remaining()?;
+    subsync_rs::check_cancelled()?;
     subtitle.persist_noclobber(&checked_output)?;
     if let Some((path, file)) = receipt {
+        subsync_rs::check_cancelled().map_err(|source| SyncError::ReportPublication {
+            subtitle_path: output.clone(),
+            source: Box::new(source),
+        })?;
         file.persist_noclobber(path)
             .map_err(|e| SyncError::ReportPublication {
                 subtitle_path: output,
@@ -404,6 +405,7 @@ fn stage_file(
     destination: &Path,
     write: impl FnOnce(&mut fs::File) -> anyhow::Result<()>,
 ) -> anyhow::Result<tempfile::NamedTempFile> {
+    subsync_rs::check_cancelled()?;
     let parent = destination
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Missing sync output directory"))?;
@@ -413,49 +415,110 @@ fn stage_file(
     Ok(file)
 }
 
-fn parse_report(stdout: &str) -> anyhow::Result<Value> {
-    let report: Value = serde_json::from_str(stdout.trim_start_matches('\u{feff}'))?;
-    let numbers = [
-        "audio_duration_ms",
-        "cues_snapped",
-        "cues_total",
-        "fps_ratio",
-        "global_offset_ms",
-        "max_cue_delta_ms",
-        "median_cue_delta_ms",
-        "overlap_score_after",
-        "overlap_score_before",
-        "speech_segments_count",
-    ];
+fn parse_report(stdout: &str) -> anyhow::Result<(Value, SyncReport)> {
+    let data: Value = serde_json::from_str(stdout.trim_start_matches('\u{feff}'))?;
+    let report: SyncReport = serde_json::from_value(data.clone())?;
     anyhow::ensure!(
-        numbers.iter().all(|field| report[*field].is_number())
-            && report["split_segments"].is_array(),
-        "subsync returned an incomplete sync report"
+        report.audio_duration_ms > 0
+            && report.audio_duration_ms <= subsync_rs::align::MAX_TIMELINE_FRAMES as u64 * 10
+            && report.speech_segments_count > 0
+            && report.speech_segments_count as u64 <= report.audio_duration_ms.div_ceil(10)
+            && report.cues_total > 0
+            && report.cues_snapped <= report.cues_total
+            && report.fps_ratio.is_finite()
+            && report.fps_ratio > 0.0
+            && (0.0..=1.0).contains(&report.overlap_score_before)
+            && (0.0..=1.0).contains(&report.overlap_score_after)
+            && report.median_cue_delta_ms.is_finite()
+            && (0.0..=report.max_cue_delta_ms as f64).contains(&report.median_cue_delta_ms),
+        "Sync worker returned invalid report values"
     );
-    Ok(report)
+    let mut end = 0_usize;
+    for segment in &report.split_segments {
+        anyhow::ensure!(
+            end.checked_add(1) == Some(segment.start_cue)
+                && segment.end_cue >= segment.start_cue
+                && segment.end_cue <= report.cues_total,
+            "Sync worker returned invalid split segment coverage"
+        );
+        end = segment.end_cue;
+    }
+    anyhow::ensure!(
+        end == report.cues_total,
+        "Sync worker split segments do not cover every cue"
+    );
+    Ok((data, report))
+}
+
+fn validate_worker_output(
+    bytes: &[u8],
+    original: &SubtitleDocument,
+    report: &SyncReport,
+    config: &SyncConfig,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        (1..=SUBTITLE_LIMIT).contains(&(bytes.len() as u64)),
+        "Sync worker returned invalid subtitle size"
+    );
+    let path = Path::new(match original.format {
+        SubtitleFormat::Srt => "worker.srt",
+        SubtitleFormat::Ass => "worker.ass",
+    });
+    let output = SubtitleDocument::parse(std::str::from_utf8(bytes)?, Some(path))?;
+    anyhow::ensure!(
+        original.cues.len() == report.cues_total && output.cues.len() == report.cues_total,
+        "Sync worker cue counts do not match its input, output and report"
+    );
+    anyhow::ensure!(
+        original.has_same_untimed_content(&output),
+        "Sync worker changed subtitle content outside timestamp fields"
+    );
+    anyhow::ensure!(
+        subsync_rs::align::FPS_RATIOS
+            .iter()
+            .take(if config.fps_search {
+                subsync_rs::align::FPS_RATIOS.len()
+            } else {
+                1
+            })
+            .any(|ratio| (ratio - report.fps_ratio).abs() <= 1e-9)
+            && report.global_offset_ms.unsigned_abs() <= config.max_offset_ms as u64
+            && report.split_segments.iter().all(|segment| {
+                segment.shift_ms.abs_diff(report.global_offset_ms)
+                    <= config.max_split_offset_ms as u64
+            }),
+        "Sync worker exceeded the requested speed or offset search bounds"
+    );
+    if original.format == SubtitleFormat::Srt {
+        anyhow::ensure!(
+            output
+                .cues
+                .windows(2)
+                .all(|pair| pair[0].end_ms <= pair[1].start_ms),
+            "Sync worker returned unordered or overlapping SRT cues"
+        );
+    }
+    let mut deltas: Vec<_> = original
+        .cues
+        .iter()
+        .zip(&output.cues)
+        .map(|(before, after)| before.start_ms.abs_diff(after.start_ms))
+        .collect();
+    deltas.sort_unstable();
+    let mid = deltas.len() / 2;
+    let median = if deltas.len().is_multiple_of(2) {
+        (deltas[mid - 1] as f64 + deltas[mid] as f64) / 2.0
+    } else {
+        deltas[mid] as f64
+    };
+    anyhow::ensure!(
+        report.max_cue_delta_ms == *deltas.last().expect("parsed subtitle has cues")
+            && (report.median_cue_delta_ms - median).abs() <= 1e-9,
+        "Sync worker timing changes do not match its reported delta statistics"
+    );
+    Ok(())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn malformed_worker_report_is_refused() {
-        assert!(parse_report("{\"cues_total\": 2, \"split_segments\": []}").is_err());
-        assert!(parse_report("logging\n{}").is_err());
-    }
-
-    #[test]
-    fn stages_both_files_before_declaring_a_worker_result() -> anyhow::Result<()> {
-        let root = tempfile::tempdir()?;
-        let output = root.path().join("output.srt");
-        let staged = stage_file(&output, |file| {
-            file.write_all(b"owned bytes")?;
-            Ok(())
-        })?;
-        fs::write(&output, b"independent winner")?;
-        assert!(staged.persist_noclobber(&output).is_err());
-        assert_eq!(fs::read(&output)?, b"independent winner");
-        Ok(())
-    }
-}
+#[path = "sync_bridge_tests.rs"]
+mod tests;

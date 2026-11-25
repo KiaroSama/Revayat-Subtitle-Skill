@@ -1,6 +1,6 @@
 use super::{
-    distribution::{self, AGENTS},
-    files::{invalid, lock_owner, safe_path},
+    distribution::{self, AGENTS, SYNC},
+    files::{invalid, lock_owner, metadata, safe_path},
     recovery, transaction,
 };
 use clap::Args;
@@ -52,6 +52,7 @@ pub fn run_install(args: InstallArgs) -> anyhow::Result<()> {
     let mut stdout = io::stdout().lock();
     serde_json::to_writer_pretty(&mut stdout, &report)?;
     writeln!(stdout)?;
+    stdout.flush()?;
     Ok(())
 }
 
@@ -84,6 +85,7 @@ pub fn install(root: &Path, home: &Path, args: InstallArgs) -> io::Result<Value>
         return Ok(json!({"state":"restored", "journal":journal}));
     }
     let custom = args.destination.is_some();
+    let discover_uninstall = args.uninstall && args.agent == "all" && !custom;
     if custom && args.recovery_dir.is_none() || args.plugin && !custom {
         return Err(invalid(
             "A custom destination or plugin requires --destination and --recovery-dir",
@@ -121,7 +123,20 @@ pub fn install(root: &Path, home: &Path, args: InstallArgs) -> io::Result<Value>
                     continue;
                 }
             }
-            if !targets.contains(&target) {
+            if discover_uninstall {
+                let mut present = false;
+                for candidate in [target.clone(), target.with_file_name(SYNC)] {
+                    if metadata(&candidate)?.is_some() {
+                        present = true;
+                        if !targets.contains(&candidate) {
+                            targets.push(candidate);
+                        }
+                    }
+                }
+                if !present {
+                    skipped.push(*agent);
+                }
+            } else if !targets.contains(&target) {
                 targets.push(target);
             }
         }
@@ -137,7 +152,7 @@ pub fn install(root: &Path, home: &Path, args: InstallArgs) -> io::Result<Value>
             &targets,
             args.plugin,
             args.recovery_dir.as_deref(),
-            !custom,
+            !custom && !discover_uninstall,
         )?
     } else {
         transaction::plan_install(

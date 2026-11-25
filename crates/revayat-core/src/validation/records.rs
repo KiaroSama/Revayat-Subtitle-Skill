@@ -130,6 +130,11 @@ pub(super) fn project(value: &Value) -> Result<(), String> {
             "expected keep or remove",
         ));
     }
+    if let Some(output) = value.get("output_format")
+        && !matches!(output.as_str(), Some("ass" | "srt"))
+    {
+        return Err(invalid("project.json.output_format", "expected ass or srt"));
+    }
     for (i, item) in items(&value["sources"], "project.json.sources", 1000)?
         .iter()
         .enumerate()

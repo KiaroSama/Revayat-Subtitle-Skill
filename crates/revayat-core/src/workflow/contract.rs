@@ -44,8 +44,8 @@ pub fn workspace_path(value: &Value) -> Result<PathBuf, String> {
     })
 }
 
-pub fn path_marker(path: &Path) -> Value {
-    json!({"$path": path.to_string_lossy()})
+pub fn path_marker(path: &Path) -> Result<Value, String> {
+    Ok(json!({"$path": path.to_str().ok_or_else(|| value_error("Path must use valid UTF-8"))?}))
 }
 
 fn path(value: &Value) -> Option<PathBuf> {

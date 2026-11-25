@@ -58,6 +58,9 @@ pub fn timecode(ms: i64, kind: &str) -> Result<String, String> {
     })
 }
 pub fn effective_times(start: i64, end: i64, kind: &str) -> Result<(i64, i64), String> {
+    if !matches!(kind, "ass" | "srt") {
+        return Err(invalid("Cue timing requires ASS or SRT format"));
+    }
     if start < 0 || end <= start || end > MAX_TIME_MS {
         return Err(invalid(
             "Cue timing requires nonnegative integers and end after start",

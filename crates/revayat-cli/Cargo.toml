@@ -22,6 +22,7 @@ revayat-core = { path = "../revayat-core" }
 subsync-rs = { path = "../subsync-rs" }
 anyhow = "1"
 clap = { version = "4.6", features = ["derive"] }
+ctrlc = { version = "3.5", features = ["termination"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "unbounded_depth"] }
 hmac = "0.13"

@@ -4,16 +4,37 @@ pub mod align;
 pub mod audio;
 mod error;
 pub mod formats;
+mod input;
 mod publication;
 pub mod vad;
 
 pub use error::SyncError;
 pub use formats::{SubtitleCue, SubtitleDocument, SubtitleFormat};
-use serde::Serialize;
-use std::{fs, path::Path, time::Duration};
-use vad::{VadResult, extract_speech_activity};
+pub use input::{MAX_SUBTITLE_BYTES, open_bounded_regular_file};
+use serde::{Deserialize, Serialize};
+use std::{
+    path::Path,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
+use vad::{VadResult, extract_speech_activity_cancellable};
 
 const FRAME_MS: u32 = 10;
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Request cooperative cancellation without installing a process-wide signal handler.
+pub fn request_cancel() {
+    CANCEL_REQUESTED.store(true, Ordering::Relaxed);
+}
+
+/// Stop before additional work or publication after the CLI requests cancellation.
+pub fn check_cancelled() -> Result<(), SyncError> {
+    if CANCEL_REQUESTED.load(Ordering::Relaxed) {
+        Err(SyncError::Cancelled)
+    } else {
+        Ok(())
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct SyncConfig {
@@ -56,14 +77,14 @@ impl SyncConfig {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct SplitSegment {
     pub start_cue: usize,
     pub end_cue: usize,
     pub shift_ms: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SyncReport {
     pub video_path: Option<String>,
     pub wav_path: Option<String>,
@@ -87,9 +108,11 @@ pub fn sync_subtitles_with_vad(
     vad: &VadResult,
     config: &SyncConfig,
 ) -> Result<SyncReport, SyncError> {
+    check_cancelled()?;
     config.validate()?;
     validate_vad(vad)?;
     let alignment = align::align(&doc.cues, doc.format, vad, config)?;
+    check_cancelled()?;
     let mut deltas: Vec<_> = doc
         .cues
         .iter()
@@ -237,6 +260,7 @@ fn prepare_file(
     config: &SyncConfig,
     load_audio: impl FnOnce() -> Result<(u32, Vec<i16>), SyncError>,
 ) -> Result<(Vec<u8>, SyncReport), SyncError> {
+    check_cancelled()?;
     config.validate()?;
     if output
         .try_exists()
@@ -246,8 +270,17 @@ fn prepare_file(
             "choose a new subtitle output path; existing files are not replaced".into(),
         ));
     }
-    let text =
-        fs::read_to_string(input).map_err(|e| SyncError::io("Read UTF-8 subtitle input", e))?;
+    let text = String::from_utf8(input::read_bytes(
+        input,
+        MAX_SUBTITLE_BYTES,
+        "Read UTF-8 subtitle input",
+    )?)
+    .map_err(|error| {
+        SyncError::io(
+            "Read UTF-8 subtitle input",
+            std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+        )
+    })?;
     let mut doc = SubtitleDocument::parse(&text, Some(input))?;
     if SubtitleFormat::from_path(output).is_some_and(|format| format != doc.format) {
         return Err(SyncError::Subtitle(
@@ -255,7 +288,7 @@ fn prepare_file(
         ));
     }
     let (rate, pcm) = load_audio()?;
-    let vad = extract_speech_activity(&pcm, rate, FRAME_MS);
+    let vad = extract_speech_activity_cancellable(&pcm, rate, FRAME_MS)?;
     let mut report = sync_subtitles_with_vad(&mut doc, &vad, config)?;
     let bytes = doc.serialize()?.into_bytes();
     report.subtitle_in = Some(input.to_string_lossy().into_owned());

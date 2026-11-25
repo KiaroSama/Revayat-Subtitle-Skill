@@ -1,33 +1,50 @@
 use crate::{
-    SplitSegment, SyncConfig, SyncError,
+    SplitSegment, SyncConfig, SyncError, check_cancelled,
     formats::{SubtitleCue, SubtitleFormat},
     vad::VadResult,
 };
 use rustfft::{FftPlanner, num_complex::Complex};
 
-const FPS_RATIOS: [f64; 5] = [1.0, 23.976 / 25.0, 25.0 / 23.976, 24.0 / 25.0, 25.0 / 24.0];
-const MAX_FFT_LEN: usize = 1 << 22;
+/// Playback speed candidates supported by the synchronization report protocol.
+pub const FPS_RATIOS: [f64; 5] = [1.0, 23.976 / 25.0, 25.0 / 23.976, 24.0 / 25.0, 25.0 / 24.0];
+/// Largest supported timeline before additional offset padding is considered.
+pub const MAX_TIMELINE_FRAMES: usize = 1 << 22;
 
 pub fn build_subtitle_activity(
     cues: &[SubtitleCue],
     total_frames: usize,
     frame_ms: u32,
 ) -> Vec<f32> {
+    build_activity_with_check(cues, total_frames, frame_ms, || Ok(()))
+        .expect("the public rasterizer has an infallible checkpoint")
+}
+
+fn build_activity_with_check(
+    cues: &[SubtitleCue],
+    total_frames: usize,
+    frame_ms: u32,
+    mut checkpoint: impl FnMut() -> Result<(), SyncError>,
+) -> Result<Vec<f32>, SyncError> {
+    checkpoint()?;
     let mut activity = vec![0.0_f32; total_frames];
     let frame = u64::from(frame_ms);
     if frame == 0 {
-        return activity;
+        return Ok(activity);
     }
     for cue in cues.iter().filter(|cue| cue.start_ms < cue.end_ms) {
+        checkpoint()?;
         let range = cue.start_ms / frame..cue.end_ms.div_ceil(frame).min(total_frames as u64);
         for index in range {
+            if index.is_multiple_of(4096) {
+                checkpoint()?;
+            }
             let start = index * frame;
             let covered = cue.end_ms.min(start.saturating_add(frame)) - cue.start_ms.max(start);
             let value = &mut activity[index as usize];
             *value = value.max(covered as f32 / frame as f32);
         }
     }
-    activity
+    Ok(activity)
 }
 
 struct Global {
@@ -42,6 +59,7 @@ fn global_match(
     frame_ms: u32,
     config: &SyncConfig,
 ) -> Result<Global, SyncError> {
+    check_cancelled()?;
     let frame = i64::from(frame_ms);
     let bound = config.max_offset_ms / frame;
     let margin = config.max_split_offset_ms / frame;
@@ -53,7 +71,7 @@ fn global_match(
         .max(weights.len())
         .checked_add(lag)
         .and_then(usize::checked_next_power_of_two)
-        .filter(|&len| len <= MAX_FFT_LEN)
+        .filter(|&len| len <= MAX_TIMELINE_FRAMES)
         .ok_or_else(|| SyncError::Audio("timeline exceeds the FFT frame limit".into()))?;
     let mut planner = FftPlanner::<f32>::new();
     let forward = planner.plan_fft_forward(n);
@@ -70,6 +88,7 @@ fn global_match(
         bin.re = weight;
     }
     forward.process_with_scratch(&mut audio, &mut scratch);
+    check_cancelled()?;
     let mut work = vec![Complex::default(); n];
     let mut best_score = f64::NEG_INFINITY;
     let mut solution = Global {
@@ -82,8 +101,9 @@ fn global_match(
     } else {
         1
     }] {
+        check_cancelled()?;
         let scaled: Vec<_> = cues.iter().map(|cue| scaled_cue(*cue, ratio)).collect();
-        let subtitle = build_subtitle_activity(&scaled, needed, frame_ms);
+        let subtitle = build_activity_with_check(&scaled, needed, frame_ms, check_cancelled)?;
         let (sum, energy) = stats(&subtitle, n);
         let norm = (audio_energy * energy).sqrt();
         if norm <= f64::EPSILON {
@@ -94,10 +114,12 @@ fn global_match(
             bin.re = weight;
         }
         forward.process_with_scratch(&mut work, &mut scratch);
+        check_cancelled()?;
         for (bin, audio_bin) in work.iter_mut().zip(&audio) {
             *bin = audio_bin * bin.conj();
         }
         inverse.process_with_scratch(&mut work, &mut scratch);
+        check_cancelled()?;
         // The shared zero padding permits centered, normalized correlation without wrapping across a searched lag.
         let score = |shift: i64| {
             let dot = f64::from(work[shift.rem_euclid(n as i64) as usize].re) / n as f64;
@@ -268,6 +290,7 @@ fn local_shifts(
                 && offsets[i].abs_diff(global.shift) < offsets[j].abs_diff(global.shift))
     };
     for (step, group) in groups.iter().enumerate() {
+        check_cancelled()?;
         // An earlier offset is legal if its previous cue or overlap group ends before this one starts.
         let room = step.checked_sub(1).map_or(i64::MAX, |prev| {
             group.start_ms.saturating_sub(groups[prev].end_ms) as i64
@@ -275,6 +298,9 @@ fn local_shifts(
         let mut best = 0;
         let mut limit = 0;
         for (j, &shift) in offsets.iter().enumerate() {
+            if j.is_multiple_of(64) {
+                check_cancelled()?;
+            }
             let legal = shift.saturating_add(room);
             while limit < n && offsets[limit] <= legal {
                 if better(limit, best, &previous) {
@@ -375,6 +401,7 @@ pub(crate) fn align(
     vad: &VadResult,
     config: &SyncConfig,
 ) -> Result<Alignment, SyncError> {
+    check_cancelled()?;
     if cues.is_empty()
         || cues
             .iter()
@@ -429,6 +456,7 @@ pub(crate) fn align(
     let mut split_segments: Vec<SplitSegment> = Vec::new();
     let mut previous_end = 0_u64;
     for (group, shift) in groups.iter().zip(offsets) {
+        check_cancelled()?;
         let shift = shift.div_euclid(unit as i64) * unit as i64;
         let actual = if format == SubtitleFormat::Ass {
             shift.max(previous_end as i64 - group.start_ms as i64)
@@ -464,6 +492,7 @@ pub(crate) fn align(
     let mut cues_snapped = 0;
     let mut previous_end = 0;
     for group in &groups {
+        check_cancelled()?;
         let indices = &order[group.first..group.end];
         if let [i] = indices {
             cues_snapped += usize::from(snap_start(
@@ -490,4 +519,32 @@ pub(crate) fn align(
         split_segments,
         cues_snapped,
     })
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+
+    #[test]
+    fn a_long_subtitle_cue_can_cancel_during_rasterization() {
+        let mut calls = 0;
+        let result = build_activity_with_check(
+            &[SubtitleCue {
+                start_ms: 0,
+                end_ms: 100000,
+            }],
+            10000,
+            10,
+            || {
+                calls += 1;
+                if calls == 4 {
+                    Err(SyncError::Cancelled)
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert!(matches!(result, Err(SyncError::Cancelled)));
+        assert_eq!(calls, 4);
+    }
 }

@@ -186,9 +186,18 @@ fn plan_targets(
         if path_key(&root).starts_with(path_key(&recovery))
             || protected.iter().any(|p| overlaps(&recovery, p))
             || planned.iter().any(|p| overlaps(&recovery, &p.target))
-            || recovery
-                .iter()
-                .any(|p| matches!(p.to_str(), Some("skills" | "plugins")))
+            || recovery.iter().any(|p| {
+                p.to_str().is_some_and(|name| {
+                    #[cfg(windows)]
+                    {
+                        name.eq_ignore_ascii_case("skills") || name.eq_ignore_ascii_case("plugins")
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        matches!(name, "skills" | "plugins")
+                    }
+                })
+            })
         {
             return Err(invalid(
                 "Recovery root overlaps source or skill/plugin discovery",
@@ -332,7 +341,10 @@ pub fn execute_owned(
         };
         let new = if plan.payloads.is_empty() {
             let (saved_id, saved_tree) = registry::installed_manifest(owner, target, home)?;
-            if previous_id != saved_id || old != saved_tree {
+            if previous_id != saved_id
+                || !manifest_matches(&old, &saved_tree)
+                || !distribution::legacy_binary_modes_match(&old, &saved_tree)
+            {
                 return Err(invalid(
                     "Installed tree changed; preserve it instead of uninstalling",
                 ));

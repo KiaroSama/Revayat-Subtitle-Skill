@@ -172,9 +172,10 @@ pub fn uncomment(text: String, kind: String) -> Result<String, String> {
         let mut current = Vec::new();
         for span in block_spans(&result, &kind) {
             let (range, _) = span?;
-            if !hidden(&result[range.clone()], &kind) {
-                current.push(&result[range]);
+            if hidden(&result[range.clone()], &kind) {
+                return Err(ACTIVATED.into());
             }
+            current.push(&result[range]);
         }
         if current != active {
             return Err(ACTIVATED.into());

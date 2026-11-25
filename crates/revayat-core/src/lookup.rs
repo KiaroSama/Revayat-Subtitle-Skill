@@ -293,6 +293,9 @@ pub fn find_fa(
                 .split_once('/')
                 .map_or(translation, |(first, _)| first),
         );
+        if phrase.is_empty() {
+            continue;
+        }
         let found = match py_type(&text) {
             "str" => text.as_str().is_some_and(|s| s.contains(phrase)),
             "bytes" => return Err("TypeError: a bytes-like object is required, not 'str'".into()),

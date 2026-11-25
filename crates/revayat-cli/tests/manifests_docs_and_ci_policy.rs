@@ -512,6 +512,22 @@ fn supported_matrix(path: &str) -> Result<()> {
 fn ci_only_builds_the_four_supported_rust_targets() -> Result<()> {
     supported_matrix("ci")
 }
+
+#[test]
+fn ci_executes_tests_and_provisions_media_on_every_supported_host() -> Result<()> {
+    let ci = workflow("ci")?;
+    assert_eq!(
+        ci.lines()
+            .filter(|line| line.trim() == "test: true")
+            .count(),
+        4
+    );
+    assert!(!ci.contains("test: false"));
+    assert!(ci.contains("if: runner.os == 'Linux'"));
+    assert!(ci.contains("if: runner.os == 'Windows'"));
+    assert!(ci.contains("REVAYAT_REQUIRE_FFMPEG: '1'"));
+    Ok(())
+}
 #[test]
 fn release_only_builds_the_four_supported_rust_targets() -> Result<()> {
     supported_matrix("release")
@@ -603,6 +619,24 @@ fn release_validation_is_scoped_to_its_run() -> Result<()> {
         "cancel-in-progress: false",
     ] {
         assert!(release.contains(token));
+    }
+    Ok(())
+}
+
+#[test]
+fn release_binds_tag_to_workspace_plugins_and_both_binary_versions() -> Result<()> {
+    let release = workflow("release")?;
+    for required in [
+        "release_version=\"${TAG#v}\"",
+        "cargo metadata --no-deps --locked --format-version 1",
+        "all(.[]; .version == $version)",
+        "'.version == $version' \"$manifest\"",
+        "\"$binary\" --version",
+    ] {
+        assert!(
+            release.contains(required),
+            "missing version gate: {required}"
+        );
     }
     Ok(())
 }

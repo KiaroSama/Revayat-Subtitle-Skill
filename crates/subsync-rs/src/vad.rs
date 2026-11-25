@@ -1,3 +1,4 @@
+use crate::SyncError;
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::TAU;
 
@@ -17,6 +18,25 @@ pub struct VadResult {
 }
 
 pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32) -> VadResult {
+    extract_with_check(samples, sample_rate, frame_ms, || Ok(()))
+        .expect("the public detector has an infallible checkpoint")
+}
+
+pub(crate) fn extract_speech_activity_cancellable(
+    samples: &[i16],
+    sample_rate: u32,
+    frame_ms: u32,
+) -> Result<VadResult, SyncError> {
+    extract_with_check(samples, sample_rate, frame_ms, crate::check_cancelled)
+}
+
+fn extract_with_check(
+    samples: &[i16],
+    sample_rate: u32,
+    frame_ms: u32,
+    mut checkpoint: impl FnMut() -> Result<(), SyncError>,
+) -> Result<VadResult, SyncError> {
+    checkpoint()?;
     let mut result = VadResult {
         frame_ms,
         duration_ms: 0,
@@ -28,7 +48,7 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
         || !(8000..=192_000).contains(&sample_rate)
         || !(1..=100).contains(&frame_ms)
     {
-        return result;
+        return Ok(result);
     }
     let window_len = sample_rate as usize / 50;
     let fft_len = window_len.next_power_of_two().max(512);
@@ -47,6 +67,9 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
     let frames = result.duration_ms.div_ceil(u64::from(frame_ms)) as usize;
     let mut features = Vec::with_capacity(frames);
     for i in 0..frames {
+        if i.is_multiple_of(64) {
+            checkpoint()?;
+        }
         let center = ((i as u64 * hop_numerator + hop_numerator / 2) / 1000) as usize;
         let mut energy = 0.0;
         let mut crossings = 0;
@@ -77,6 +100,7 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
         let zcr_hz = crossings as f32 * sample_rate as f32 / (window_len - 1) as f32;
         features.push((db, zcr_hz, band / total.max(f32::EPSILON)));
     }
+    checkpoint()?;
     let mut levels: Vec<_> = features.iter().map(|&(db, _, _)| db).collect();
     let percentile = levels.len() / 5;
     let (_, floor, _) = levels.select_nth_unstable_by(percentile, f32::total_cmp);
@@ -94,12 +118,18 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
     let mut segments = Vec::<(usize, usize)>::new();
     let mut cursor = 0;
     while cursor < frames {
+        if cursor.is_multiple_of(2048) {
+            checkpoint()?;
+        }
         if result.probability[cursor] < 0.52 {
             cursor += 1;
             continue;
         }
         let start = cursor;
         while cursor < frames && result.probability[cursor] >= 0.52 {
+            if cursor.is_multiple_of(2048) {
+                checkpoint()?;
+            }
             cursor += 1;
         }
         if let Some((_, end)) = segments.last_mut()
@@ -121,12 +151,18 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
     }
     let mut i = 0;
     while i < frames {
+        if i.is_multiple_of(2048) {
+            checkpoint()?;
+        }
         if result.activity[i] == 0 {
             i += 1;
             continue;
         }
         let start = i;
         while i < frames && result.activity[i] != 0 {
+            if i.is_multiple_of(2048) {
+                checkpoint()?;
+            }
             i += 1;
         }
         result.segments.push(TimeSpan {
@@ -134,7 +170,8 @@ pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32)
             end_ms: (i as u64 * frame).min(result.duration_ms),
         });
     }
-    result
+    checkpoint()?;
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -163,5 +200,20 @@ mod tests {
         assert!(vad.probability[45] < vad.probability[55]);
         assert_eq!(vad.activity[45], 1);
         assert_eq!(vad.activity[125], 0);
+    }
+    #[test]
+    fn long_detection_can_cancel_between_spectral_frames() {
+        let samples = vec![100; 16000 * 4];
+        let mut calls = 0;
+        let result = extract_with_check(&samples, 16000, 10, || {
+            calls += 1;
+            if calls == 3 {
+                Err(SyncError::Cancelled)
+            } else {
+                Ok(())
+            }
+        });
+        assert!(matches!(result, Err(SyncError::Cancelled)));
+        assert_eq!(calls, 3);
     }
 }

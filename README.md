@@ -153,7 +153,7 @@ An unrun stage stays pending. If an edit changes the build, rerender it and rene
 
 ## Logging
 
-CLI execution uses UTF-8 logs named `logs/<binary>_YYYY-MM-DD_HH-mm-ss_UTC.log`, with a suffix when a filename would collide. Each line uses `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message`. Logs record progress, failures, and exit status without subtitle bodies or secrets. The levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`; use `--log-level` for more detail where supported. Logs are not deleted automatically. Review local path information before sharing one with a bug report. Agent activity logs are separate from these CLI logs.
+`revayat-subtitle` execution uses UTF-8 logs named `logs/revayat-subtitle_YYYY-MM-DD_HH-mm-ss_UTC.log`, with a suffix when a filename would collide. Each line uses `[YYYY-MM-DD HH:mm:ss UTC] [LEVEL] [COMPONENT] Message`. Logs record progress, failures, and exit status without subtitle bodies or secrets. The levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`; use `--log-level` for more detail. Logs are not deleted automatically. Review local path information before sharing one with a bug report. Agent activity logs are separate from these CLI logs. The standalone `subsync` binary writes its JSON result to stdout and diagnostics to stderr; use `--json-report` to save its result, or run through `revayat-subtitle sync` for operational file logging.
 
 ## Verification
 
