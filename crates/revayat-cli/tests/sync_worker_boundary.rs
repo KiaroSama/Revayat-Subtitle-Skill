@@ -119,12 +119,20 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
         "wrong-delta",
         "zero-bounds-shift",
         "zero-bounds-end",
+        "lead-in-after-audio",
     ] {
         let root = tempfile::tempdir()?;
         let root = root.path();
         authored_inputs(root)?;
         let zero_bounds = defect.starts_with("zero-bounds");
-        if zero_bounds {
+        let near_end = defect == "lead-in-after-audio";
+        let fixed_offsets = zero_bounds || near_end;
+        if near_end {
+            fs::write(
+                root.join("source.srt"),
+                "1\n00:00:07,900 --> 00:00:08,900\nAuthored\n",
+            )?;
+        } else if zero_bounds {
             fs::write(
                 root.join("source.srt"),
                 "1\n00:00:01,000 --> 00:00:02,000\nAuthored\n",
@@ -137,8 +145,8 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
             &root.join("reference.srt"),
             &subsync_rs::SyncConfig {
                 fps_search: false,
-                max_offset_ms: if zero_bounds { 0 } else { 60000 },
-                max_split_offset_ms: if zero_bounds { 0 } else { 15000 },
+                max_offset_ms: if fixed_offsets { 0 } else { 60000 },
+                max_split_offset_ms: if fixed_offsets { 0 } else { 15000 },
                 snap_ms: if zero_bounds { 0 } else { 350 },
                 lead_in_ms: 50,
                 ..subsync_rs::SyncConfig::default()
@@ -171,6 +179,12 @@ fn malformed_external_worker_results_leave_both_destinations_retryable() -> Resu
                 b"1\n01:00:00,000 --> 01:00:01,000\nAuthored\n".to_vec()
             }
             "zero-bounds-end" => b"1\n00:00:01,000 --> 01:00:01,000\nAuthored\n".to_vec(),
+            "lead-in-after-audio" => {
+                report["cues_snapped"] = serde_json::json!(1);
+                report["max_cue_delta_ms"] = serde_json::json!(90);
+                report["median_cue_delta_ms"] = serde_json::json!(90.0);
+                b"1\n00:00:07,990 --> 00:00:08,900\nAuthored\n".to_vec()
+            }
             _ => unreachable!(),
         };
         fs::write(root.join("worker-payload"), bytes)?;
@@ -208,7 +222,7 @@ cat "$REVAYAT_TEST_WORKER_REPORT"
             "--timeout".into(),
             "5".into(),
         ];
-        if zero_bounds {
+        if fixed_offsets {
             args.extend(
                 [
                     "--max-offset-sec",
@@ -216,7 +230,7 @@ cat "$REVAYAT_TEST_WORKER_REPORT"
                     "--max-split-offset-ms",
                     "0",
                     "--snap-ms",
-                    "0",
+                    if zero_bounds { "0" } else { "350" },
                 ]
                 .map(str::to_owned),
             );
@@ -245,7 +259,7 @@ cat "$REVAYAT_TEST_WORKER_REPORT"
         );
         assert_eq!(fs::read(root.join("output.srt"))?, valid_bytes);
         let receipt: Value = serde_json::from_slice(&fs::read(root.join("receipt.json"))?)?;
-        assert_eq!(receipt["cues_total"], if zero_bounds { 1 } else { 4 });
+        assert_eq!(receipt["cues_total"], if fixed_offsets { 1 } else { 4 });
     }
     Ok(())
 }

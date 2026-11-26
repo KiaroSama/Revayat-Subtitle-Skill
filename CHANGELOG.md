@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Check speech-overlap quality before selecting a nearby onset, and validate the implied onset including the configured lead-in when replaying worker results. Preserve joined cues, original ASS overlaps and the existing FPS controls.
+- Share one extraction deadline across audio probing, Center decoding and mono fallback. Recognize documented Front Center layouts, including `7.1(wide-side)`, without confusing `TFC` with `FC`.
+- Preserve the exact source `Default` style's bold setting and supported numeric spellings. Retain generated ASS options when the source uses an abbreviated style Format, including reviewed mixed-source editions, while preserving other styles and custom metadata. New editions use generation recipe `16`; normalization remains `13` and earlier sealed editions keep their evidence.
+
 ## 3.0.2 (2026-11-26)
 
 - Run Persian style and percent checks on inputs up to 16 MiB without exhausting the regex backtracking limit. Use a non-backtracking style matcher and a percent prepass that skips unrelated text (PR #36, F01).

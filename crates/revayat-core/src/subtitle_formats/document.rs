@@ -510,24 +510,101 @@ pub fn serialize(doc: &Document, cues: &[Cue], remove_fonts: bool) -> Result<Str
     Ok(out.join("\n"))
 }
 pub fn source_default_style_is_bold(doc: &Document) -> bool {
-    doc.kind == "ass"
-        && doc
-            .style_fields
+    if doc.kind != "ass" {
+        return false;
+    }
+    let Some(index) = doc.style_fields.iter().position(|field| field == "bold") else {
+        return false;
+    };
+    let Some(raw) = doc.styles.get("Default").and_then(|row| row.get(index)) else {
+        return false;
+    };
+    if raw.trim().eq_ignore_ascii_case("true") {
+        return true;
+    }
+    let value = raw.trim_start_matches([' ', '\t']);
+    let (radix, digits) = ["&H", "&h", "0x", "0X"]
+        .iter()
+        .find_map(|prefix| value.strip_prefix(prefix))
+        .map_or((10u32, value), |hex| (16, hex));
+    // libass reads the integer prefix modulo 2^32. Its sign does not affect zero.
+    let digits = digits.trim_start_matches([' ', '\t']);
+    let digits = digits.strip_prefix(['+', '-']).unwrap_or(digits);
+    // Its hexadecimal reader also accepts 0x after the sign and initial base marker.
+    let digits = if radix == 16 {
+        digits
+            .strip_prefix("0x")
+            .or_else(|| digits.strip_prefix("0X"))
+            .unwrap_or(digits)
+    } else {
+        digits
+    };
+    digits
+        .chars()
+        .map_while(|c| c.to_digit(radix))
+        .fold(0u32, |n, digit| n.wrapping_mul(radix).wrapping_add(digit))
+        != 0
+}
+
+pub(crate) fn inherited_style_value(field: &str) -> String {
+    // libass initializes native V4+ styles to zero, except for these three fields.
+    match field {
+        "scalex" | "scaley" => "100",
+        "fontname" => "Arial",
+        _ => "0",
+    }
+    .to_owned()
+}
+
+pub(crate) fn insert_generated_style(
+    doc: &mut Document,
+    name: &str,
+    layout: &[String],
+    row: &[String],
+) {
+    let missing: Vec<_> = layout
+        .iter()
+        .filter(|field| !doc.style_fields.contains(field))
+        .cloned()
+        .collect();
+    if !missing.is_empty() {
+        // Prepending keeps the source's last field last and preserves a custom format,
+        // which enables libass's implicit ScaledBorderAndShadow setting.
+        let inherited: Vec<_> = missing
             .iter()
-            .position(|field| field == "bold")
-            .is_some_and(|index| {
-                doc.styles
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("Default"))
-                    .and_then(|(_, fields)| fields.get(index))
-                    .is_some_and(|value| {
-                        value.trim().eq_ignore_ascii_case("true")
-                            || value
-                                .trim()
-                                .parse::<f64>()
-                                .is_ok_and(|n| n.is_finite() && n != 0.0)
-                    })
-            })
+            .map(|field| inherited_style_value(field))
+            .collect();
+        for existing in doc.styles.values_mut() {
+            existing.splice(..0, inherited.iter().cloned());
+        }
+        doc.style_fields.splice(..0, missing);
+    }
+    let generated = doc.styles.entry(name.to_owned()).or_default();
+    generated.resize_with(doc.style_fields.len(), String::new);
+    for (field, value) in layout.iter().zip(row) {
+        if let Some(index) = doc.style_fields.iter().position(|f| f == field) {
+            generated[index].clone_from(value);
+        }
+    }
+}
+
+// Only reconcile widened rows from formerly identical source layouts. Other donor
+// schemas must still be adapted explicitly so unrelated presentation changes stay visible.
+pub(crate) fn donor_style_prefix<'a>(base: &'a Document, donor: &Document) -> Option<&'a [String]> {
+    let prefix = base
+        .style_fields
+        .strip_suffix(donor.style_fields.as_slice())?;
+    if prefix.is_empty() {
+        return Some(prefix);
+    }
+    let original = base
+        .sections
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("[V4+ Styles]"))?
+        .1
+        .iter()
+        .find_map(|line| ass_line_start(line).strip_prefix("Format:"))?;
+    (fields(original) == donor.style_fields).then_some(prefix)
 }
 
 pub fn ass_template(
