@@ -20,6 +20,33 @@ const MAX_PCM_BYTES: u64 =
 pub const MAX_WAV_BYTES: u64 = MAX_PCM_BYTES + 4096;
 const MAX_DIAGNOSTIC_BYTES: u64 = 1024 * 1024;
 
+#[derive(Clone, Copy)]
+struct FfmpegDeadline {
+    started: Instant,
+    timeout: Duration,
+}
+
+impl FfmpegDeadline {
+    fn new(timeout: Duration) -> Self {
+        Self {
+            started: Instant::now(),
+            timeout,
+        }
+    }
+
+    fn remaining(self) -> Result<Duration, SyncError> {
+        check_cancelled()?;
+        let remaining = self.timeout.saturating_sub(self.started.elapsed());
+        if remaining.is_zero() {
+            return Err(SyncError::Ffmpeg(format!(
+                "timed out after {} seconds",
+                self.timeout.as_secs_f64()
+            )));
+        }
+        Ok(remaining)
+    }
+}
+
 pub fn extract_pcm_via_ffmpeg(video_path: &Path, ffmpeg_bin: &str) -> Result<Vec<i16>, SyncError> {
     extract_pcm_via_ffmpeg_with_timeout(video_path, ffmpeg_bin, DEFAULT_FFMPEG_TIMEOUT)
 }
@@ -35,33 +62,73 @@ pub fn extract_pcm_via_ffmpeg_with_timeout(
             "FFmpeg timeout must be greater than 0 and at most 86400 seconds".into(),
         ));
     }
+    let deadline = FfmpegDeadline::new(timeout);
     let video = fs::canonicalize(video_path).map_err(|e| SyncError::io("Open video input", e))?;
-    if probe_front_center(&video, ffmpeg_bin, timeout.min(Duration::from_secs(15))) {
-        match extract_stream(&video, ffmpeg_bin, timeout, true) {
-            Ok(pcm) if audible_center(&pcm) => return Ok(pcm),
+    let probe_deadline = FfmpegDeadline {
+        timeout: timeout.min(Duration::from_secs(15)),
+        ..deadline
+    };
+    if probe_front_center(&video, ffmpeg_bin, probe_deadline) {
+        match extract_stream(&video, ffmpeg_bin, deadline, true) {
+            Ok(pcm) if audible_center(&pcm) => {
+                deadline.remaining()?;
+                return Ok(pcm);
+            }
             Err(SyncError::Cancelled) => return Err(SyncError::Cancelled),
             _ => {}
         }
     }
-    check_cancelled()?;
-    extract_stream(&video, ffmpeg_bin, timeout, false)
+    let pcm = extract_stream(&video, ffmpeg_bin, deadline, false)?;
+    deadline.remaining()?;
+    Ok(pcm)
 }
 
 fn has_front_center_channel(channels: u32, layout: &str) -> bool {
-    channels >= 3
-        && (matches!(
-            layout,
-            "5.1"
-                | "5.1(side)"
-                | "7.1"
-                | "7.1(wide)"
-                | "6.1"
-                | "3.0"
-                | "3.1"
-                | "4.1"
-                | "5.0"
-                | "7.0"
-        ) || layout.contains("FC"))
+    if channels < 3 {
+        return false;
+    }
+    // FFprobe reports a standard layout by name, or a channel list such as "3 channels (FL+FR+FC)".
+    if matches!(
+        layout,
+        "3.0"
+            | "3.1"
+            | "4.0"
+            | "4.1"
+            | "5.0"
+            | "5.0(side)"
+            | "5.1"
+            | "5.1(side)"
+            | "6.0"
+            | "6.1"
+            | "6.1(back)"
+            | "7.0"
+            | "7.0(front)"
+            | "7.1"
+            | "7.1(wide)"
+            | "7.1(wide-side)"
+            | "3.1.2"
+            | "5.1.2"
+            | "5.1.4"
+            | "7.1.2"
+            | "7.1.4"
+            | "7.2.3"
+            | "9.1.4"
+            | "9.1.6"
+            | "hexagonal"
+            | "octagonal"
+            | "hexadecagonal"
+            | "22.2"
+    ) {
+        return true;
+    }
+    let list = layout
+        .strip_suffix(')')
+        .and_then(|layout| layout.split_once(" channels ("))
+        .map_or(layout, |(_, list)| list);
+    // A display name can contain '+', making the serialized channel sequence ambiguous.
+    let mut identifiers = list.split('+');
+    identifiers.clone().count() == channels as usize
+        && identifiers.any(|channel| channel.split('@').next() == Some("FC"))
 }
 
 fn audible_center(pcm: &[i16]) -> bool {
@@ -73,7 +140,7 @@ fn audible_center(pcm: &[i16]) -> bool {
             >= 400.0 * pcm.len() as f64
 }
 
-fn probe_front_center(video: &Path, ffmpeg_bin: &str, timeout: Duration) -> bool {
+fn probe_front_center(video: &Path, ffmpeg_bin: &str, deadline: FfmpegDeadline) -> bool {
     let ffmpeg = Path::new(ffmpeg_bin);
     let probe = ffmpeg.with_file_name(
         if ffmpeg
@@ -85,7 +152,10 @@ fn probe_front_center(video: &Path, ffmpeg_bin: &str, timeout: Duration) -> bool
             "ffprobe"
         },
     );
-    let mut command = Command::new(probe);
+    query_front_center(Command::new(probe), video, deadline)
+}
+
+fn query_front_center(mut command: Command, video: &Path, deadline: FfmpegDeadline) -> bool {
     command
         .args([
             "-v",
@@ -95,28 +165,32 @@ fn probe_front_center(video: &Path, ffmpeg_bin: &str, timeout: Duration) -> bool
             "-show_entries",
             "stream=channels,channel_layout",
             "-of",
-            "csv=p=0",
+            "json",
         ])
         .arg(video);
-    let Ok((status, stdout, _)) = run_ffmpeg(command, timeout) else {
+    let Ok((status, stdout, _)) = run_ffmpeg(command, deadline) else {
         return false;
     };
-    let text = String::from_utf8_lossy(&stdout);
+    #[derive(serde::Deserialize)]
+    struct Probe {
+        streams: [AudioStream; 1],
+    }
+    #[derive(serde::Deserialize)]
+    struct AudioStream {
+        channels: u32,
+        channel_layout: String,
+    }
     status.success()
-        && text
-            .trim()
-            .split_once(',')
-            .is_some_and(|(channels, layout)| {
-                channels
-                    .parse()
-                    .is_ok_and(|channels| has_front_center_channel(channels, layout))
-            })
+        && serde_json::from_slice::<Probe>(&stdout).is_ok_and(|probe| {
+            let [stream] = probe.streams;
+            has_front_center_channel(stream.channels, &stream.channel_layout)
+        })
 }
 
 fn extract_stream(
     video: &Path,
     ffmpeg_bin: &str,
-    timeout: Duration,
+    deadline: FfmpegDeadline,
     center: bool,
 ) -> Result<Vec<i16>, SyncError> {
     let mut command = Command::new(ffmpeg_bin);
@@ -131,7 +205,7 @@ fn extract_stream(
         "aresample=async=1:first_pts=0"
     };
     command.args(["-af", filter, "-f", "s16le", "-"]);
-    let (status, stdout, stderr) = run_ffmpeg(command, timeout)?;
+    let (status, stdout, stderr) = run_ffmpeg(command, deadline)?;
     if !status.success() {
         let stderr = String::from_utf8_lossy(&stderr);
         let message = stderr.lines().next().unwrap_or("no error output");
@@ -142,7 +216,7 @@ fn extract_stream(
 
 fn run_ffmpeg(
     mut command: Command,
-    timeout: Duration,
+    deadline: FfmpegDeadline,
 ) -> Result<(ExitStatus, Vec<u8>, Vec<u8>), SyncError> {
     // Capture in anonymous files so inherited pipe handles cannot hang a reader during cleanup.
     let capture = |error| SyncError::io("Capture FFmpeg output", error);
@@ -161,13 +235,12 @@ fn run_ffmpeg(
         .wrap(process_wrap::std::JobObject);
     #[cfg(unix)]
     command.wrap(process_wrap::std::ProcessGroup::leader());
-    let deadline = Instant::now() + timeout;
-    check_cancelled()?;
+    deadline.remaining()?;
     let mut child = command
         .spawn()
         .map_err(|e| SyncError::io("Start FFmpeg", e))?;
     drop(command);
-    let outcome = await_ffmpeg(child.as_mut(), [&stdout, &stderr], deadline, timeout);
+    let outcome = await_ffmpeg(child.as_mut(), [&stdout, &stderr], deadline);
     let cleanup = terminate(child.as_mut());
     let status = match (outcome, cleanup) {
         (Ok(()), Ok(status)) => status,
@@ -203,18 +276,10 @@ fn run_ffmpeg(
 fn await_ffmpeg(
     child: &mut dyn ChildWrapper,
     streams: [&File; 2],
-    deadline: Instant,
-    timeout: Duration,
+    deadline: FfmpegDeadline,
 ) -> Result<(), SyncError> {
     loop {
-        check_cancelled()?;
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            return Err(SyncError::Ffmpeg(format!(
-                "timed out after {} seconds",
-                timeout.as_secs_f64()
-            )));
-        }
+        let remaining = deadline.remaining()?;
         if leader_exited(child).map_err(|e| SyncError::io("Check FFmpeg status", e))? {
             return Ok(());
         }
@@ -412,6 +477,30 @@ mod tests {
     use super::*;
     use std::{env, fs::OpenOptions};
 
+    fn probe_labeled_channels(layout: &str) -> bool {
+        let mut probe = Command::new("ffprobe");
+        probe.args(["-f", "lavfi"]);
+        let source = format!("anullsrc=cl={layout}:r=16000");
+        query_front_center(
+            probe,
+            Path::new(&source),
+            FfmpegDeadline::new(Duration::from_secs(5)),
+        )
+    }
+
+    #[test]
+    fn comma_in_a_channel_name_preserves_the_physical_center() {
+        for layout in [r"FC@A\,B+FL+FR", r"FL@A\,B+FR+FC"] {
+            assert!(probe_labeled_channels(layout), "{layout}");
+        }
+    }
+
+    #[test]
+    fn plus_in_a_channel_name_does_not_create_a_physical_center() {
+        // Four backslashes pass one escaped plus through both lavfi option parsers.
+        assert!(!probe_labeled_channels(r"FL+FR+BC@X\\\\+FC"));
+    }
+
     fn owned_fixture(directory: &Path, role: &str, finish: bool) -> Command {
         let mut command = Command::new(env::current_exe().unwrap());
         command
@@ -477,7 +566,7 @@ mod tests {
             let before = Instant::now();
             let outcome = run_ffmpeg(
                 owned_fixture(directory.path(), "leader", finish),
-                Duration::from_secs(3),
+                FfmpegDeadline::new(Duration::from_secs(3)),
             );
             if finish {
                 assert!(outcome.unwrap().0.success());
@@ -503,10 +592,29 @@ mod tests {
 #[cfg(test)]
 #[test]
 fn front_center_requires_a_supported_layout_and_audible_pcm() {
-    for (channels, layout) in [(6, "5.1"), (6, "5.1(side)"), (8, "7.1"), (3, "3.0")] {
+    for (channels, layout) in [
+        (6, "5.1"),
+        (6, "5.1(side)"),
+        (8, "7.1"),
+        (3, "3.0"),
+        (4, "4.0"),
+        (5, "5.0(side)"),
+        (6, "6.0"),
+        (8, "7.1(wide-side)"),
+        (3, "3 channels (FC@Voice+LFE+BC)"),
+    ] {
         assert!(has_front_center_channel(channels, layout));
     }
-    for (channels, layout) in [(1, "mono"), (2, "stereo"), (4, "quad"), (3, "2.1")] {
+    for (channels, layout) in [
+        (1, "mono"),
+        (2, "stereo"),
+        (4, "quad"),
+        (3, "2.1"),
+        (3, "3 channels (FL+FR+TFC)"),
+        (3, "FL+FR+BFC"),
+        (3, "FL+FR+BC@FC"),
+        (6, "6.0(front)"),
+    ] {
         assert!(!has_front_center_channel(channels, layout));
     }
     assert!(!audible_center(&[]));

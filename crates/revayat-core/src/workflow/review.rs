@@ -242,7 +242,9 @@ pub fn donor(
     source: &str,
     keep_fonts: bool,
 ) -> Result<Vec<Cue>, String> {
-    use crate::subtitle_formats::document::{ass_template, srt_to_ass};
+    use crate::subtitle_formats::document::{
+        ass_template, donor_style_prefix, inherited_style_value, insert_generated_style, srt_to_ass,
+    };
     if cues.is_empty() || base.kind == "srt" && donor.kind == "srt" {
         return Ok(cues);
     }
@@ -259,31 +261,24 @@ pub fn donor(
                 .styles
                 .get("Default")
                 .ok_or_else(|| value_error("Default style template is missing"))?;
-            let row = candidate
-                .style_fields
-                .iter()
-                .map(|key| {
-                    template
-                        .style_fields
-                        .iter()
-                        .position(|f| f == key)
-                        .and_then(|i| default.get(i))
-                        .cloned()
-                        .unwrap_or_default()
-                })
-                .collect();
-            candidate.styles.insert("Default".into(), row);
+            insert_generated_style(&mut candidate, "Default", &template.style_fields, default);
         }
         let result = cues.into_iter().map(srt_to_ass).collect::<Result<_, _>>()?;
         base.styles = candidate.styles;
+        base.style_fields = candidate.style_fields;
         return Ok(result);
     }
-    if candidate.style_fields != donor.style_fields || candidate.event_fields != donor.event_fields
-    {
+    let Some(prefix) = donor_style_prefix(&candidate, donor)
+        .filter(|_| candidate.event_fields == donor.event_fields)
+    else {
         return Err(value_error(
             "ASS candidate formats differ; adapt them explicitly before merging",
         ));
-    }
+    };
+    let inherited: Vec<_> = prefix
+        .iter()
+        .map(|field| inherited_style_value(field))
+        .collect();
     let a = script_info(&candidate)?;
     let b = script_info(donor)?;
     let differences: Vec<_> = TRACK_FIELDS
@@ -308,7 +303,7 @@ pub fn donor(
             .iter()
             .position(|key| key == "name")
             .ok_or_else(|| value_error("Donor style format lacks a name"))?;
-        let mut values = values.clone();
+        let mut values: Vec<_> = inherited.iter().chain(values).cloned().collect();
         *values
             .get_mut(index)
             .ok_or_else(|| value_error("Donor style format lacks a name"))? = mapped.clone();

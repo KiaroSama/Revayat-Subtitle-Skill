@@ -425,7 +425,7 @@ pub fn validate_reported_timing(
                     || after.start_ms < previous_end
                     || after.start_ms > snap_join_limit(&plan, g, previous_end)
                     || after.end_ms - after.start_ms < 500
-                    || after.start_ms >= report.audio_duration_ms
+                    || after.start_ms.saturating_add(config.lead_in_ms) >= report.audio_duration_ms
                     || !after.start_ms.is_multiple_of(plan.unit)
                 {
                     return Err(invalid());
@@ -544,6 +544,7 @@ fn snap_start(
     cue: &mut SubtitleCue,
     min_start: u64,
     vad: &VadResult,
+    binary: &Integral<'_, u8>,
     config: &SyncConfig,
     max_start: u64,
     unit: u64,
@@ -555,10 +556,16 @@ fn snap_start(
     let low = cue.start_ms.saturating_sub(distance);
     let high = cue.start_ms.saturating_add(distance);
     let lead = config.lead_in_ms;
+    let baseline = binary.fraction(cue.start_ms, cue.end_ms);
     let first = vad.segments.partition_point(|span| span.start_ms < low);
     let candidate = vad.segments[first..]
         .iter()
         .take_while(|span| span.start_ms <= high.saturating_add(lead))
+        // Score speech from its onset so the intentional lead-in does not count as silence.
+        .filter(|span| {
+            span.start_ms < cue.end_ms
+                && binary.fraction(span.start_ms, cue.end_ms) + 1e-9 >= baseline
+        })
         .map(|span| span.start_ms.saturating_sub(lead) / unit * unit)
         .filter(|&start| {
             start >= low
@@ -648,6 +655,7 @@ pub(crate) fn align(
                 &mut aligned[*i],
                 previous_end,
                 vad,
+                &binary,
                 config,
                 snap_join_limit(&plan, g, previous_end),
                 plan.unit,

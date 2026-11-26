@@ -159,18 +159,11 @@ pub fn ass_document_to_ass(
     {
         row[index] = "-1".into();
     }
-    let by_field: HashMap<_, _> = template.style_fields.iter().zip(&row).collect();
     let mut result = doc.clone();
     result.cues.clear();
     result.source_comments.clear();
     result.comments = 0;
-    result.styles.insert(
-        style.clone(),
-        doc.style_fields
-            .iter()
-            .map(|f| by_field.get(f).map_or_else(String::new, |s| (*s).clone()))
-            .collect(),
-    );
+    document::insert_generated_style(&mut result, style, &template.style_fields, &row);
     if !options.title.is_empty() {
         let mut found = false;
         for (section, lines) in &mut result.sections {
