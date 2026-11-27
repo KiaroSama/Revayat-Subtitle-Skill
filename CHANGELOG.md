@@ -10,6 +10,7 @@
 - Classify text direction from the visible ASS text so `\h` and soft `\n` no longer trigger an LTR wrapper on Persian-only lines.
 - In ASS conversion, treat `\n` as a line break when `WrapStyle: 2`, an inline `\q2`, or `Banner` makes it one.
 - Run Gitleaks in a separate concurrency group for each commit pushed to `main`, so a newer push does not cancel the earlier scan.
+- Advance generation to `20` and normalization to `17` for the visible-ASS direction change. Rebuild recipe `19/16` workspaces into a distinct edition instead of reporting an untouched previous build as modified; preserve old files and require fresh render approval. See the [2026-11-28 edition migration recheck](docs/audit-revayat-subtitle-2026-11-28.md).
 
 ## [3.0.4] - 2026-11-27
 

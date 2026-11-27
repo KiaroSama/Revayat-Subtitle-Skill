@@ -35,8 +35,10 @@ pub struct RecipeVersion {
 }
 
 pub const RECIPE_VERSION: RecipeVersion = RecipeVersion {
-    normalization: 16,
-    generation: 19,
+    // Visible ASS direction semantics changed after recipe 19/16 reached main.
+    // Keep its immutable editions while rebuilding from the same reviewed input.
+    normalization: 17,
+    generation: 20,
 };
 
 pub fn utf8_path(path: &Path) -> Result<&str, String> {
