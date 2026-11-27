@@ -27,6 +27,8 @@ const SRT: &str = "1\n00:00:01,001 --> 00:00:02,009\n<i>می روم.</i>\n\n2\n0
 const RLE: char = '\u{202b}';
 const RLM: char = '\u{200f}';
 const PDF: char = '\u{202c}';
+const RTL: &str = "\u{200f}\u{2067}";
+const PDI: char = '\u{2069}';
 
 fn err<T: std::fmt::Debug>(result: Result<T, String>, expected: &str) {
     let error = result.expect_err(expected);
@@ -211,7 +213,7 @@ macro_rules! anchors {
         fn $name() -> Check {
             let end=$ending;
             let source=format!(r"{{\an8}}- سلام{end}\N{{\i1}}دنیا{end}{{\i0}}");
-            let expected=format!(r"{{\an8}}{RLE}{RLM}- سلام{end}{RLM}{PDF}\N{{\i1}}{RLE}دنیا{end}{RLM}{PDF}{{\i0}}");
+            let expected=format!(r"{{\an8}}{RTL}- سلام{end}{PDI}\N{{\i1}}{RTL}دنیا{end}{PDI}{{\i0}}");
             let anchor=|body| text::anchor_rtl_line(body,Some("ass".into()),Some("rtl".into()));
             let result=anchor(source)?;
             assert_eq!(result,expected);
@@ -233,11 +235,11 @@ fn anchor_strips_outer_noise_but_keeps_drawings_and_ltr() -> Check {
     };
     assert_eq!(
         anchor(format!("{PDF}{RLM}سلام!{RLE}"), "srt", "rtl")?,
-        format!("{RLE}سلام!{RLM}{PDF}")
+        format!("{RTL}سلام!{PDI}")
     );
     assert_eq!(
         anchor("سلام.\nدنیا!".into(), "srt", "rtl")?,
-        format!("{RLE}سلام.{RLM}{PDF}\n{RLE}دنیا!{RLM}{PDF}")
+        format!("{RTL}سلام.{PDI}\n{RTL}دنیا!{PDI}")
     );
     assert_eq!(anchor("سلام!".into(), "srt", "ltr")?, "سلام!");
     assert_eq!(anchor("Hello!".into(), "ass", "rtl")?, "Hello!");
@@ -245,7 +247,7 @@ fn anchor_strips_outer_noise_but_keeps_drawings_and_ltr() -> Check {
     assert_eq!(anchor(drawing.into(), "ass", "rtl")?, drawing);
     assert!(
         markup::rtl("سلام.".into(), "ass".into(), "rtl".into(), false)?
-            .ends_with(&format!(".{RLM}{PDF}"))
+            .ends_with(&format!(".{PDI}"))
     );
     Ok(())
 }
@@ -260,7 +262,7 @@ fn process_applies_flags_and_distinct_line_models() -> Check {
         Some(false),
         Some(false),
     )?;
-    assert_eq!(result, format!(r"{{\i1}}{RLE}مي روم؟{RLM}{PDF}{{\i0}}"));
+    assert_eq!(result, format!(r"{{\i1}}{RTL}مي روم؟{PDI}{{\i0}}"));
     assert_eq!(
         text::process_cue_text(
             "one two three four five".into(),
@@ -450,7 +452,7 @@ macro_rules! physical_newlines {
             let row=json!({"id":"c000001","source_text":"original","text":format!("سلام{}دنیا",$nl),"reviewed":true,"action":"edit","start_ms":1000,"end_ms":2000});
             let (cues,_)=review::reviewed_cues(&doc,&[row],"fa")?;
             assert!(!cues[0].text.contains('\r'));
-            assert_eq!(cues[0].text.matches(RLM).count(),4);
+            assert_eq!(cues[0].text.matches(RTL).count(),2);
             assert_eq!(document::parse(&document::serialize(&doc,&cues,false)?,"srt")?.cues[0].text,cues[0].text);
             Ok(())
         }

@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const VERSION: &str = "3.0.2";
+const VERSION: &str = "3.0.3";
 const SKILL: &str = "skills/revayat-subtitle";
 const WORKFLOW: &str = "skills/revayat-subtitle/references/multi-agent-workflow.md";
 const PLUGINS: &[&str] = &[
@@ -401,7 +401,7 @@ fn rtl_prompt_keeps_last_punctuation_inside_the_isolate() -> Result<()> {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    assert!(workflow.contains("RLI (U+2067) and close it with PDI (U+2069) after the last character, including any terminal punctuation"));
+    assert!(workflow.contains("RLM (U+200F) and RLI (U+2067) before the readable text and PDI (U+2069) after the final punctuation"));
     Ok(())
 }
 

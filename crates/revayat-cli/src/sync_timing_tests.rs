@@ -102,6 +102,7 @@ fn zero_limits_accept_unchanged_timing_and_exact_cumulative_srt_repairs() {
 #[test]
 fn exact_positive_and_negative_shift_boundaries_apply_to_both_endpoints() {
     let config = SyncConfig {
+        end_adjust_ms: 0,
         max_offset_ms: 1000,
         max_split_offset_ms: 200,
         ..zero_limits()
@@ -140,6 +141,7 @@ fn exact_positive_and_negative_shift_boundaries_apply_to_both_endpoints() {
 #[test]
 fn fps_then_total_split_shifts_and_format_rounding_are_replayed_exactly() {
     let config = SyncConfig {
+        end_adjust_ms: 0,
         fps_search: true,
         max_split_offset_ms: 200,
         ..zero_limits()
@@ -183,6 +185,7 @@ fn fps_then_total_split_shifts_and_format_rounding_are_replayed_exactly() {
 #[test]
 fn ass_group_clamping_uses_time_order_and_preserves_internal_offsets() {
     let config = SyncConfig {
+        end_adjust_ms: 0,
         max_offset_ms: 100,
         ..zero_limits()
     };
@@ -204,6 +207,7 @@ fn ass_group_clamping_uses_time_order_and_preserves_internal_offsets() {
         .unwrap();
     }
     let config = SyncConfig {
+        end_adjust_ms: 0,
         max_split_offset_ms: 500,
         ..zero_limits()
     };
@@ -222,6 +226,7 @@ fn ass_group_clamping_uses_time_order_and_preserves_internal_offsets() {
 #[test]
 fn non_centisecond_ass_report_shift_cannot_expand_the_requested_bound() {
     let config = SyncConfig {
+        end_adjust_ms: 0,
         max_split_offset_ms: 31,
         ..zero_limits()
     };
@@ -244,6 +249,7 @@ fn eligible_snap_boundaries_and_exact_remaining_duration_are_accepted() {
     for (start, distance) in [(900, 100), (1100, 100), (1500, 500)] {
         for format in [SubtitleFormat::Srt, SubtitleFormat::Ass] {
             let config = SyncConfig {
+                end_adjust_ms: 0,
                 snap_ms: distance,
                 ..zero_limits()
             };
@@ -253,6 +259,7 @@ fn eligible_snap_boundaries_and_exact_remaining_duration_are_accepted() {
         }
     }
     let config = SyncConfig {
+        end_adjust_ms: 0,
         snap_ms: 50,
         ..zero_limits()
     };
@@ -275,6 +282,7 @@ fn real_engine_nonzero_snaps_obey_duration_without_a_new_onset_grid_restriction(
     let source = "1\n00:00:01,000 --> 00:00:02,000\nAuthored\n";
     let original = SubtitleDocument::parse(source, None).unwrap();
     let config = SyncConfig {
+        end_adjust_ms: 0,
         snap_ms: 100,
         lead_in_ms: 0,
         ..zero_limits()
@@ -318,6 +326,7 @@ fn snapping_cannot_change_an_end_or_escape_distance_duration_and_count_limits() 
         (1000, 2100, 100, 0),
     ] {
         let config = SyncConfig {
+            end_adjust_ms: 0,
             snap_ms: distance,
             ..zero_limits()
         };
@@ -335,6 +344,7 @@ fn snapping_cannot_change_an_end_or_escape_distance_duration_and_count_limits() 
         );
     }
     let config = SyncConfig {
+        end_adjust_ms: 0,
         snap_ms: 100,
         ..zero_limits()
     };

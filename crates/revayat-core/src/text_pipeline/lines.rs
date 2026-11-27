@@ -1,10 +1,48 @@
-use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate, starts_with_latin};
+use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate};
 use std::collections::HashSet;
 use unicode_bidi::{BidiClass, bidi_class};
 
 use super::drawing_mode;
 use super::tokens;
-use super::{BIDI, PDF, RLE, RLM, Regex, WORD, ZWNJ, py_space, srt_break, srt_tag_fits};
+use super::{BIDI, PDF, RLE, Regex, WORD, ZWNJ, py_space, srt_break, srt_tag_fits};
+
+const WRAP_PUNCT: &str = "،.؟?!؛:…";
+const EDGE_MARKS: &str = "\u{200f}\u{200e}\u{061c}";
+
+fn trim_edge_marks(head: &mut String, leading: bool) {
+    if leading {
+        let end = head.len() - head.trim_start_matches(|c| EDGE_MARKS.contains(c)).len();
+        head.drain(..end);
+    } else {
+        let end = head.trim_end_matches(py_space).len();
+        let start = head[..end]
+            .trim_end_matches(|c| EDGE_MARKS.contains(c))
+            .len();
+        head.drain(start..end);
+    }
+}
+
+fn repair_leading_punctuation(parts: &mut [String], first: usize, last: usize) {
+    let start = parts[first].trim_start_matches(|c| py_space(c) || BIDI.contains(c));
+    let prefix = [
+        "...", "?!", "!?", "؟!", "!؟", ".", "،", "؛", "!", "؟", "?", "…",
+    ]
+    .into_iter()
+    .find(|prefix| {
+        start
+            .strip_prefix(prefix)
+            .is_some_and(|body| body.chars().next().is_some_and(super::prose::arabic_letter))
+    });
+    let Some(prefix) = prefix else { return };
+    let tail = parts[last].trim_end_matches(|c| py_space(c) || BIDI.contains(c));
+    if tail.ends_with(|c| WRAP_PUNCT.contains(c)) {
+        return;
+    }
+    let offset = parts[first].len() - start.len();
+    let end = tail.len() - if first == last { prefix.len() } else { 0 };
+    parts[first].drain(offset..offset + prefix.len());
+    parts[last].insert_str(end, prefix);
+}
 
 type Token<'a> = (&'a str, bool);
 type Line<'a> = Vec<Token<'a>>;
@@ -79,7 +117,8 @@ fn wrap_group(lines: &[Line<'_>], width: usize, limit: usize, kind: &str) -> Str
         merged.extend_from_slice(line);
     }
     let raw = original(&merged);
-    let total = visible(&merged, kind).chars().count();
+    let visible_chars: Vec<_> = visible(&merged, kind).chars().collect();
+    let total = visible_chars.len();
     if total <= width || limit <= 1 {
         return raw;
     }
@@ -101,7 +140,12 @@ fn wrap_group(lines: &[Line<'_>], width: usize, limit: usize, kind: &str) -> Str
             for space in spaces.find_iter(part) {
                 before += extend(&part[cursor..space.start()], &mut tail);
                 let space_len = space.len();
-                if before > 0 && before < total.saturating_sub(space_len) {
+                if before > 0
+                    && before < total.saturating_sub(space_len)
+                    && !visible_chars
+                        .get(before + space_len)
+                        .is_some_and(|c| WRAP_PUNCT.contains(*c))
+                {
                     candidates.push((
                         offset + space.start(),
                         offset + space.end(),
@@ -279,8 +323,15 @@ pub(super) fn anchor(
             .iter()
             .filter(|(part, show)| *show && !part.trim_matches(py_space).is_empty());
         let already_isolated = has_outer_rtl_isolate(spans.flat_map(|(part, _)| part.chars()));
-        if has_rtl && !already_isolated {
+        if has_rtl {
             let line_balanced = balanced(&raw, kind);
+            if already_isolated && line_balanced {
+                output.push_str(&raw);
+                if let Some(delimiter) = breaks.get(i) {
+                    output.push_str(delimiter);
+                }
+                continue;
+            }
             if line_balanced || !whole_balanced {
                 let mut indices = line
                     .iter()
@@ -290,6 +341,15 @@ pub(super) fn anchor(
                     let last = indices.next_back().map_or(first, |(last, _)| last);
                     let mut parts: Vec<_> =
                         line.iter().map(|(part, _)| (*part).to_owned()).collect();
+                    if !line_balanced {
+                        for (part, (_, show)) in parts.iter_mut().zip(line) {
+                            if *show {
+                                part.retain(|c| !matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'));
+                            }
+                        }
+                    }
+                    trim_edge_marks(&mut parts[first], true);
+                    trim_edge_marks(&mut parts[last], false);
                     if line_balanced
                         && parts[first].starts_with(RLE)
                         && parts[last].trim_end_matches(py_space).ends_with(PDF)
@@ -298,41 +358,17 @@ pub(super) fn anchor(
                         parts[first].drain(..RLE.len_utf8());
                         let end = parts[last].trim_end_matches(py_space).len();
                         parts[last].drain(end - PDF.len_utf8()..end);
-                        if !balanced(&parts.concat(), kind) {
+                        if balanced(&parts.concat(), kind) {
+                            trim_edge_marks(&mut parts[first], true);
+                            trim_edge_marks(&mut parts[last], false);
+                        } else {
                             parts[first] = a;
                             parts[last] = b;
                         }
                     }
-                    let noise = if line_balanced {
-                        "\u{200f}\u{200e}\u{061c}"
-                    } else {
-                        BIDI
-                    };
-                    let leading = parts[first].len()
-                        - parts[first].trim_start_matches(|c| noise.contains(c)).len();
-                    parts[first].drain(..leading);
-                    let end = parts[last].trim_end_matches(py_space).len();
-                    let suffix = parts[last][..end]
-                        .trim_end_matches(|c| noise.contains(c))
-                        .len();
-                    parts[last].drain(suffix..end);
-                    if line_balanced && starts_with_latin(prose.chars()) {
-                        parts[first].insert_str(0, RTL_ISOLATE);
-                        parts[last].push(PDI);
-                    } else {
-                        let head = parts[first].trim_start_matches(py_space);
-                        if head.starts_with("- ") {
-                            let offset = parts[first].len() - head.len();
-                            parts[first].insert(offset, RLM);
-                        }
-                        let tail = parts[last].trim_end_matches(py_space);
-                        if tail.ends_with(|c| ".،؟!…:؛»)]\"'-".contains(c)) {
-                            let offset = tail.len();
-                            parts[last].insert(offset, RLM);
-                        }
-                        parts[first].insert(0, RLE);
-                        parts[last].push(PDF);
-                    }
+                    repair_leading_punctuation(&mut parts, first, last);
+                    parts[first].insert_str(0, RTL_ISOLATE);
+                    parts[last].push(PDI);
                     let candidate = parts.concat();
                     if balanced(&candidate, kind) {
                         raw = candidate;

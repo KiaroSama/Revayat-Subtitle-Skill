@@ -18,25 +18,18 @@ Fix the sentence itself when the source was stored in visual order. A direction
 mark cannot repair word order. The same applies to Latin names, acronyms, URLs,
 dates, measurements and numbers; preserve a meaningful Latin literal.
 
-The builder inserts actual U+200F RIGHT-TO-LEFT MARK at Persian display-line
-boundaries, outside ASS commands and drawing payloads. The six literal characters
-`\u200f` are not a mark. Keep meaningful U+200C ZWNJ in Persian words.
+The builder wraps each Persian display line in `RLM` (`U+200F`) followed by
+`RLI` (`U+2067`), with `PDI` (`U+2069`) after the readable text and punctuation.
+This applies regardless of the opening script, digit, or dialogue dash. Keep
+ASS overrides, drawing data, and SRT tags outside the generated wrapper.
+Use actual Unicode characters and check the result in the target renderer.
 
-For mixed Persian/Latin or Persian/number lines it also uses balanced U+202B RLE
-and U+202C PDF. RLM alone left word groups in the wrong order in actual libass
-renders. This embeds direction without reversing the logical string. Preserve
-valid isolates, including scopes crossing display lines; those lines receive marks
-without an extra embedding wrapper. Repair accidental overrides only in editable prose.
-
-When a Persian display line starts with a Latin or English word, an acronym, or a
-number-plus-Latin token, put Right-to-Left Isolate (`RLI`, `U+2067`) before the
-line's readable text and Pop Directional Isolate (`PDI`, `U+2069`) after the
-last character, including any trailing punctuation. If the renderer infers
-paragraph direction and needs an RTL base, put Right-to-Left Mark (`RLM`,
-`U+200F`) immediately before `RLI`, outside the isolate.
-Use the actual Unicode characters outside markup. Check word order and trailing
-punctuation in the target renderer (libass, VLC, mpv, or the web player). The
-punctuation should stay with the sentence; the left edge can be correct for RTL.
+Conversion removes unbalanced directional controls from imported prose and
+keeps intentional balanced inner and cross-line scopes. Inside Persian words,
+it replaces stray `RLM` between letters with `ZWNJ` (`U+200C`). Reversed leading
+punctuation moves to the logical end only when it directly precedes a Persian
+letter and the line has no terminal punctuation. Keep legitimate continuation
+ellipses and dialogue dashes.
 
 For a difficult Latin phrase within a line, test `U+2066` LRI with `U+2069` PDI
 in the real renderer. Never use `U+202E` RLO to fix logical word order.
@@ -117,7 +110,6 @@ or the user overrides it. Preserve inline emphasis.
 To keep terminal punctuation on its own line in libass and players such as VLC,
 mpv and PotPlayer, the text pipeline balances lines over 42 visible characters
 with explicit `\N` breaks. It does not split override blocks or ZWNJ compounds.
-It wraps each physical RTL line in `U+202B` and `U+202C` and puts `U+200F` after
-terminal neutral punctuation, before `U+202C`. Tag-aware ZWNJ enforcement
+Wraps keep detached terminal punctuation with the preceding text. Tag-aware ZWNJ enforcement
 normalizes `می‌`/`نمی‌`, `‌ها`/`‌های`, `‌تر`/`‌ترین`, and heh-final enclitics without
 altering tags or Latin spans.

@@ -100,6 +100,7 @@ fn zero_limits() -> SyncConfig {
         split_penalty: 7.0,
         snap_ms: 0,
         lead_in_ms: 50,
+        end_adjust_ms: 0,
         fps_search: false,
     }
 }
@@ -365,6 +366,7 @@ fn accepts_real_engine_fps_quantization_and_negative_clamping_reports() {
                 max_split_offset_ms: 0,
                 snap_ms: 0,
                 lead_in_ms: 50,
+                end_adjust_ms: 0,
                 ..SyncConfig::default()
             };
             let report = subsync_rs::sync_subtitles_with_vad(&mut aligned, &vad, &config).unwrap();

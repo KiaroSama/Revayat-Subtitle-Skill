@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 3.0.3 (2026-11-27)
 
-- Check speech-overlap quality before selecting a nearby onset, and validate the implied onset including the configured lead-in when replaying worker results. Preserve joined cues, original ASS overlaps and the existing FPS controls.
-- Share one extraction deadline across audio probing, Center decoding and mono fallback. Recognize documented Front Center layouts, including `7.1(wide-side)`, without confusing `TFC` with `FC`.
-- Preserve the exact source `Default` style's bold setting and supported numeric spellings. Retain generated ASS options when the source uses an abbreviated style Format, including reviewed mixed-source editions, while preserving other styles and custom metadata. New editions use generation recipe `16`; normalization remains `13` and earlier sealed editions keep their evidence.
+- Filter nearby speech onsets by overlap quality before snapping. When replaying worker results, check the implied onset after accounting for the configured lead-in (PR #38, A01–A02).
+- Parse source ASS Default bold values as libass does. Expand abbreviated style schemas so generated columns survive conversion, including in mixed-source reviewed editions (PR #38, A03–A04).
+- Use one FFmpeg deadline for probing, Center extraction, and mono fallback. Read FFprobe's structured JSON to detect Front Center (`FC`) without confusing it with Top Front Center (`TFC`) (PR #38, A05–A06).
+- Align each cue's start and end to speech. Search farther for drift in standalone cues while keeping joined dialogue together. Extend ends that cut off speech, aim for 900 ms of readable duration when space allows, and trim excess silence toward a 250 ms trail-out. Bound end changes with `--end-adjust-ms` (default `600`) and validate the reported `cues_end_adjusted` count during replay.
+- Wrap Persian RTL display lines in UAX #9 `RLM + RLI ... PDI` (`U+200F U+2067 ... U+2069`). Clean unbalanced bidi controls, replace intra-word `RLM` with ZWNJ, move reversed leading punctuation to the logical end, and keep commas from starting wrapped lines. Use generation recipe `17` and normalization recipe `14`.
 
 ## 3.0.2 (2026-11-26)
 

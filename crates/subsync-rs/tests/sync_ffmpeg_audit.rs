@@ -29,7 +29,9 @@ fn extracts_real_ffmpeg_matroska_audio() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let report = support::report(run(fixture.command_for("--video", &media)));
+    let mut command = fixture.command_for("--video", &media);
+    command.args(["--end-adjust-ms", "0"]);
+    let report = support::report(run(command));
     assert_eq!(report["cues_total"], INTERVALS.len());
     assert!(report["global_offset_ms"].as_i64().unwrap().abs_diff(-1300) <= 100);
     assert!(report["overlap_score_after"].as_f64().unwrap() >= 0.9);
@@ -39,7 +41,9 @@ fn extracts_real_ffmpeg_matroska_audio() {
     );
     let wav_fixture = Fixture::new();
     wav_fixture.write_subtitle("\n");
-    let wav_report = support::report(run(wav_fixture.command()));
+    let mut wav_command = wav_fixture.command();
+    wav_command.args(["--end-adjust-ms", "0"]);
+    let wav_report = support::report(run(wav_command));
     assert_eq!(report["global_offset_ms"], wav_report["global_offset_ms"]);
     assert_eq!(
         fs::read(fixture.output).unwrap(),

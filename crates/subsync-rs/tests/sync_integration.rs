@@ -133,7 +133,16 @@ fn shifts_srt_back_by_3200_ms_using_wav() {
     write_wav_pcm16(&wav, RATE, &pcm).unwrap();
     assert_eq!(read_wav_pcm16(&wav).unwrap(), (RATE, pcm));
     fs::write(&original, srt(SPEECH.map(|(s, e)| (s + 3200, e + 3200)))).unwrap();
-    let report = sync_file_to_wav(&wav, &original, &aligned, &SyncConfig::default()).unwrap();
+    let report = sync_file_to_wav(
+        &wav,
+        &original,
+        &aligned,
+        &SyncConfig {
+            end_adjust_ms: 0,
+            ..SyncConfig::default()
+        },
+    )
+    .unwrap();
     assert!(report.global_offset_ms.abs_diff(-3200) <= 100, "{report:?}");
     assert!(report.overlap_score_after - report.overlap_score_before > 0.35);
     let result = fs::read_to_string(&aligned).unwrap();
@@ -160,7 +169,15 @@ fn shifts_utf8_ass_forward_and_preserves_non_dialogue_bytes() {
     }
     let mut doc = SubtitleDocument::parse(&original, None).unwrap();
     assert_eq!(doc.format, SubtitleFormat::Ass);
-    let report = sync_subtitles_with_vad(&mut doc, &vad, &SyncConfig::default()).unwrap();
+    let report = sync_subtitles_with_vad(
+        &mut doc,
+        &vad,
+        &SyncConfig {
+            end_adjust_ms: 0,
+            ..SyncConfig::default()
+        },
+    )
+    .unwrap();
     assert!(report.global_offset_ms.abs_diff(2400) <= 100, "{report:?}");
     let output = doc.serialize().unwrap();
     assert!(output.starts_with(header));
@@ -190,7 +207,15 @@ fn detects_pal_to_ntsc_drift() {
             )
         });
         let mut doc = SubtitleDocument::parse(&srt(scaled), None).unwrap();
-        let report = sync_subtitles_with_vad(&mut doc, &vad, &SyncConfig::default()).unwrap();
+        let report = sync_subtitles_with_vad(
+            &mut doc,
+            &vad,
+            &SyncConfig {
+                end_adjust_ms: 0,
+                ..SyncConfig::default()
+            },
+        )
+        .unwrap();
         assert!((report.fps_ratio - 1.0 / ratio).abs() < 1e-6, "{report:?}");
         assert_times(&doc, &SPEECH, 100);
     }
@@ -337,6 +362,7 @@ fn per_dialogue_alignment_fixes_individual_drifted_cues() {
         max_offset_ms: 0,
         fps_search: false,
         snap_ms: 0,
+        end_adjust_ms: 0,
         ..SyncConfig::default()
     };
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
@@ -361,6 +387,7 @@ fn per_dialogue_alignment_respects_zero_split_limit() {
         max_split_offset_ms: 0,
         fps_search: false,
         snap_ms: 0,
+        end_adjust_ms: 0,
         ..SyncConfig::default()
     };
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
@@ -380,6 +407,7 @@ fn detects_a_five_second_edit_and_aligns_both_halves() {
     let mut doc = SubtitleDocument::parse(&srt(shifted), None).unwrap();
     let config = SyncConfig {
         fps_search: false,
+        end_adjust_ms: 0,
         ..SyncConfig::default()
     };
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
@@ -496,6 +524,7 @@ fn aligns_twelve_edited_sections_across_a_twelve_minute_timeline() {
     let config = SyncConfig {
         fps_search: false,
         snap_ms: 0,
+        end_adjust_ms: 0,
         ..SyncConfig::default()
     };
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();

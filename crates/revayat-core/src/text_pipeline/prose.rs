@@ -155,11 +155,36 @@ fn normalize_prose(
     })
 }
 
+pub(super) fn arabic_letter(c: char) -> bool {
+    ('\u{0600}'..='\u{06ff}').contains(&c) && c.is_alphabetic()
+}
+
+fn repair_intra_word_rlm(text: &str) -> Cow<'_, str> {
+    if !text.contains('\u{200f}') {
+        return Cow::Borrowed(text);
+    }
+    let mut chars = text.chars().peekable();
+    let mut previous = None;
+    let mut output = String::with_capacity(text.len());
+    while let Some(c) = chars.next() {
+        if c == '\u{200f}'
+            && previous.is_some_and(arabic_letter)
+            && chars.peek().copied().is_some_and(arabic_letter)
+        {
+            output.push(ZWNJ);
+        } else {
+            output.push(c);
+        }
+        previous = Some(c);
+    }
+    Cow::Owned(output)
+}
+
 pub(super) fn normalize(text: &str, runtime_word_class: Option<&str>) -> Result<String, String> {
     let protected = pattern!(
         FancyRegex,
         format!(
-            r"{ASS}|{HTML}|\\[NnHh]|(?:[A-Za-z][A-Za-z0-9+.-]*://|[Ww][Ww][Ww]\.|[Tt]\.[Mm][Ee]/)[^\x09-\x0d <>{{}}\\]+|(?:(?<![A-Za-z0-9_])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9_])(?=-))(?:[A-Za-z0-9-]+\.)+[A-Za-z]{{2,}}/[^\x09-\x0d <>{{}}\\]*|[A-Za-z0-9_.+-]+@[A-Za-z0-9_.-]+\.[A-Za-z]{{2,}}|<!--"
+            r"{ASS}|{HTML}|`[^`\r\n]*`|\\[NnHh]|(?:[A-Za-z][A-Za-z0-9+.-]*://|[Ww][Ww][Ww]\.|[Tt]\.[Mm][Ee]/)[^\x09-\x0d <>{{}}\\]+|(?:(?<![A-Za-z0-9_])(?=[A-Za-z0-9])|(?<=[A-Za-z0-9_])(?=-))(?:[A-Za-z0-9-]+\.)+[A-Za-z]{{2,}}/[^\x09-\x0d <>{{}}\\]*|[A-Za-z0-9_.+-]+@[A-Za-z0-9_.-]+\.[A-Za-z]{{2,}}|<!--"
         )
     );
     let patterns = normalizer_patterns(runtime_word_class)?;
@@ -167,7 +192,7 @@ pub(super) fn normalize(text: &str, runtime_word_class: Option<&str>) -> Result<
     for segment in segments(text, protected) {
         let (prose, literal) = segment?;
         if !prose.is_empty() {
-            output.push_str(&normalize_prose(prose, &patterns)?);
+            output.push_str(&normalize_prose(&repair_intra_word_rlm(prose), &patterns)?);
         }
         output.push_str(literal);
     }

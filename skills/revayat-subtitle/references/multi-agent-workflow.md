@@ -78,13 +78,11 @@ and bidi controls. Break at phrase boundaries with literal \N in ASS or a newlin
 in SRT. Flag indivisible spans, clipping and crowded spacing. Never split an
 override block, grapheme or ZWNJ compound.
 
-Check each Persian line that starts with a Latin or English word, acronym or
-number-plus-Latin token. Start the readable line with RLI (U+2067) and close it
-with PDI (U+2069) after the last character, including any terminal punctuation.
-Put RLM (U+200F) before RLI if the renderer infers paragraph direction and needs
-an RTL base. Keep text in logical order. Let the normalizer handle its usual
-U+202B/U+202C wrappers and U+200F punctuation marks without duplicating them.
-Keep ZWNJ inside Persian words without touching tags, URLs or Latin spans.
+Check every Persian display line, including lines that open with Latin text,
+a number, or a dialogue dash. Keep the text in logical order and let the
+normalizer put RLM (U+200F) and RLI (U+2067) before the readable text and PDI
+(U+2069) after the final punctuation. Do not add another wrapper. Keep ZWNJ
+inside Persian words without touching tags, URLs, or Latin spans.
 
 In Translator Mode, keep primary overlap groups and the order and layers within
 them. Add empty donor timing slots only for uncovered spans and keep source

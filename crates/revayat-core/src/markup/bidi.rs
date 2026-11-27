@@ -11,7 +11,6 @@ use Piece::Text;
 
 const RLM: char = '\u{200f}';
 const LRM: char = '\u{200e}';
-const RLE: char = '\u{202b}';
 const LRE: char = '\u{202a}';
 const PDF: char = '\u{202c}';
 pub(super) const CONTROLS: &str = "\u{061c}\u{200e}\u{200f}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069}";
@@ -146,12 +145,6 @@ pub(crate) fn has_outer_rtl_isolate(mut text: impl Iterator<Item = char>) -> boo
     false
 }
 
-pub(crate) fn starts_with_latin(mut text: impl Iterator<Item = char>) -> bool {
-    let latin = pattern!(Regex, r"\A\p{Script=Latin}\z");
-    text.find(|c| !python_space(*c) && !CONTROLS.contains(*c))
-        .is_some_and(|c| c.is_alphabetic() && latin.is_match(c.encode_utf8(&mut [0; 4])))
-}
-
 fn flush(
     line: &mut Vec<Token<'_>>,
     output: &mut String,
@@ -188,6 +181,7 @@ fn flush(
         for (prefix, suffix) in [
             ("\u{202b}\u{200f}", "\u{200f}\u{202c}"),
             ("\u{202a}\u{200e}", "\u{200e}\u{202c}"),
+            ("\u{202b}", "\u{202c}"),
             ("\u{200f}", "\u{200f}"),
             ("\u{200e}", "\u{200e}"),
         ] {
@@ -203,32 +197,21 @@ fn flush(
         }
         if force || indices.iter().any(|&i| has_rtl(&line[i].1)) {
             let mixed = indices.iter().any(|&i| has_ltr(&line[i].1));
-            let terminal = rtl
-                && line[last]
-                    .1
-                    .trim_end_matches(python_space)
-                    .ends_with(['.', '،', '؟', '!', '…', ':', '؛']);
-            // Marks may cross display lines; embeddings must not enclose half an isolate.
-            let isolate =
-                rtl && mixed && starts_with_latin(indices.iter().flat_map(|&i| line[i].1.chars()));
-            let embedding = (mixed || terminal)
-                && validate(
-                    &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
-                    kind,
-                )
-                .is_ok();
-            if isolate && embedding {
+            // Do not enclose half of an intentional scope that crosses a display break.
+            let balanced = validate(
+                &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                kind,
+            )
+            .is_ok();
+            if rtl && balanced {
                 line[first].1.to_mut().insert_str(0, RTL_ISOLATE);
                 line[last].1.to_mut().push(PDI);
             } else {
                 let mark = if rtl { RLM } else { LRM };
                 line[first].1.to_mut().insert(0, mark);
                 line[last].1.to_mut().push(mark);
-                if embedding {
-                    line[first]
-                        .1
-                        .to_mut()
-                        .insert(0, if rtl { RLE } else { LRE });
+                if !rtl && mixed && balanced {
+                    line[first].1.to_mut().insert(0, LRE);
                     line[last].1.to_mut().push(PDF);
                 }
             }

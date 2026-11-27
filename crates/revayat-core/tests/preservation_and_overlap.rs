@@ -558,7 +558,7 @@ fn srt_break_variants_anchor_each_persian_display_line() -> Check {
         let text = format!("سلام{tag}دنیا OVA");
         let normalized = markup::rtl(text.clone(), "srt".into(), "rtl".into(), false)?;
         assert_eq!(visible(text, "srt".into())?, "سلام\nدنیا OVA");
-        assert_eq!(normalized.matches('\u{200f}').count(), 4);
+        assert_eq!(normalized.matches("\u{200f}\u{2067}").count(), 2);
         assert_eq!(visible(normalized.clone(), "srt".into())?, "سلام\nدنیا OVA");
         assert_eq!(
             markup::rtl(normalized.clone(), "srt".into(), "rtl".into(), false)?,

@@ -409,13 +409,27 @@ pub fn validate_reported_timing(
     }
     plan.repair(&mut expected);
     let mut snapped = 0;
+    let mut end_adjusted = 0;
     let mut previous_end = 0;
     for (g, group) in plan.groups.iter().enumerate() {
         let indices = &plan.order[group.first..group.end];
         for &i in indices {
             let (before, after) = (expected[i], output[i]);
-            if after.end_ms != before.end_ms || after.start_ms >= after.end_ms {
+            if after.start_ms >= after.end_ms {
                 return Err(invalid());
+            }
+            if after.end_ms != before.end_ms {
+                let (low, high) = align_cue::end_bounds(&plan, g, output, report.audio_duration_ms);
+                if indices.len() != 1
+                    || config.end_adjust_ms == 0
+                    || after.end_ms.abs_diff(before.end_ms) > config.end_adjust_ms
+                    || after.end_ms - after.start_ms < 500
+                    || !(low..=high).contains(&after.end_ms)
+                    || !after.end_ms.is_multiple_of(plan.unit)
+                {
+                    return Err(invalid());
+                }
+                end_adjusted += 1;
             }
             if after.start_ms != before.start_ms {
                 if indices.len() != 1
@@ -439,7 +453,7 @@ pub fn validate_reported_timing(
             .max()
             .unwrap_or(previous_end);
     }
-    if snapped != report.cues_snapped {
+    if snapped != report.cues_snapped || end_adjusted != report.cues_end_adjusted {
         return Err(invalid());
     }
     Ok(())
@@ -591,6 +605,7 @@ pub(crate) struct Alignment {
     pub global_offset_ms: i64,
     pub split_segments: Vec<SplitSegment>,
     pub cues_snapped: usize,
+    pub cues_end_adjusted: usize,
     pub overlap_score_before: f64,
     pub overlap_score_after: f64,
 }
@@ -667,6 +682,11 @@ pub(crate) fn align(
             .max()
             .unwrap_or(previous_end);
     }
+    let cues_end_adjusted = if config.end_adjust_ms > 0 {
+        align_cue::refine_ends(&plan, &mut aligned, vad, config.end_adjust_ms)?
+    } else {
+        0
+    };
     Ok(Alignment {
         overlap_score_before: score(cues, &binary),
         overlap_score_after: score(&aligned, &binary),
@@ -675,6 +695,7 @@ pub(crate) fn align(
         global_offset_ms: global.shift,
         split_segments,
         cues_snapped,
+        cues_end_adjusted,
     })
 }
 

@@ -40,6 +40,8 @@ pub struct SyncArgs {
     pub snap_ms: u64,
     #[arg(long, default_value_t = 50)]
     pub lead_in_ms: u64,
+    #[arg(long, default_value_t = 600)]
+    pub end_adjust_ms: u64,
     #[arg(long)]
     pub no_fps_search: bool,
     #[arg(long)]
@@ -79,6 +81,7 @@ pub struct SyncOptions<'a> {
     pub split_penalty: f64,
     pub snap_ms: u64,
     pub lead_in_ms: u64,
+    pub end_adjust_ms: u64,
     pub fps_search: bool,
     pub json_report: Option<&'a Path>,
     pub timeout: f64,
@@ -94,6 +97,7 @@ impl Default for SyncOptions<'_> {
             split_penalty: 7.0,
             snap_ms: 350,
             lead_in_ms: 50,
+            end_adjust_ms: 600,
             fps_search: true,
             json_report: None,
             timeout: SYNC_TIMEOUT,
@@ -126,6 +130,7 @@ pub fn run_sync(args: SyncArgs) -> anyhow::Result<()> {
             split_penalty: args.split_penalty,
             snap_ms: args.snap_ms,
             lead_in_ms: args.lead_in_ms,
+            end_adjust_ms: args.end_adjust_ms,
             fps_search: !args.no_fps_search,
             json_report: args.json_report.as_deref(),
             timeout: args.timeout.unwrap_or(SYNC_TIMEOUT),
@@ -214,6 +219,7 @@ pub fn sync_subtitle_to_video(
         split_penalty: options.split_penalty,
         snap_ms: options.snap_ms,
         lead_in_ms: options.lead_in_ms,
+        end_adjust_ms: options.end_adjust_ms,
         fps_search: options.fps_search,
     };
     config.validate()?;
@@ -347,6 +353,8 @@ pub fn sync_subtitle_to_video(
         options.snap_ms.to_string(),
         "--lead-in-ms".into(),
         options.lead_in_ms.to_string(),
+        "--end-adjust-ms".into(),
+        options.end_adjust_ms.to_string(),
     ]);
     if !options.fps_search {
         command.push("--no-fps-search".into());

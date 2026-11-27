@@ -13,7 +13,7 @@ use subsync_rs::{
     sync_file_to_wav_with_report,
 };
 
-const USAGE: &str = "Usage: subsync (--video PATH | --wav PATH) --in PATH --out PATH\n       [--ffmpeg PATH] [--ffmpeg-timeout 300] [--max-offset-sec 60]\n       [--max-split-offset-ms 15000] [--split-penalty 7.0] [--snap-ms 350] [--lead-in-ms 50]\n       [--no-fps-search] [--json-report PATH]";
+const USAGE: &str = "Usage: subsync (--video PATH | --wav PATH) --in PATH --out PATH\n       [--ffmpeg PATH] [--ffmpeg-timeout 300] [--max-offset-sec 60]\n       [--max-split-offset-ms 15000] [--split-penalty 7.0] [--snap-ms 350] [--lead-in-ms 50] [--end-adjust-ms 600]\n       [--no-fps-search] [--json-report PATH]";
 
 fn invalid(message: impl Into<String>) -> SyncError {
     SyncError::Config(message.into())
@@ -98,6 +98,7 @@ fn run() -> Result<(), SyncError> {
             "--split-penalty" => config.split_penalty = parse(value()?, flag)?,
             "--snap-ms" => config.snap_ms = parse(value()?, flag)?,
             "--lead-in-ms" => config.lead_in_ms = parse(value()?, flag)?,
+            "--end-adjust-ms" => config.end_adjust_ms = parse(value()?, flag)?,
             _ => return Err(invalid(format!("unknown option: {flag}\n{USAGE}"))),
         }
     }
@@ -182,7 +183,7 @@ mod tests {
         for flag in ["--version", "-V"] {
             let mut output = Vec::new();
             assert!(write_version(flag.as_ref(), &mut output)?);
-            assert_eq!(output, b"subsync 3.0.2\n");
+            assert_eq!(output, b"subsync 3.0.3\n");
         }
         let mut output = Vec::new();
         assert!(!write_version("-v".as_ref(), &mut output)?);

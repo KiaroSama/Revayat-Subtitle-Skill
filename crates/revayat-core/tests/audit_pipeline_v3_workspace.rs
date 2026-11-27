@@ -466,7 +466,7 @@ fn recipe_upgrade_preserves_the_previous_generation_and_requires_fresh_evidence(
     assert_eq!(built["input_identity"], edition.manifest["input_identity"]);
     assert_eq!(
         built["generation_recipe"],
-        json!({"version": 16, "normalization": 13, "timing": "floor-centisecond"})
+        json!({"version": 17, "normalization": 14, "timing": "floor-centisecond"})
     );
     assert!(
         !Path::new(built["build"].as_str().ok_or("build path")?)

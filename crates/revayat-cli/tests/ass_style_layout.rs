@@ -241,7 +241,7 @@ fn reviewed_workspace_adds_complete_srt_style_then_merges_a_compatible_ass_donor
         assert_eq!(cell(&edition, style, "custom"), "credit");
     }
     assert_eq!(edition.cues.len(), 3);
-    assert_eq!(manifest["generation_recipe"]["version"], 16);
+    assert_eq!(manifest["generation_recipe"]["version"], 17);
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://code.claude.com/schemas/marketplace.json",
   "name": "revayat-subtitle-marketplace",
-  "description": "Revayat Subtitle 3.0.2: Persian-default ASS translation, RTL and ZWNJ checks, Translator Mode and audio sync through a pure Rust CLI.",
+  "description": "Revayat Subtitle 3.0.3: Persian-default ASS translation, RTL and ZWNJ checks, Translator Mode and audio sync through a pure Rust CLI.",
   "owner": {
     "name": "Kiaro Sama",
     "email": "Kiaro.Sama.Dev@gmail.com"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "revayat-subtitle",
-      "version": "3.0.2",
+      "version": "3.0.3",
       "license": "GPL-3.0-or-later",
       "description": "Translate and review anime subtitles with a pure Rust CLI and no Python runtime. Check FFmpeg renders and sync to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
       "author": {

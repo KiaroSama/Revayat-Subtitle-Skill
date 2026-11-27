@@ -26,7 +26,6 @@ mod tokens;
 use lines::{anchor, wrap};
 
 const ZWNJ: char = '\u{200c}';
-const RLM: char = '\u{200f}';
 const RLE: char = '\u{202b}';
 const PDF: char = '\u{202c}';
 const BIDI: &str = "\u{061c}\u{200e}\u{200f}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069}";
@@ -346,7 +345,7 @@ mod tests {
         let literal = "<b title=\"سلام\">.</b>";
         let anchored =
             anchor_rtl_line(literal.into(), Some("ass".into()), Some("rtl".into())).unwrap();
-        assert!(anchored.starts_with(RLE));
+        assert!(anchored.starts_with("\u{200f}\u{2067}"));
         assert!(anchored.contains(literal));
     }
 
@@ -494,7 +493,7 @@ mod tests {
 
     #[test]
     fn rtl_anchor_keeps_overrides_and_is_idempotent() {
-        let anchored = "{\\i1}\u{202b}\u{200f}- سلام!\u{200f}\u{202c}{\\i0}";
+        let anchored = "{\\i1}\u{200f}\u{2067}- سلام!\u{2069}{\\i0}";
         for text in [r"{\i1}- سلام!{\i0}", anchored] {
             assert_eq!(
                 anchor_rtl_line(text.into(), Some("ass".into()), Some("rtl".into())).as_deref(),
@@ -515,7 +514,7 @@ mod tests {
                 Some(true)
             )
             .as_deref(),
-            Ok("{\\i1}\u{202b}می\u{200c}رود!\u{200f}\u{202c}{\\i0}\\N\u{202b}سلام؟\u{200f}\u{202c}")
+            Ok("{\\i1}\u{200f}\u{2067}می\u{200c}رود!\u{2069}{\\i0}\\N\u{200f}\u{2067}سلام؟\u{2069}")
         );
     }
 }

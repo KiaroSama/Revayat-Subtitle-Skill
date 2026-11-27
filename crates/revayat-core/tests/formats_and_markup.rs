@@ -76,8 +76,8 @@ fn bidi_only_blank_line_keeps_its_balanced_scope() -> Check {
     let (kept, _) = review::reviewed_cues(&ass(source)?, &[edit(source, source)], "fa")?;
     let text = &kept[0].text;
     assert_eq!(visible(text.clone(), "ass".into())?, "Hello\nسلام");
-    assert_eq!(text.matches('\u{2067}').count(), 1);
-    assert_eq!(text.matches('\u{2069}').count(), 1);
+    assert_eq!(text.matches('\u{2067}').count(), 2);
+    assert_eq!(text.matches('\u{2069}').count(), 2);
     validate_bidi(text.clone(), "ass".into())
 }
 

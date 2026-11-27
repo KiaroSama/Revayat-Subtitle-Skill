@@ -27,7 +27,7 @@ pub(super) fn refine_group_shifts(
         let indices = &plan.order[groups[first].first..groups[end - 1].end];
         let score = |shift| score_shift(plan, speech, config.lead_in_ms, indices, shift);
         let baseline = score(base);
-        let radius = limit.min(if baseline >= 0.25 { 600 } else { 1500 });
+        let radius = limit.min(if baseline >= 0.35 { 900 } else { 1500 });
         let low = (global_shift - limit)
             .max(base - radius)
             .max(previous_end as i64 - groups[first].start_ms as i64);
@@ -40,8 +40,8 @@ pub(super) fn refine_group_shifts(
             for step in -((base - low) / frame)..=(high - base) / frame {
                 check_cancelled()?;
                 let candidate = base + step * frame;
-                let value = score(candidate) - 0.00018 * candidate.abs_diff(base) as f64;
-                if value > baseline + 0.06
+                let value = score(candidate) - 0.00010 * candidate.abs_diff(base) as f64;
+                if value > baseline + 0.05
                     && (value > best_score + 1e-9
                         || ((value - best_score).abs() <= 1e-9
                             && candidate.abs_diff(base) < best.abs_diff(base)))
@@ -82,14 +82,14 @@ pub(super) fn refine_group_shifts(
                 }
                 let indices = &plan.order[group.first..group.end];
                 let baseline = score_shift(plan, speech, config.lead_in_ms, indices, best);
-                let mut top = baseline + 0.06;
+                let mut top = baseline + 0.05;
                 for step in -((best - lo) / frame)..=(hi - best) / frame {
                     check_cancelled()?;
                     let candidate = best + step * frame;
                     let value = score_shift(plan, speech, config.lead_in_ms, indices, candidate)
-                        - 0.00018 * candidate.abs_diff(best) as f64;
+                        - 0.00004 * candidate.abs_diff(best) as f64;
                     if value > top + 1e-9
-                        || value > baseline + 0.06
+                        || value > baseline + 0.05
                             && (value - top).abs() <= 1e-9
                             && candidate.abs_diff(best) < offsets[g].abs_diff(best)
                     {
@@ -148,5 +148,94 @@ fn score_shift(
         };
         onset += (speech.fraction(target, after) - preceding).max(0.0);
     }
-    matched / duration + 0.005 * onset / indices.len() as f64
+    matched / duration + 0.06 * onset / indices.len() as f64
+}
+
+const TRAIL_OUT_MS: u64 = 250;
+const MIN_READABLE_MS: u64 = 900;
+const MIN_GAP_MS: u64 = 20;
+
+pub(super) fn end_bounds(
+    plan: &TimingPlan,
+    g: usize,
+    cues: &[super::SubtitleCue],
+    duration: u64,
+) -> (u64, u64) {
+    let Some(next) = plan.groups.get(g + 1) else {
+        return (0, duration);
+    };
+    let start = cues[plan.order[next.first]].start_ms;
+    match joined_gap(plan.groups[g].end_ms, next.start_ms) {
+        Some(gap) => (start.saturating_sub(gap + 80), start.min(duration)),
+        None => (0, start.saturating_sub(MIN_GAP_MS).min(duration)),
+    }
+}
+
+pub(super) fn refine_ends(
+    plan: &TimingPlan,
+    cues: &mut [super::SubtitleCue],
+    vad: &super::VadResult,
+    limit: u64,
+) -> Result<usize, SyncError> {
+    let mut changed = 0;
+    for (g, group) in plan.groups.iter().enumerate() {
+        check_cancelled()?;
+        if group.end - group.first != 1 {
+            continue;
+        }
+        let i = plan.order[group.first];
+        let cue = cues[i];
+        let (min_end, max_end) = end_bounds(plan, g, cues, vad.duration_ms);
+        let low = cue
+            .end_ms
+            .saturating_sub(limit)
+            .max(cue.start_ms + 500)
+            .max(min_end)
+            .div_ceil(plan.unit)
+            * plan.unit;
+        let high = cue.end_ms.saturating_add(limit).min(max_end) / plan.unit * plan.unit;
+        if low > high {
+            continue;
+        }
+        let split = vad
+            .segments
+            .partition_point(|seg| seg.start_ms < cue.end_ms);
+        let last = split.checked_sub(1).map(|i| &vad.segments[i]);
+        let duration = cue.end_ms - cue.start_ms;
+        let original = plan.base[i];
+        let original_duration = original.end_ms - original.start_ms;
+        let target = if let Some(seg) = last.filter(|seg| {
+            seg.end_ms > cue.end_ms.saturating_add(140)
+                && seg.end_ms <= cue.end_ms.saturating_add(limit)
+        }) {
+            (seg.end_ms + TRAIL_OUT_MS).clamp(low, high)
+        } else if original_duration < MIN_READABLE_MS
+            && duration < MIN_READABLE_MS
+            && high > cue.end_ms
+        {
+            let next_speech = vad.segments.get(split).map_or(high, |seg| seg.start_ms);
+            let target = (cue.start_ms + MIN_READABLE_MS).min(next_speech).min(high);
+            if target < low.max(cue.end_ms) {
+                continue;
+            }
+            target
+        } else if let Some(seg) = last.filter(|seg| {
+            duration > 1500 && seg.end_ms > cue.start_ms && cue.end_ms > seg.end_ms + 600
+        }) {
+            if low > high.min(cue.end_ms) {
+                continue;
+            }
+            (seg.end_ms + TRAIL_OUT_MS)
+                .max(cue.start_ms + MIN_READABLE_MS)
+                .clamp(low, high.min(cue.end_ms))
+        } else {
+            continue;
+        };
+        let end = target / plan.unit * plan.unit;
+        if end != cue.end_ms {
+            cues[i].end_ms = end;
+            changed += 1;
+        }
+    }
+    Ok(changed)
 }

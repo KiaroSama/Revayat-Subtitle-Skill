@@ -96,7 +96,7 @@ fn f01_rtl_anchor_sees_letters_inside_literal_ass_html() -> Check {
     let text = "<b title=\"سلام\">.</b>";
     let anchor = |body| text::anchor_rtl_line(body, Some("ass".into()), Some("rtl".into()));
     let anchored = anchor(text.into())?;
-    assert!(anchored.starts_with('\u{202b}'));
+    assert!(anchored.starts_with("\u{200f}\u{2067}"));
     assert_eq!(visible(anchored.clone(), "ass".into())?, text);
     assert_eq!(anchor(anchored.clone())?, anchored);
     markup::validate_bidi(anchored, "ass".into())

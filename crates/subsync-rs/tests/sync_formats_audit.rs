@@ -30,7 +30,11 @@ fn align_srt(newline: &str) {
     let fixture = Fixture::new();
     let original = format!("\u{feff}{}", fixture.srt(1300, newline));
     fs::write(&fixture.subtitle, &original).unwrap();
-    let receipt = report(run(fixture.command()));
+    let receipt = report(run({
+        let mut command = fixture.command();
+        command.args(["--end-adjust-ms", "0"]);
+        command
+    }));
     assert_report(&fixture, &receipt, 1300);
     let actual = fs::read_to_string(&fixture.output).unwrap();
     let original = original.strip_prefix('\u{feff}').unwrap();
@@ -82,7 +86,15 @@ fn wav_preserves_unicode_ass_tags_and_comments() {
             .collect::<String>()
     );
     fs::write(&fixture.subtitle, &document).unwrap();
-    assert_report(&fixture, &report(run(fixture.command())), -250);
+    assert_report(
+        &fixture,
+        &report(run({
+            let mut command = fixture.command();
+            command.args(["--end-adjust-ms", "0"]);
+            command
+        })),
+        -250,
+    );
     let actual = fs::read_to_string(&fixture.output).unwrap();
     assert!(actual.starts_with(header));
     assert_eq!(actual.matches(caption).count(), INTERVALS.len());
@@ -121,7 +133,15 @@ fn preserves_every_mixed_line_ending_including_last_byte() {
         })
         .collect::<String>();
     fs::write(&fixture.subtitle, &mixed).unwrap();
-    assert_report(&fixture, &report(run(fixture.command())), 1300);
+    assert_report(
+        &fixture,
+        &report(run({
+            let mut command = fixture.command();
+            command.args(["--end-adjust-ms", "0"]);
+            command
+        })),
+        1300,
+    );
     let actual = fs::read_to_string(&fixture.output).unwrap();
     let nondigits = |text: &str| {
         text.bytes()
@@ -140,7 +160,11 @@ fn missing_separator(numbered: bool) {
         "00:00:01,000 --> 00:00:02,000\nFirst\n00:00:03,000 --> 00:00:04,000\nSecond\n"
     };
     fs::write(&fixture.subtitle, source).unwrap();
-    let result = run(fixture.command());
+    let result = run({
+        let mut command = fixture.command();
+        command.args(["--end-adjust-ms", "0"]);
+        command
+    });
     assert!(!result.status.success());
     assert!(
         String::from_utf8_lossy(&result.stderr).contains("separator"),

@@ -43,6 +43,7 @@ pub struct SyncConfig {
     pub split_penalty: f64,
     pub snap_ms: u64,
     pub lead_in_ms: u64,
+    pub end_adjust_ms: u64,
     pub fps_search: bool,
 }
 
@@ -54,6 +55,7 @@ impl Default for SyncConfig {
             split_penalty: 7.0,
             snap_ms: 350,
             lead_in_ms: 50,
+            end_adjust_ms: 600,
             fps_search: true,
         }
     }
@@ -67,6 +69,11 @@ impl SyncConfig {
             return Err(SyncError::Config(
                 "offset bounds must be within 0..=600000 ms globally and 0..=60000 ms locally"
                     .into(),
+            ));
+        }
+        if self.end_adjust_ms > 5_000 {
+            return Err(SyncError::Config(
+                "end adjustment must be at most 5000 ms".into(),
             ));
         }
         if self.lead_in_ms > 500 {
@@ -102,6 +109,8 @@ pub struct SyncReport {
     pub split_segments: Vec<SplitSegment>,
     pub cues_total: usize,
     pub cues_snapped: usize,
+    #[serde(default)]
+    pub cues_end_adjusted: usize,
     pub overlap_score_before: f64,
     pub overlap_score_after: f64,
     pub max_cue_delta_ms: u64,
@@ -144,6 +153,7 @@ pub fn sync_subtitles_with_vad(
         split_segments: alignment.split_segments,
         cues_total: doc.cues.len(),
         cues_snapped: alignment.cues_snapped,
+        cues_end_adjusted: alignment.cues_end_adjusted,
         overlap_score_before: alignment.overlap_score_before,
         overlap_score_after: alignment.overlap_score_after,
         max_cue_delta_ms: deltas.last().copied().unwrap_or(0),

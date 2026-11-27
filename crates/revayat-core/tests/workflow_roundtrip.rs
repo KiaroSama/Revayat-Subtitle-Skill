@@ -98,7 +98,7 @@ closing_breaks! {
 fn closing_break_anchors_two_persian_display_lines() -> Check {
     let rtl = |value| markup::rtl(value, "srt".into(), "rtl".into(), false);
     let normalized = rtl("سلام</br>دنیا OVA".into())?;
-    assert_eq!(normalized.matches('\u{200f}').count(), 4);
+    assert_eq!(normalized.matches("\u{200f}\u{2067}").count(), 2);
     assert_eq!(visible(normalized.clone(), "srt".into())?, "سلام\nدنیا OVA");
     assert_eq!(rtl(normalized.clone())?, normalized);
     Ok(())
@@ -705,7 +705,7 @@ fn generation_upgrade_preserves_history_reviews_and_sources() -> Check {
     assert_eq!(fresh["input_identity"], *input_identity);
     assert_eq!(
         fresh["generation_recipe"],
-        json!({"version":16,"normalization":13,"timing":"floor-centisecond"})
+        json!({"version":17,"normalization":14,"timing":"floor-centisecond"})
     );
     assert!(!build_path(&fresh)?.join("renders").exists());
     assert_eq!(snapshot(&paths)?, before);

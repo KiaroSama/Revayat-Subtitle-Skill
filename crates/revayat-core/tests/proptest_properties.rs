@@ -143,7 +143,7 @@ proptest! {
     #[test]
     fn ass_rtl_preserves_override_positions_and_is_idempotent(latin in "[A-Z]{1,12}", persian in "[سلامدنیا]{1,12}") {
         let input = format!(r"{{\i1}}{latin} {persian}{{\i0}}\N{{\b1}}{persian}{{\b0}}");
-        let expected = format!(r"{{\i1}}{rtl_start}{latin} {persian}{pdi}{{\i0}}\N{{\b1}}{mark}{persian}{mark}{{\b0}}", rtl_start = "\u{200f}\u{2067}", pdi = '\u{2069}', mark = '\u{200f}');
+        let expected = format!(r"{{\i1}}{rtl_start}{latin} {persian}{pdi}{{\i0}}\N{{\b1}}{rtl_start}{persian}{pdi}{{\b0}}", rtl_start = "\u{200f}\u{2067}", pdi = '\u{2069}');
         let actual = rtl(input, "ass".into(), "rtl".into(), false).map_err(TestCaseError::fail)?;
         prop_assert_eq!(&actual, &expected);
         prop_assert_eq!(&actual, &rtl(actual.clone(), "ass".into(), "rtl".into(), false).map_err(TestCaseError::fail)?);
