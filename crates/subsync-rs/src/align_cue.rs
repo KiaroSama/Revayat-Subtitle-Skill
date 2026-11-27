@@ -171,6 +171,22 @@ pub(super) fn end_bounds(
     }
 }
 
+fn continuation_target(vad: &super::VadResult, end: u64, merged_end: u64) -> Option<u64> {
+    let islands = &vad.raw_segments;
+    if islands.is_empty() {
+        return Some(merged_end.saturating_add(TRAIL_OUT_MS));
+    }
+    let next = islands.partition_point(|island| island.start_ms <= end);
+    let island = islands.get(next.checked_sub(1)?)?;
+    if end.saturating_sub(island.start_ms) < 100 || island.end_ms.saturating_sub(end) < 70 {
+        return None;
+    }
+    let target = island.end_ms.saturating_add(TRAIL_OUT_MS);
+    Some(islands.get(next).map_or(target, |next| {
+        target.min(next.start_ms.saturating_sub(MIN_GAP_MS))
+    }))
+}
+
 pub(super) fn refine_ends(
     plan: &TimingPlan,
     cues: &mut [super::SubtitleCue],
@@ -206,8 +222,16 @@ pub(super) fn refine_ends(
         let original_duration = original.end_ms - original.start_ms;
         let target =
             if let Some(seg) = last.filter(|seg| seg.end_ms > cue.end_ms.saturating_add(140)) {
-                // Continue toward ongoing speech even when the movement budget cannot cover it all.
-                (seg.end_ms + TRAIL_OUT_MS).clamp(low, high)
+                if high <= cue.end_ms {
+                    continue;
+                }
+                let Some(target) = continuation_target(vad, cue.end_ms, seg.end_ms) else {
+                    continue;
+                };
+                if !vad.raw_segments.is_empty() && target < low {
+                    continue;
+                }
+                target.clamp(low, high)
             } else if original_duration < MIN_READABLE_MS
                 && duration < MIN_READABLE_MS
                 && high > cue.end_ms
@@ -237,4 +261,44 @@ pub(super) fn refine_ends(
         }
     }
     Ok(changed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TimingPlan, refine_ends};
+    use crate::{
+        SubtitleCue, SubtitleFormat,
+        vad::{TimeSpan, VadResult},
+    };
+
+    #[test]
+    fn ongoing_speech_only_extends_an_end_when_there_is_room() {
+        let cue = |start_ms, end_ms| SubtitleCue { start_ms, end_ms };
+        let authored = [cue(1000, 2000), cue(2300, 3700)];
+        let vad = VadResult {
+            raw_segments: Vec::new(),
+            onset_anchors_ms: Vec::new(),
+            frame_ms: 10,
+            duration_ms: 4000,
+            probability: Vec::new(),
+            activity: Vec::new(),
+            segments: vec![TimeSpan {
+                start_ms: 1000,
+                end_ms: 3100,
+            }],
+        };
+        for format in [SubtitleFormat::Srt, SubtitleFormat::Ass] {
+            let plan = TimingPlan::new(&authored, format, 1.0);
+            for (next_start, expected) in [(2000, 2000), (2020, 2000), (2040, 2020)] {
+                let mut transformed = [authored[0], cue(next_start, next_start + 1400)];
+                let changed = refine_ends(&plan, &mut transformed, &vad, 600).unwrap();
+                assert_eq!(
+                    transformed[0].end_ms, expected,
+                    "{format:?} next={next_start}"
+                );
+                assert_eq!(changed, usize::from(expected != 2000));
+                assert_eq!(transformed[1], cue(next_start, next_start + 1400));
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use unicode_bidi::{BidiClass, bidi_class};
+use unicode_bidi::{BidiClass, InitialInfo, Level, bidi_class};
 
 use super::{
     Regex, python_space,
@@ -122,6 +122,47 @@ fn text_runs<'a>(text: &'a str, kind: &str) -> Result<Vec<Token<'a>>, String> {
 pub(crate) const RTL_ISOLATE: &str = "\u{200f}\u{2067}";
 pub(crate) const PDI: char = '\u{2069}';
 
+pub(crate) fn wrapper_fits(visible_prose: &str, rtl: bool) -> bool {
+    use BidiClass::{FSI, LRE, LRI, LRO, PDF, PDI, RLE, RLI, RLO};
+
+    let base = if rtl { Level::rtl() } else { Level::ltr() };
+    // InitialInfo resolves FSI from its own first strong character, skipping nested isolates.
+    let info = InitialInfo::new(visible_prose, Some(base));
+    let mut scopes = Vec::<(Level, bool)>::new();
+    for (at, _) in visible_prose.char_indices() {
+        let class = info.original_classes[at];
+        match class {
+            PDF if scopes.last().is_some_and(|&(_, isolate)| !isolate) => {
+                scopes.pop();
+            }
+            PDI => {
+                if let Some(open) = scopes.iter().rposition(|&(_, isolate)| isolate) {
+                    scopes.truncate(open);
+                }
+            }
+            RLE | RLO | RLI | LRE | LRO | LRI | FSI => {
+                let level = scopes.last().map_or(base, |&(level, _)| level);
+                let next = if matches!(class, RLE | RLO | RLI) {
+                    level.new_explicit_next_rtl()
+                } else {
+                    level.new_explicit_next_ltr()
+                };
+                let Ok(next) = next else { return false };
+                scopes.push((next, matches!(class, RLI | LRI | FSI)));
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+fn readable(line: &[Token<'_>]) -> String {
+    line.iter()
+        .filter(|(piece, _)| *piece == Text)
+        .map(|(_, text)| text.as_ref())
+        .collect()
+}
+
 pub(crate) fn has_outer_rtl_isolate(mut text: impl Iterator<Item = char>) -> bool {
     if text.next() != Some(RLM) || text.next() != Some('\u{2067}') {
         return false;
@@ -222,11 +263,12 @@ fn flush(
                 let original_last = line[last].1.clone();
                 line[first].1.to_mut().insert_str(0, RTL_ISOLATE);
                 line[last].1.to_mut().push(PDI);
-                isolated = validate(
-                    &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
-                    kind,
-                )
-                .is_ok();
+                isolated = wrapper_fits(&readable(line), true)
+                    && validate(
+                        &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                        kind,
+                    )
+                    .is_ok();
                 if !isolated {
                     // Boundary marks preserve input already at the supported nesting limit.
                     line[first].1 = original_first;
@@ -242,13 +284,13 @@ fn flush(
                     let original_last = line[last].1.clone();
                     line[first].1.to_mut().insert(0, LRE);
                     line[last].1.to_mut().push(PDF);
-                    if validate(
-                        &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
-                        kind,
-                    )
-                    .is_err()
+                    if !wrapper_fits(&readable(line), false)
+                        || validate(
+                            &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                            kind,
+                        )
+                        .is_err()
                     {
-                        // LTR anchoring must preserve the same supported input depth as RTL.
                         line[first].1 = original_first;
                         line[last].1 = original_last;
                     }

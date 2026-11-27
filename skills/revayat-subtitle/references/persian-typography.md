@@ -30,9 +30,15 @@ intentional balanced inner and cross-line scopes, including scopes across style
 tags, and leaves controls in tags and drawing data untouched. A `PDI` closes its
 matching isolate and any embeddings opened inside it; a stray terminator must
 not discard another balanced scope. Legacy embedding wrappers are removed only
-when their endpoints enclose one complete scope. At the supported nesting limit,
-boundary marks can anchor a line without adding another isolate. Inside Persian
-words, conversion replaces stray `RLM` between letters with `ZWNJ` (`U+200C`).
+when their endpoints enclose one complete scope. Before adding an RTL isolate
+or LTR embedding, check the [UAX #9](https://www.unicode.org/reports/tr9/tr9-52.html#Explicit_Levels_and_Directions)
+effective explicit level of the readable text. Each opener advances to the next
+odd or even level, by one or two. `FSI` takes its direction from the first strong
+character in its own isolate, skipping nested isolates; it defaults to LTR.
+If adding a wrapper would exceed level 125, preserve the authored controls.
+Reviewed markup uses boundary `RLM` or `LRM` marks in that case; conversion keeps
+the existing line. Inside Persian words, conversion replaces stray `RLM` between
+letters with `ZWNJ` (`U+200C`).
 Reversed leading punctuation moves to the logical end only when it directly precedes a Persian
 letter and the line has no terminal punctuation. Keep legitimate continuation
 ellipses and dialogue dashes.

@@ -434,6 +434,7 @@ pub fn validate_reported_timing(
             if after.start_ms != before.start_ms {
                 if indices.len() != 1
                     || config.snap_ms == 0
+                    || !snap_moves(before.start_ms, after.start_ms)
                     || before.end_ms - before.start_ms < 500
                     // Snapping precedes end refinement; a later extension cannot make it eligible.
                     || before.end_ms.saturating_sub(after.start_ms) < 500
@@ -556,6 +557,10 @@ fn snap_join_limit(plan: &TimingPlan, g: usize, previous_end: u64) -> u64 {
         .map_or(u64::MAX, |gap| previous_end.saturating_add(gap + 80))
 }
 
+fn snap_moves(before: u64, candidate: u64) -> bool {
+    candidate > 0 && (candidate < before || candidate > before.saturating_add(20))
+}
+
 fn snap_start(
     cue: &mut SubtitleCue,
     min_start: u64,
@@ -574,25 +579,36 @@ fn snap_start(
     let lead = config.lead_in_ms;
     let baseline = binary.fraction(cue.start_ms, cue.end_ms);
     let first = vad.segments.partition_point(|span| span.start_ms < low);
+    let allowed = |start| {
+        start >= low
+            && start <= high
+            && start >= min_start
+            && start <= max_start
+            && start <= cue.end_ms - 500
+            && start > 0
+    };
     let candidate = vad.segments[first..]
         .iter()
-        .take_while(|span| span.start_ms <= high.saturating_add(lead))
-        // Score speech from its onset so the intentional lead-in does not count as silence.
-        .filter(|span| {
+        .enumerate()
+        .take_while(|(_, span)| span.start_ms <= high.saturating_add(lead))
+        // Score the confirmed onset, not silence in the lead-in or consonant closure.
+        .filter(|(_, span)| {
             span.start_ms < cue.end_ms
                 && binary.fraction(span.start_ms, cue.end_ms) + 1e-9 >= baseline
         })
-        .map(|span| span.start_ms.saturating_sub(lead) / unit * unit)
-        .filter(|&start| {
-            start >= low
-                && start <= high
-                && start >= min_start
-                && start <= max_start
-                && start <= cue.end_ms - 500
-                && start > 0
+        .filter_map(|(i, span)| {
+            let before_onset = |onset: u64| onset.saturating_sub(lead) / unit * unit;
+            vad.onset_anchors_ms
+                .get(first + i)
+                .map(|&onset| before_onset(onset))
+                .filter(|&start| allowed(start))
+                .or_else(|| {
+                    let start = before_onset(span.start_ms);
+                    allowed(start).then_some(start)
+                })
         })
         .min_by_key(|&start| start.abs_diff(cue.start_ms))
-        .filter(|&start| start < cue.start_ms || start - cue.start_ms > 20);
+        .filter(|&start| snap_moves(cue.start_ms, start));
     if let Some(start) = candidate {
         cue.start_ms = start;
         true

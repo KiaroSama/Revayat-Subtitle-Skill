@@ -5,6 +5,37 @@ use subsync_rs::{
     sync_subtitles_with_vad,
 };
 
+#[test]
+fn replay_requires_the_same_start_movement_as_the_engine() {
+    let config = SyncConfig::default();
+    for (format, before, after, accepted) in [
+        (SubtitleFormat::Srt, 100, 0, false),
+        (SubtitleFormat::Srt, 100, 99, true),
+        (SubtitleFormat::Srt, 100, 101, false),
+        (SubtitleFormat::Srt, 100, 120, false),
+        (SubtitleFormat::Srt, 100, 121, true),
+        (SubtitleFormat::Ass, 100, 0, false),
+        (SubtitleFormat::Ass, 100, 90, true),
+        (SubtitleFormat::Ass, 100, 110, false),
+        (SubtitleFormat::Ass, 100, 120, false),
+        (SubtitleFormat::Ass, 100, 130, true),
+        (SubtitleFormat::Ass, 0, 0, true),
+        (SubtitleFormat::Srt, 0, 0, true),
+    ] {
+        let cue = |start_ms| SubtitleCue {
+            start_ms,
+            end_ms: 1500,
+        };
+        let receipt = report(1.0, 0, usize::from(before != after), 0);
+        assert_eq!(
+            validate_reported_timing(&[cue(before)], &[cue(after)], format, &receipt, &config)
+                .is_ok(),
+            accepted,
+            "{format:?}: {before} to {after}"
+        );
+    }
+}
+
 fn report(fps_ratio: f64, shift_ms: i64, snapped: usize, adjusted: usize) -> SyncReport {
     SyncReport {
         audio_duration_ms: 4000,
@@ -124,6 +155,8 @@ fn real_snap_then_end_adjustment_replays_at_the_presnap_duration_boundary() {
             let mut activity = vec![0_u8; 400];
             activity[onset / 10..220].fill(1);
             let vad = VadResult {
+                raw_segments: Vec::new(),
+                onset_anchors_ms: Vec::new(),
                 frame_ms: 10,
                 duration_ms: 4000,
                 probability: activity.iter().map(|&value| f32::from(value)).collect(),

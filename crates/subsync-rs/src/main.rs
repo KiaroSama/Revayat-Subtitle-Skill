@@ -183,7 +183,7 @@ mod tests {
         for flag in ["--version", "-V"] {
             let mut output = Vec::new();
             assert!(write_version(flag.as_ref(), &mut output)?);
-            assert_eq!(output, b"subsync 3.0.3\n");
+            assert_eq!(output, b"subsync 3.0.4\n");
         }
         let mut output = Vec::new();
         assert!(!write_version("-v".as_ref(), &mut output)?);

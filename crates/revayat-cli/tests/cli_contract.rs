@@ -59,7 +59,7 @@ fn help_lists_all_sixteen_commands_and_version() -> Result<()> {
     assert_code(&output, 0);
     assert_eq!(
         String::from_utf8(output.stdout)?.trim(),
-        "revayat-subtitle 3.0.3"
+        "revayat-subtitle 3.0.4"
     );
     Ok(())
 }

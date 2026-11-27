@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/revayat-core", "crates/subsync-rs", "crates/revayat-cli"]
 
 [workspace.package]
-version = "3.0.3"
+version = "3.0.4"
 edition = "2024"
 rust-version = "1.100.0"
 license = "GPL-3.0-or-later"

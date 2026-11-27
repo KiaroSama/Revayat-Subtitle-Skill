@@ -33,6 +33,8 @@ fn snap_skips_a_nearer_short_burst_that_would_reduce_speech_overlap() {
         activity[segment.start_ms as usize / 10..segment.end_ms as usize / 10].fill(1);
     }
     let vad = VadResult {
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
         frame_ms: 10,
         duration_ms: 3000,
         probability: activity.iter().map(|&value| f32::from(value)).collect(),
@@ -109,6 +111,8 @@ fn endpoints_extend_trim_and_replay() {
         activity[span.start_ms as usize / 10..span.end_ms as usize / 10].fill(1);
     }
     let vad = VadResult {
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
         frame_ms: 10,
         duration_ms: 8000,
         probability: activity.iter().map(|&a| f32::from(a)).collect(),
@@ -163,6 +167,8 @@ fn recovers_large_standalone_drift_without_tearing_joined_cues() {
         activity[span.start_ms as usize / 10..span.end_ms as usize / 10].fill(1);
     }
     let vad = VadResult {
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
         frame_ms: 10,
         duration_ms: 9000,
         probability: activity.iter().map(|&a| f32::from(a)).collect(),

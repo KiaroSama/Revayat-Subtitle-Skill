@@ -24,7 +24,7 @@
 
 Revayat Subtitle is a skill for translating and reviewing subtitles, with tools to convert ASS and SRT, check rendered frames, and align cues to dialogue audio. Persian is the default translation language. The final ZIP contains the reviewed episode subtitles; the series glossary is delivered separately.
 
-Version `3.0.3` ships two standalone binaries written entirely in Rust: `revayat-subtitle` and `subsync`. The project uses Rust `1.100.0`, edition `2024`, and ships no Python, PowerShell, or Bash scripts. Releases and CI target 64-bit Windows and Linux only, on x64 and arm64.
+Version `3.0.4` ships two standalone binaries written entirely in Rust: `revayat-subtitle` and `subsync`. The project uses Rust `1.100.0`, edition `2024`, and ships no Python, PowerShell, or Bash scripts. Releases and CI target 64-bit Windows and Linux only, on x64 and arm64.
 
 ## Install
 
@@ -182,6 +182,8 @@ CI builds both binaries for all four targets and runs workspace tests with FFmpe
 - `skills/` and `commands/`: Agent instructions, workflow references, voice guides, and bundled assets.
 - `docs/`: Platform, verification, and signing references.
 - `bin/`: Local release binaries; generated and not tracked.
+
+<a id="releases-and-tags"></a>
 
 ## Releases and tags
 

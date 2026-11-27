@@ -301,6 +301,8 @@ fn real_engine_nonzero_snaps_obey_duration_without_a_new_onset_grid_restriction(
                 start_ms: onset,
                 end_ms: 2000,
             }],
+            raw_segments: Vec::new(),
+            onset_anchors_ms: Vec::new(),
         };
         let mut aligned = SubtitleDocument::parse(source, None).unwrap();
         let mut report = subsync_rs::sync_subtitles_with_vad(&mut aligned, &vad, &config).unwrap();

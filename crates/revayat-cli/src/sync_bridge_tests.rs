@@ -319,6 +319,8 @@ fn accepts_real_engine_fps_quantization_and_negative_clamping_reports() {
             .iter()
             .map(|&(start_ms, end_ms)| TimeSpan { start_ms, end_ms })
             .collect(),
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
     };
     for format in [SubtitleFormat::Srt, SubtitleFormat::Ass] {
         for clamp in [false, true] {

@@ -162,16 +162,26 @@ pub fn sync_subtitles_with_vad(
 }
 
 fn validate_vad(vad: &VadResult) -> Result<(), SyncError> {
+    let ordered_spans = |spans: &[vad::TimeSpan]| {
+        spans
+            .iter()
+            .all(|s| s.start_ms < s.end_ms && s.end_ms <= vad.duration_ms)
+            && spans.windows(2).all(|s| s[0].end_ms <= s[1].start_ms)
+    };
     if vad.frame_ms != FRAME_MS
         || vad.probability.len() != vad.activity.len()
         || vad.duration_ms.div_ceil(u64::from(FRAME_MS)) != vad.activity.len() as u64
         || vad.probability.iter().any(|p| !(0.0..=1.0).contains(p))
         || vad.activity.iter().any(|&p| p > 1)
-        || vad
-            .segments
-            .iter()
-            .any(|s| s.start_ms >= s.end_ms || s.end_ms > vad.duration_ms)
-        || vad.segments.windows(2).any(|s| s[0].end_ms > s[1].start_ms)
+        || !ordered_spans(&vad.segments)
+        || !ordered_spans(&vad.raw_segments)
+        || (!vad.onset_anchors_ms.is_empty()
+            && (vad.onset_anchors_ms.len() != vad.segments.len()
+                || vad
+                    .onset_anchors_ms
+                    .iter()
+                    .zip(&vad.segments)
+                    .any(|(&onset, span)| onset > span.start_ms || span.start_ms - onset > 380)))
     {
         return Err(SyncError::Audio(
             "expected a valid 10 ms speech activity timeline".into(),

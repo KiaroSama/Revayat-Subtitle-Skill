@@ -211,6 +211,79 @@ fn ltr_wrappers_preserve_valid_maximum_depth_scopes() -> Check {
 }
 
 #[test]
+fn rtl_wrapping_respects_the_effective_explicit_level() -> Check {
+    for kind in ["srt", "ass"] {
+        for depth in [62, 61] {
+            let source = format!("{}سلام{}", RLI.repeat(depth), PDI.repeat(depth));
+            let (expected, expected_anchor) = if depth == 62 {
+                (format!("{RLM}{source}{RLM}"), source.clone())
+            } else {
+                (isolated(&source), isolated(&source))
+            };
+            let result = markup::rtl(source.clone(), kind.into(), "rtl".into(), false)?;
+            assert!(
+                result == expected,
+                "{kind}: wrong RTL wrapper at depth {depth}"
+            );
+            assert_eq!(
+                markup::rtl(result.clone(), kind.into(), "rtl".into(), false)?,
+                result
+            );
+            let anchored = anchor(&source, kind)?;
+            assert!(
+                anchored == expected_anchor,
+                "{kind}: wrong anchor at depth {depth}"
+            );
+            assert_eq!(anchor(&anchored, kind)?, anchored);
+        }
+    }
+    Ok(())
+}
+
+fn assert_ltr_wrap(source: &str, kind: &str, fits: bool) -> Check {
+    const LRM: &str = "\u{200e}";
+    let marked = format!("{LRM}{source}{LRM}");
+    let expected = if fits {
+        format!("{LRE}{marked}{PDF}")
+    } else {
+        marked
+    };
+    let result = markup::rtl(source.into(), kind.into(), "ltr".into(), false)?;
+    assert!(result == expected, "{kind}: wrong LTR wrapper, fits={fits}");
+    assert_eq!(
+        markup::rtl(result.clone(), kind.into(), "ltr".into(), false)?,
+        result
+    );
+    Ok(())
+}
+
+#[test]
+fn ltr_wrapping_respects_the_effective_explicit_level() -> Check {
+    for kind in ["srt", "ass"] {
+        for depth in [62, 61] {
+            let source = format!("A سلام {}B{}", LRE.repeat(depth), PDF.repeat(depth));
+            assert_ltr_wrap(&source, kind, depth == 61)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn ltr_wrapping_resolves_the_first_strong_character_of_fsi() -> Check {
+    for kind in ["srt", "ass"] {
+        for (first_strong, fits) in [("B", false), ("دنیا", true)] {
+            let source = format!(
+                "A سلام {}\u{2068}{first_strong}{PDI}{}",
+                LRE.repeat(61),
+                PDF.repeat(61)
+            );
+            assert_ltr_wrap(&source, kind, fits)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn excessive_balanced_nesting_is_not_silently_deleted_as_stray_controls() -> Check {
     let source = format!("{}سلام{}", LRI.repeat(126), PDI.repeat(126));
     assert!(markup::rtl(source.clone(), "srt".into(), "rtl".into(), false).is_err());

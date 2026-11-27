@@ -1030,7 +1030,7 @@ checksum = "d902046e6a28a1e4c3cab97258a0ce11e994903f01c2d97a9447a0b3df85f4f6"
 
 [[package]]
 name = "revayat-cli"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -1055,7 +1055,7 @@ dependencies = [
 
 [[package]]
 name = "revayat-core"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "caseless",
  "crc32fast",
@@ -1237,7 +1237,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "subsync-rs"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "ctrlc",
  "nix",

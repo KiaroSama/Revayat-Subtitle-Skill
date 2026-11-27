@@ -2,10 +2,14 @@
 
 ## Unreleased
 
-- Validate a snapped start against the transformed cue end before end adjustment, so a later extension cannot legitimize an impossible worker result. Keep failed worker output unpublished and retryable.
-- Extend cues toward continuing speech within the configured movement budget even when the complete spoken segment ends beyond that budget. Preserve neighboring, joined, overlapping ASS, audio-duration, and timestamp-precision bounds.
-- Preserve valid sibling bidi embeddings during reviewed builds. Repair only unmatched controls across the whole readable cue, retaining balanced inner and cross-line scopes, style tags, and drawing data. Keep supported maximum-depth scopes valid when anchoring them.
-- Advance generation to `18` and normalization to `15`; preserve earlier editions and require fresh image evidence. See the [Rust 3.0.3 recheck](docs/audit-rust-303-2026-11-27.md) and [issue #39](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/39).
+## [3.0.4] - 2026-11-27
+
+- Check worker-reported start snaps against the cue end before refinement. Reject changed starts at zero and forward moves of 20 ms or less, as the engine does. Keep invalid worker output unpublished so a corrected run can retry (R01, H03).
+- Extend a cue toward confirmed continuing speech even when that speech outlasts the adjustment budget. Check the cue’s own unpadded speech segment before extending, and leave its end unchanged if the next cue leaves no room to extend. Keep neighbor, audio-duration, and ASS timing bounds (R02, H02, S02).
+- Look back from a confirmed onset to recover quiet, low-pitched starts. Use energy from 125 to 3400 Hz with upper-band evidence and a local noise floor to screen out isolated bass, drones, and flat music (S01).
+- Keep valid sibling embeddings, and remove only unmatched bidi controls across the readable cue. Preserve balanced inner and cross-line scopes, markup, and drawings (R03, R04).
+- Check the effective UAX #9 level before adding RTL or LTR wrappers. Respect the parity step and the first strong character in each FSI; use boundary marks if a wrapper would exceed level 125 (LTR-depth fix, H01).
+- Use generation recipe `18` and normalization recipe `15`. Keep earlier editions and require fresh render evidence. See the [Rust 3.0.3 recheck](docs/audit-rust-303-2026-11-27.md) and [issue #39](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/39).
 
 ## 3.0.3 (2026-11-27)
 

@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const VERSION: &str = "3.0.3";
+const VERSION: &str = "3.0.4";
 const SKILL: &str = "skills/revayat-subtitle";
 const WORKFLOW: &str = "skills/revayat-subtitle/references/multi-agent-workflow.md";
 const PLUGINS: &[&str] = &[

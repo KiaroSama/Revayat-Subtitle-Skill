@@ -1,4 +1,4 @@
-use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate};
+use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate, wrapper_fits};
 use std::collections::HashSet;
 use unicode_bidi::{BidiClass, bidi_class};
 
@@ -421,9 +421,16 @@ pub(super) fn anchor(
                     repair_leading_punctuation(&mut parts, first, last);
                     parts[first].insert_str(0, RTL_ISOLATE);
                     parts[last].push(PDI);
-                    let candidate = parts.concat();
-                    if balanced(&candidate, kind) {
-                        raw = candidate;
+                    let readable: String = parts
+                        .iter()
+                        .zip(line)
+                        .filter_map(|(part, (_, show))| show.then_some(part.as_str()))
+                        .collect();
+                    if wrapper_fits(&readable, true) {
+                        let candidate = parts.concat();
+                        if balanced(&candidate, kind) {
+                            raw = candidate;
+                        }
                     }
                 }
             }

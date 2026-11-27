@@ -34,6 +34,8 @@ fn check(
     let mut activity = vec![0_u8; duration.div_ceil(10) as usize];
     activity[speech.0 as usize / 10..speech.1.div_ceil(10) as usize].fill(1);
     let vad = VadResult {
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
         frame_ms: 10,
         duration_ms: duration,
         probability: activity.iter().map(|&value| f32::from(value)).collect(),

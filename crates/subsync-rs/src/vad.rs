@@ -15,6 +15,10 @@ pub struct VadResult {
     pub probability: Vec<f32>,
     pub activity: Vec<u8>,
     pub segments: Vec<TimeSpan>,
+    /// Primary activity before gap bridging and tail padding.
+    pub raw_segments: Vec<TimeSpan>,
+    /// Onsets for snapping only, in the same order as `segments`.
+    pub onset_anchors_ms: Vec<u64>,
 }
 
 pub fn extract_speech_activity(samples: &[i16], sample_rate: u32, frame_ms: u32) -> VadResult {
@@ -43,6 +47,8 @@ fn extract_with_check(
         probability: Vec::new(),
         activity: Vec::new(),
         segments: Vec::new(),
+        raw_segments: Vec::new(),
+        onset_anchors_ms: Vec::new(),
     };
     if samples.is_empty()
         || !(8000..=192_000).contains(&sample_rate)
@@ -56,6 +62,7 @@ fn extract_with_check(
     let mut scratch = vec![Complex::default(); fft.get_inplace_scratch_len()];
     let mut spectrum = vec![Complex::default(); fft_len];
     let first_bin = (300 * fft_len).div_ceil(sample_rate as usize);
+    let low_bin = (120 * fft_len).div_ceil(sample_rate as usize);
     let last_bin = (3400 * fft_len / sample_rate as usize).min(fft_len / 2);
     let window: Vec<_> = (0..window_len)
         .map(|i| 0.5 - 0.5 * (TAU * i as f32 / (window_len - 1) as f32).cos())
@@ -98,16 +105,26 @@ fn extract_with_check(
             .sum::<f32>();
         let db = 10.0 * (energy / window_len as f32).max(1e-10).log10();
         let zcr_hz = crossings as f32 * sample_rate as f32 / (window_len - 1) as f32;
-        features.push((db, zcr_hz, band / total.max(f32::EPSILON)));
+        let denominator = total.max(f32::EPSILON);
+        let low_band = spectrum[low_bin..first_bin]
+            .iter()
+            .map(Complex::norm_sqr)
+            .sum::<f32>();
+        features.push((
+            db,
+            zcr_hz,
+            band / denominator,
+            (band + low_band) / denominator,
+        ));
     }
     checkpoint()?;
-    let mut levels: Vec<_> = features.iter().map(|&(db, _, _)| db).collect();
+    let mut levels: Vec<_> = features.iter().map(|&(db, _, _, _)| db).collect();
     let percentile = levels.len() / 5;
     let (_, floor, _) = levels.select_nth_unstable_by(percentile, f32::total_cmp);
     let threshold = (*floor + 8.0).clamp(-55.0, -28.0);
     result.probability = features
-        .into_iter()
-        .map(|(db, zcr, band)| {
+        .iter()
+        .map(|&(db, zcr, band, _)| {
             let loudness = ((db - threshold + 3.0) / 14.0).clamp(0.0, 1.0);
             let spectral = ((band - 0.28) / 0.49).clamp(0.0, 1.0);
             let voiced =
@@ -132,6 +149,10 @@ fn extract_with_check(
             }
             cursor += 1;
         }
+        result.raw_segments.push(TimeSpan {
+            start_ms: start as u64 * u64::from(frame_ms),
+            end_ms: (cursor as u64 * u64::from(frame_ms)).min(result.duration_ms),
+        });
         if let Some((_, end)) = segments.last_mut()
             && start - *end <= (200 / frame_ms) as usize
         {
@@ -170,8 +191,90 @@ fn extract_with_check(
             end_ms: (i as u64 * frame).min(result.duration_ms),
         });
     }
-    checkpoint()?;
+    if !result.segments.is_empty() {
+        result.onset_anchors_ms = voiced_onsets(&features, &result.segments, frame_ms, checkpoint)?;
+    }
     Ok(result)
+}
+
+fn voiced_onsets(
+    features: &[(f32, f32, f32, f32)],
+    segments: &[TimeSpan],
+    frame_ms: u32,
+    mut checkpoint: impl FnMut() -> Result<(), SyncError>,
+) -> Result<Vec<u64>, SyncError> {
+    let step = (1000 / frame_ms) as usize;
+    let radius = (12_500 / frame_ms) as usize;
+    let mut floors = Vec::with_capacity(features.len().div_ceil(step));
+    let mut levels = Vec::with_capacity(radius * 2);
+    for i in (0..features.len()).step_by(step) {
+        checkpoint()?;
+        levels.clear();
+        levels.extend(
+            features[i.saturating_sub(radius)..(i + radius).min(features.len())]
+                .iter()
+                .map(|f| f.0),
+        );
+        let percentile = levels.len() / 5;
+        let (_, floor, _) = levels.select_nth_unstable_by(percentile, f32::total_cmp);
+        floors.push(floor.clamp(-56.0, -30.0));
+    }
+    let qualifies = |i: usize| {
+        let (db, zcr, upper, broad) = features[i];
+        let left = floors[i / step];
+        let right = floors.get(i / step + 1).copied().unwrap_or(left);
+        let floor = left + (right - left) * ((i % step) as f32 / step as f32);
+        broad >= 0.65 && upper >= 0.06 && (350.0..=3800.0).contains(&zcr) && db >= floor + 8.0
+    };
+    let frame = u64::from(frame_ms);
+    let persistence = 40_u32.div_ceil(frame_ms) as usize;
+    let lookback = (380 / frame_ms) as usize;
+    let closure = (180 / frame_ms) as usize;
+    let crossing = 30_u32.div_ceil(frame_ms) as usize;
+    let contrast = 150_u32.div_ceil(frame_ms) as usize;
+    let mean_db = |start: usize, end: usize| {
+        features[start..end].iter().map(|f| f.0).sum::<f32>() / (end - start) as f32
+    };
+    let mut previous_end = 0;
+    let mut anchors = Vec::with_capacity(segments.len());
+    for segment in segments {
+        checkpoint()?;
+        let start = (segment.start_ms / frame) as usize;
+        let lower = start.saturating_sub(lookback).max(previous_end);
+        let upper = (start + crossing).min(features.len());
+        previous_end = segment.end_ms.div_ceil(frame) as usize;
+        let mut candidate = None;
+        let mut i = lower;
+        while i < upper {
+            if !qualifies(i) {
+                i += 1;
+                continue;
+            }
+            let run_start = i;
+            while i < upper && qualifies(i) {
+                i += 1;
+            }
+            if candidate.is_some() && run_start + crossing <= start && i >= start + crossing {
+                candidate = None;
+                break;
+            }
+            let run_end = i.min(start);
+            if run_end.saturating_sub(run_start) < persistence || start - run_end > closure {
+                continue;
+            }
+            let before = run_start.saturating_sub(contrast);
+            if before < run_start {
+                let background = mean_db(before, run_start);
+                if background > -30.0 && mean_db(run_start, run_end) - background < 4.0 {
+                    continue;
+                }
+            }
+            candidate.get_or_insert(run_start);
+        }
+        anchors.push(candidate.map_or(segment.start_ms, |i| i as u64 * frame));
+    }
+    checkpoint()?;
+    Ok(anchors)
 }
 
 #[cfg(test)]
