@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Consider recovered speech onsets and ASS centisecond rounding throughout the complete permitted snap window. Keep exact endpoint, neighbor, overlap and replay guards.
+- Reject onset candidates created by clipping a sustained background at the lookback or previous-segment boundary; retain real attacks at those boundaries.
+- Resolve FSI from rendered ASS whitespace while preserving raw escapes, markup and directional controls. Respect header and inline wrapping modes during conversion and reviewed builds.
+- Advance generation to `19` and normalization to `16`; preserve previous editions and require fresh render evidence. See the [Rust 3.0.4 recheck](docs/audit-rust-304-2026-11-27.md) and [issue #41](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/41).
+
 ## [3.0.4] - 2026-11-27
 
 - Check worker-reported start snaps against the cue end before refinement. Reject changed starts at zero and forward moves of 20 ms or less, as the engine does. Keep invalid worker output unpublished so a corrected run can retry (R01, H03).

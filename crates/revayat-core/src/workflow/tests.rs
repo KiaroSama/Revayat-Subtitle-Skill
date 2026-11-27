@@ -80,7 +80,7 @@ fn final_emission_rejects_self_links_and_links_to_removed_watermarks() -> Result
     let edition = build(&work, None)?;
     assert_eq!(
         edition["generation_recipe"],
-        json!({"version":18,"normalization":15,"timing":"floor-centisecond"})
+        json!({"version":19,"normalization":16,"timing":"floor-centisecond"})
     );
     assert_eq!(
         edition["episodes"][0]["provenance"][0]["timing"]["emitted"],

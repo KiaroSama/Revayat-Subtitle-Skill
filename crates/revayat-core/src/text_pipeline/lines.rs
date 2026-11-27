@@ -1,4 +1,5 @@
 use crate::markup::bidi::{PDI, RTL_ISOLATE, has_outer_rtl_isolate, wrapper_fits};
+use crate::markup::bidi_prose::{AssContext, project};
 use std::collections::HashSet;
 use unicode_bidi::{BidiClass, bidi_class};
 
@@ -358,6 +359,15 @@ pub(super) fn anchor(
     kind: &str,
     runtime_rtl_letters: Option<&HashSet<char>>,
 ) -> Result<String, String> {
+    anchor_with_context(text, kind, runtime_rtl_letters, AssContext::default())
+}
+
+pub(super) fn anchor_with_context(
+    text: String,
+    kind: &str,
+    runtime_rtl_letters: Option<&HashSet<char>>,
+    mut context: AssContext,
+) -> Result<String, String> {
     // Repair the whole cue so scopes crossing lines or tags keep their matching controls.
     let text = if balanced(&text, kind) {
         text
@@ -370,6 +380,8 @@ pub(super) fn anchor(
     let mut output = String::with_capacity(text.len());
     for (i, line) in lines.iter().enumerate() {
         let mut raw = original(line);
+        let line_context = context;
+        project(&raw, kind, &mut context)?;
         let prose = visible(line, kind);
         let has_rtl = prose.chars().any(|c| {
             if let Some(letters) = runtime_rtl_letters {
@@ -421,16 +433,11 @@ pub(super) fn anchor(
                     repair_leading_punctuation(&mut parts, first, last);
                     parts[first].insert_str(0, RTL_ISOLATE);
                     parts[last].push(PDI);
-                    let readable: String = parts
-                        .iter()
-                        .zip(line)
-                        .filter_map(|(part, (_, show))| show.then_some(part.as_str()))
-                        .collect();
-                    if wrapper_fits(&readable, true) {
-                        let candidate = parts.concat();
-                        if balanced(&candidate, kind) {
-                            raw = candidate;
-                        }
+                    let candidate = parts.concat();
+                    let mut candidate_context = line_context;
+                    let readable = project(&candidate, kind, &mut candidate_context)?;
+                    if wrapper_fits(&readable, true) && balanced(&candidate, kind) {
+                        raw = candidate;
                     }
                 }
             }

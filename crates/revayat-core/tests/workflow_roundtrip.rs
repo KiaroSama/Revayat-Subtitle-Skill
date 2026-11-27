@@ -705,7 +705,7 @@ fn generation_upgrade_preserves_history_reviews_and_sources() -> Check {
     assert_eq!(fresh["input_identity"], *input_identity);
     assert_eq!(
         fresh["generation_recipe"],
-        json!({"version":18,"normalization":15,"timing":"floor-centisecond"})
+        json!({"version":19,"normalization":16,"timing":"floor-centisecond"})
     );
     assert!(!build_path(&fresh)?.join("renders").exists());
     assert_eq!(snapshot(&paths)?, before);

@@ -105,8 +105,9 @@ fn process(
         if options.wrap_lines {
             cue.text = text::wrap_subtitle_lines(cue.text, Some(options.max_chars), Some(2))?;
         }
+        let context = document::ass_bidi_context(doc, &cue);
         cue.text =
-            text::anchor_rtl_line(cue.text, Some("ass".into()), Some(options.direction.into()))?;
+            text::anchor_rtl_line_with_ass_context(cue.text, "ass", options.direction, context)?;
         result.cues.push(cue);
     }
     Ok((result, removed))

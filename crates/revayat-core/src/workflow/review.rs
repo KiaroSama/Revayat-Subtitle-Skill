@@ -1,5 +1,7 @@
 use super::contract::{items, string, value_error};
-use crate::markup::{clean_empty_lines, paragraph_direction, remap_resets, rtl, uncomment};
+use crate::markup::{
+    clean_empty_lines, paragraph_direction, remap_resets, rtl_with_ass_context, uncomment,
+};
 use crate::subtitle_formats as formats;
 use crate::subtitle_formats::document::{Cue, Document};
 use crate::validation;
@@ -176,7 +178,13 @@ pub fn reviewed_cues(
             id: id.clone(),
             start,
             end,
-            text: rtl(text, kind.clone(), direction, force)?,
+            text: rtl_with_ass_context(
+                text,
+                kind.clone(),
+                direction,
+                force,
+                formats::document::ass_bidi_context(doc, cue),
+            )?,
             fields: cue.fields.clone(),
         });
     }

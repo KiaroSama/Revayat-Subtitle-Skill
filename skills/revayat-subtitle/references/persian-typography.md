@@ -35,6 +35,13 @@ or LTR embedding, check the [UAX #9](https://www.unicode.org/reports/tr9/tr9-52.
 effective explicit level of the readable text. Each opener advances to the next
 odd or even level, by one or two. `FSI` takes its direction from the first strong
 character in its own isolate, skipping nested isolates; it defaults to LTR.
+For ASS, determine that character from rendered prose: `\h` is a nonbreaking
+space, and `\n` is a space unless the effective wrapping mode makes it a line
+break. Header `WrapStyle`, inline `\q` changes and Banner effects affect that
+mode; a style reset does not reset it. Preserve the original escape and tag
+bytes in the emitted subtitle. Literal SRT backslashes keep their literal meaning.
+Reviewed normalization must use the same wrapping context when selecting line
+boundaries; a soft `\n` must not split an FSI paragraph before analysis.
 If adding a wrapper would exceed level 125, preserve the authored controls.
 Reviewed markup uses boundary `RLM` or `LRM` marks in that case; conversion keeps
 the existing line. Inside Persian words, conversion replaces stray `RLM` between

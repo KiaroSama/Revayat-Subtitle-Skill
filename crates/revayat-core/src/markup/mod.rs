@@ -17,6 +17,7 @@ macro_rules! pattern {
 }
 
 pub(crate) mod bidi;
+pub(crate) mod bidi_prose;
 mod font;
 mod tokens;
 
@@ -240,6 +241,16 @@ pub fn validate_bidi(text: String, kind: String) -> Result<(), String> {
 /// `direction` defaults to `"rtl"` and `force` defaults to `False` in Python.
 pub fn rtl(text: String, kind: String, direction: String, force: bool) -> Result<String, String> {
     bidi::normalize(&text, &kind, &direction, force, None)
+}
+
+pub(crate) fn rtl_with_ass_context(
+    text: String,
+    kind: String,
+    direction: String,
+    force: bool,
+    context: bidi_prose::AssContext,
+) -> Result<String, String> {
+    bidi::normalize_with_context(&text, &kind, &direction, force, None, context)
 }
 
 pub fn rtl_with_classes(
