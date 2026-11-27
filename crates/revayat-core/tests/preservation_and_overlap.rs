@@ -635,7 +635,12 @@ fn reset_references_and_parenthesized_scalars_are_preserved() -> Check {
 
 #[test]
 fn cross_line_isolates_and_embeddings_preserve_scope_and_prose() -> Check {
-    for (kind, newline) in [("ass", r"\N"), ("ass", r"\n"), ("srt", "\n")] {
+    // ASS \n is a physical line break only in wrap mode 2.
+    for (kind, prefix, newline) in [
+        ("ass", "", r"\N"),
+        ("ass", r"{\q2}", r"\n"),
+        ("srt", "", "\n"),
+    ] {
         for (opening, closing) in [
             ('\u{2066}', '\u{2069}'),
             ('\u{2067}', '\u{2069}'),
@@ -644,7 +649,7 @@ fn cross_line_isolates_and_embeddings_preserve_scope_and_prose() -> Check {
             ('\u{202b}', '\u{202c}'),
         ] {
             for (a, b) in [("سلام OVA", "دنیا"), ("سلام", "دنیا OVA")] {
-                let source = format!("{opening}{a}{newline}{b}{closing}");
+                let source = format!("{prefix}{opening}{a}{newline}{b}{closing}");
                 let rtl = |text| markup::rtl(text, kind.into(), "rtl".into(), false);
                 let result = rtl(source.clone())?;
                 markup::validate_bidi(result.clone(), kind.into())?;

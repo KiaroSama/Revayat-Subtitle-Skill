@@ -35,8 +35,8 @@ pub struct RecipeVersion {
 }
 
 pub const RECIPE_VERSION: RecipeVersion = RecipeVersion {
-    normalization: 15,
-    generation: 18,
+    normalization: 16,
+    generation: 19,
 };
 
 pub fn utf8_path(path: &Path) -> Result<&str, String> {

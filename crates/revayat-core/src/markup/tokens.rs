@@ -127,7 +127,15 @@ pub(super) fn block_spans<'a>(
     text: &'a str,
     kind: &'a str,
 ) -> impl Iterator<Item = Result<(Range<usize>, bool), String>> + 'a {
-    let (mut cursor, mut no_comment_end, mut drawing) = (0, false, false);
+    block_spans_with_drawing(text, kind, false)
+}
+
+fn block_spans_with_drawing<'a>(
+    text: &'a str,
+    kind: &'a str,
+    mut drawing: bool,
+) -> impl Iterator<Item = Result<(Range<usize>, bool), String>> + 'a {
+    let (mut cursor, mut no_comment_end) = (0, false);
     std::iter::from_fn(move || {
         while cursor < text.len() {
             if kind == "ass" {
@@ -192,10 +200,19 @@ use Piece::{Drawing, Tag, Text};
 pub(super) fn pieces<'a>(
     text: &'a str,
     kind: &str,
+    visit: impl FnMut(Piece, &'a str) -> Result<(), String>,
+) -> Result<(), String> {
+    pieces_with_drawing(text, kind, false, visit)
+}
+
+pub(super) fn pieces_with_drawing<'a>(
+    text: &'a str,
+    kind: &str,
+    mut drawing: bool,
     mut visit: impl FnMut(Piece, &'a str) -> Result<(), String>,
 ) -> Result<(), String> {
-    let (mut cursor, mut drawing) = (0, false);
-    for span in block_spans(text, kind) {
+    let mut cursor = 0;
+    for span in block_spans_with_drawing(text, kind, drawing) {
         let (range, next) = span?;
         if range.start > cursor {
             visit(

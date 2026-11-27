@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use unicode_bidi::{BidiClass, InitialInfo, Level, bidi_class};
 
 use super::{
-    Regex, python_space,
+    Regex,
+    bidi_prose::{AssContext, project},
+    python_space,
     tokens::{Piece, pieces},
 };
 use Piece::Text;
@@ -123,7 +125,7 @@ pub(crate) const RTL_ISOLATE: &str = "\u{200f}\u{2067}";
 pub(crate) const PDI: char = '\u{2069}';
 
 pub(crate) fn wrapper_fits(visible_prose: &str, rtl: bool) -> bool {
-    use BidiClass::{FSI, LRE, LRI, LRO, PDF, PDI, RLE, RLI, RLO};
+    use BidiClass::{B, FSI, LRE, LRI, LRO, PDF, PDI, RLE, RLI, RLO};
 
     let base = if rtl { Level::rtl() } else { Level::ltr() };
     // InitialInfo resolves FSI from its own first strong character, skipping nested isolates.
@@ -132,6 +134,7 @@ pub(crate) fn wrapper_fits(visible_prose: &str, rtl: bool) -> bool {
     for (at, _) in visible_prose.char_indices() {
         let class = info.original_classes[at];
         match class {
+            B => scopes.clear(),
             PDF if scopes.last().is_some_and(|&(_, isolate)| !isolate) => {
                 scopes.pop();
             }
@@ -156,11 +159,12 @@ pub(crate) fn wrapper_fits(visible_prose: &str, rtl: bool) -> bool {
     true
 }
 
-fn readable(line: &[Token<'_>]) -> String {
-    line.iter()
-        .filter(|(piece, _)| *piece == Text)
+fn readable(line: &[Token<'_>], kind: &str, mut context: AssContext) -> Result<String, String> {
+    let text = line
+        .iter()
         .map(|(_, text)| text.as_ref())
-        .collect()
+        .collect::<String>();
+    project(&text, kind, &mut context)
 }
 
 pub(crate) fn has_outer_rtl_isolate(mut text: impl Iterator<Item = char>) -> bool {
@@ -193,7 +197,14 @@ fn flush(
     rtl: bool,
     force: bool,
     runtime_classes: Option<&HashMap<char, BidiClass>>,
-) {
+    context: &mut AssContext,
+) -> Result<(), String> {
+    let line_context = *context;
+    let original = line
+        .iter()
+        .map(|(_, text)| text.as_ref())
+        .collect::<String>();
+    project(&original, kind, context)?;
     let has_rtl = |text: &str| has_rtl_with_classes(text, runtime_classes);
     let has_ltr = |text: &str| has_ltr_with_classes(text, runtime_classes);
     let indices = line
@@ -217,7 +228,7 @@ fn flush(
             for (_, value) in line.drain(..) {
                 output.push_str(&value);
             }
-            return;
+            return Ok(());
         }
         for (prefix, suffix) in [
             ("\u{202b}\u{200f}", "\u{200f}\u{202c}"),
@@ -263,7 +274,7 @@ fn flush(
                 let original_last = line[last].1.clone();
                 line[first].1.to_mut().insert_str(0, RTL_ISOLATE);
                 line[last].1.to_mut().push(PDI);
-                isolated = wrapper_fits(&readable(line), true)
+                isolated = wrapper_fits(&readable(line, kind, line_context)?, true)
                     && validate(
                         &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
                         kind,
@@ -284,7 +295,7 @@ fn flush(
                     let original_last = line[last].1.clone();
                     line[first].1.to_mut().insert(0, LRE);
                     line[last].1.to_mut().push(PDF);
-                    if !wrapper_fits(&readable(line), false)
+                    if !wrapper_fits(&readable(line, kind, line_context)?, false)
                         || validate(
                             &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
                             kind,
@@ -301,6 +312,7 @@ fn flush(
     for (_, value) in line.drain(..) {
         output.push_str(&value);
     }
+    Ok(())
 }
 
 pub(super) fn normalize(
@@ -310,6 +322,24 @@ pub(super) fn normalize(
     force: bool,
     runtime_classes: Option<&HashMap<char, BidiClass>>,
 ) -> Result<String, String> {
+    normalize_with_context(
+        text,
+        kind,
+        direction,
+        force,
+        runtime_classes,
+        AssContext::default(),
+    )
+}
+
+pub(super) fn normalize_with_context(
+    text: &str,
+    kind: &str,
+    direction: &str,
+    force: bool,
+    runtime_classes: Option<&HashMap<char, BidiClass>>,
+    mut context: AssContext,
+) -> Result<String, String> {
     if !matches!(direction, "rtl" | "ltr") {
         return Err("ValueError: Paragraph direction must be ltr or rtl".into());
     }
@@ -317,6 +347,7 @@ pub(super) fn normalize(
     let mut output = String::with_capacity(text.len());
     let mut line = Vec::new();
     let runs = text_runs(text, kind)?;
+    let mut delimiter_context = context;
     let breaks = if kind == "ass" {
         pattern!(Regex, r"\\[Nn]")
     } else {
@@ -324,11 +355,14 @@ pub(super) fn normalize(
     };
     for (piece, value) in &runs {
         if *piece != Text {
+            if kind == "ass" && *piece == Piece::Tag {
+                delimiter_context.tag(value)?;
+            }
             line.push((*piece, Cow::Borrowed(value.as_ref())));
             continue;
         }
-        let mut add = |part| {
-            if matches!(part, "\n" | r"\N" | r"\n") {
+        let mut add = |part, is_break| -> Result<(), String> {
+            if is_break {
                 flush(
                     &mut line,
                     &mut output,
@@ -336,19 +370,27 @@ pub(super) fn normalize(
                     direction == "rtl",
                     force,
                     runtime_classes,
-                );
+                    &mut context,
+                )?;
                 output.push_str(part);
             } else {
                 line.push((Text, Cow::Borrowed(part)));
             }
+            Ok(())
         };
         let mut cursor = 0;
         for delimiter in breaks.find_iter(value) {
-            add(&value[cursor..delimiter.start()]);
-            add(delimiter.as_str());
+            if kind == "ass"
+                && delimiter.as_str() == r"\n"
+                && !delimiter_context.soft_break_is_newline()
+            {
+                continue;
+            }
+            add(&value[cursor..delimiter.start()], false)?;
+            add(delimiter.as_str(), true)?;
             cursor = delimiter.end();
         }
-        add(&value[cursor..]);
+        add(&value[cursor..], false)?;
     }
     flush(
         &mut line,
@@ -357,7 +399,8 @@ pub(super) fn normalize(
         direction == "rtl",
         force,
         runtime_classes,
-    );
+        &mut context,
+    )?;
     validate(&output, kind)?;
     Ok(output)
 }

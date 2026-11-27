@@ -7,7 +7,7 @@ Run these from the repository root with Rust `1.100.0`, `rustfmt`, and `clippy`:
 ```text
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+cargo test --workspace --locked --no-fail-fast
 cargo build --workspace --release --locked
 ```
 
@@ -37,6 +37,8 @@ The workspace suites check CLI contracts, subtitle parsing and preservation, Per
 For a failed `revayat-subtitle` command, inspect its UTF-8 operational log as described in [Logging](../README.md#logging). Standalone `subsync` reports errors on stderr and can save its JSON result with `--json-report`; it does not create that operational logfile. Report the failing step and exit status. Check local paths before sharing a log; do not upload private input media, source subtitles, worksheets, or review images.
 
 ## Audit evidence
+
+The [2026-11-27 Rust 3.0.4 recheck](audit-rust-304-2026-11-27.md) records recovered-onset search bounds, clipped-background onset rejection, and format-aware FSI depth checks. Its new integration targets run in the existing four native CI lanes. Generation `19` and normalization `16` preserve earlier editions and require fresh render approval. The linked repair PR carries the final tested tree, head commit and hosted checks; earlier green checks do not validate a later commit.
 
 The [2026-11-27 Rust 3.0.3 recheck](audit-rust-303-2026-11-27.md) records endpoint replay, bounded continuing-speech extension, sibling embedding preservation, and whole-cue bidi repair. Its permanent regressions run in the existing workspace CI; the linked repair PR supplies the exact final revision and hosted results. Generation `18` and normalization `15` require new render evidence without changing earlier editions.
 

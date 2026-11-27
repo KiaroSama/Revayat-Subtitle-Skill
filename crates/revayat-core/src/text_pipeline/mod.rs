@@ -276,6 +276,19 @@ pub fn anchor_rtl_line_with_letters(
     }
 }
 
+pub(crate) fn anchor_rtl_line_with_ass_context(
+    text: String,
+    kind: &str,
+    direction: &str,
+    context: crate::markup::bidi_prose::AssContext,
+) -> Result<String, String> {
+    if direction == "rtl" {
+        lines::anchor_with_context(text, kind, None, context)
+    } else {
+        Ok(text)
+    }
+}
+
 pub fn process_cue_text(
     text: String,
     kind: Option<String>,

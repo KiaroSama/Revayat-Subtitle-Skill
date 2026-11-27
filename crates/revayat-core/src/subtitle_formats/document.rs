@@ -546,6 +546,28 @@ pub fn source_default_style_is_bold(doc: &Document) -> bool {
         != 0
 }
 
+pub(crate) fn ass_bidi_context(doc: &Document, cue: &Cue) -> crate::markup::bidi_prose::AssContext {
+    use crate::markup::bidi_prose::{AssContext, header_integer};
+    let mut wrap_style = 0;
+    if doc.kind == "ass" {
+        for (_, lines) in doc
+            .sections
+            .iter()
+            .filter(|(name, _)| name.eq_ignore_ascii_case("[script info]"))
+        {
+            for line in lines {
+                if let Some(value) = ass_line_start(line).strip_prefix("WrapStyle:") {
+                    wrap_style = header_integer(value);
+                }
+            }
+        }
+    }
+    AssContext::new(
+        wrap_style,
+        cue.fields.get("effect").map_or("", String::as_str),
+    )
+}
+
 pub(crate) fn inherited_style_value(field: &str) -> String {
     // libass initializes native V4+ styles to zero, except for these three fields.
     match field {

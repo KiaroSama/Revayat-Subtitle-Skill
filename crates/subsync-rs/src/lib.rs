@@ -17,7 +17,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use vad::{VadResult, extract_speech_activity_cancellable};
+use vad::{MAX_ONSET_LOOKBACK_MS, VadResult, extract_speech_activity_cancellable};
 
 const FRAME_MS: u32 = 10;
 static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -181,7 +181,9 @@ fn validate_vad(vad: &VadResult) -> Result<(), SyncError> {
                     .onset_anchors_ms
                     .iter()
                     .zip(&vad.segments)
-                    .any(|(&onset, span)| onset > span.start_ms || span.start_ms - onset > 380)))
+                    .any(|(&onset, span)| {
+                        onset > span.start_ms || span.start_ms - onset > MAX_ONSET_LOOKBACK_MS
+                    })))
     {
         return Err(SyncError::Audio(
             "expected a valid 10 ms speech activity timeline".into(),

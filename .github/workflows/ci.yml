@@ -98,7 +98,7 @@ jobs:
         run: |
           filters=$(ffmpeg -hide_banner -filters)
           grep -Eq '[[:space:]]ass[[:space:]]' <<< "$filters"
-          cargo test --workspace --locked
+          cargo test --workspace --locked --no-fail-fast
 
   repo-hygiene:
     name: Repo hygiene & code metrics

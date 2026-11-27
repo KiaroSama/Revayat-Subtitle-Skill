@@ -1,7 +1,7 @@
 use crate::{
     SplitSegment, SyncConfig, SyncError, SyncReport, check_cancelled,
     formats::{SubtitleCue, SubtitleFormat},
-    vad::VadResult,
+    vad::{MAX_ONSET_LOOKBACK_MS, VadResult},
 };
 use rustfft::{FftPlanner, num_complex::Complex};
 
@@ -579,6 +579,11 @@ fn snap_start(
     let lead = config.lead_in_ms;
     let baseline = binary.fraction(cue.start_ms, cue.end_ms);
     let first = vad.segments.partition_point(|span| span.start_ms < low);
+    // A formatted anchor can precede confirmation by the lookback and rounding allowance.
+    let search_high = high
+        .saturating_add(lead)
+        .saturating_add(unit - 1)
+        .saturating_add(MAX_ONSET_LOOKBACK_MS);
     let allowed = |start| {
         start >= low
             && start <= high
@@ -590,7 +595,7 @@ fn snap_start(
     let candidate = vad.segments[first..]
         .iter()
         .enumerate()
-        .take_while(|(_, span)| span.start_ms <= high.saturating_add(lead))
+        .take_while(|(_, span)| span.start_ms <= search_high)
         // Score the confirmed onset, not silence in the lead-in or consonant closure.
         .filter(|(_, span)| {
             span.start_ms < cue.end_ms

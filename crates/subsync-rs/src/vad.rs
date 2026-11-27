@@ -2,6 +2,8 @@ use crate::SyncError;
 use rustfft::{FftPlanner, num_complex::Complex};
 use std::f32::consts::TAU;
 
+pub(crate) const MAX_ONSET_LOOKBACK_MS: u64 = 380;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TimeSpan {
     pub start_ms: u64,
@@ -228,7 +230,7 @@ fn voiced_onsets(
     };
     let frame = u64::from(frame_ms);
     let persistence = 40_u32.div_ceil(frame_ms) as usize;
-    let lookback = (380 / frame_ms) as usize;
+    let lookback = (MAX_ONSET_LOOKBACK_MS / frame) as usize;
     let closure = (180 / frame_ms) as usize;
     let crossing = 30_u32.div_ceil(frame_ms) as usize;
     let contrast = 150_u32.div_ceil(frame_ms) as usize;
@@ -253,6 +255,10 @@ fn voiced_onsets(
             let run_start = i;
             while i < upper && qualifies(i) {
                 i += 1;
+            }
+            // A run already active before the clipped window has no onset at its lower bound.
+            if run_start == lower && lower > 0 && qualifies(lower - 1) {
+                continue;
             }
             if candidate.is_some() && run_start + crossing <= start && i >= start + crossing {
                 candidate = None;
