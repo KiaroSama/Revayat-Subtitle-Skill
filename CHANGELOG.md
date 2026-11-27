@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Validate a snapped start against the transformed cue end before end adjustment, so a later extension cannot legitimize an impossible worker result. Keep failed worker output unpublished and retryable.
+- Extend cues toward continuing speech within the configured movement budget even when the complete spoken segment ends beyond that budget. Preserve neighboring, joined, overlapping ASS, audio-duration, and timestamp-precision bounds.
+- Preserve valid sibling bidi embeddings during reviewed builds. Repair only unmatched controls across the whole readable cue, retaining balanced inner and cross-line scopes, style tags, and drawing data. Keep supported maximum-depth scopes valid when anchoring them.
+- Advance generation to `18` and normalization to `15`; preserve earlier editions and require fresh image evidence. See the [Rust 3.0.3 recheck](docs/audit-rust-303-2026-11-27.md) and [issue #39](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/39).
+
 ## 3.0.3 (2026-11-27)
 
 - Filter nearby speech onsets by overlap quality before snapping. When replaying worker results, check the implied onset after accounting for the configured lead-in (PR #38, A01–A02).

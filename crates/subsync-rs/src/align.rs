@@ -346,7 +346,7 @@ impl TimingPlan {
     }
 }
 
-/// Verify both returned endpoints against the engine's reported transform and permitted snapping.
+/// Verify both returned endpoints against the reported transform and permitted endpoint refinement.
 pub fn validate_reported_timing(
     cues: &[SubtitleCue],
     output: &[SubtitleCue],
@@ -435,6 +435,8 @@ pub fn validate_reported_timing(
                 if indices.len() != 1
                     || config.snap_ms == 0
                     || before.end_ms - before.start_ms < 500
+                    // Snapping precedes end refinement; a later extension cannot make it eligible.
+                    || before.end_ms.saturating_sub(after.start_ms) < 500
                     || after.start_ms.abs_diff(before.start_ms) > config.snap_ms
                     || after.start_ms < previous_end
                     || after.start_ms > snap_join_limit(&plan, g, previous_end)
