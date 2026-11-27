@@ -418,10 +418,20 @@ fn path_markers_and_inventory_refuse_lossy_filename_conversion() -> Check {
 
 #[test]
 fn recipe_upgrade_preserves_the_previous_generation_and_requires_fresh_evidence() -> Check {
+    for (generation, normalization) in [(13, 12), (17, 14)] {
+        check_recipe_upgrade(json!({
+            "version": generation,
+            "normalization": normalization,
+            "timing": "floor-centisecond"
+        }))?;
+    }
+    Ok(())
+}
+
+fn check_recipe_upgrade(old_recipe: serde_json::Value) -> Check {
     let root = tempfile::tempdir().map_err(|e| e.to_string())?;
     let work = reviewed(root.path(), "Authored subtitle")?;
     let edition = workspace::assemble(&work, None)?;
-    let old_recipe = json!({"version": 13, "normalization": 12, "timing": "floor-centisecond"});
     let old_id = workspace::digest(
         contract_json::dump(
             &json!([edition.manifest["input_identity"], old_recipe, "srt"]),
@@ -466,7 +476,7 @@ fn recipe_upgrade_preserves_the_previous_generation_and_requires_fresh_evidence(
     assert_eq!(built["input_identity"], edition.manifest["input_identity"]);
     assert_eq!(
         built["generation_recipe"],
-        json!({"version": 17, "normalization": 14, "timing": "floor-centisecond"})
+        json!({"version": 18, "normalization": 15, "timing": "floor-centisecond"})
     );
     assert!(
         !Path::new(built["build"].as_str().ok_or("build path")?)

@@ -204,33 +204,32 @@ pub(super) fn refine_ends(
         let duration = cue.end_ms - cue.start_ms;
         let original = plan.base[i];
         let original_duration = original.end_ms - original.start_ms;
-        let target = if let Some(seg) = last.filter(|seg| {
-            seg.end_ms > cue.end_ms.saturating_add(140)
-                && seg.end_ms <= cue.end_ms.saturating_add(limit)
-        }) {
-            (seg.end_ms + TRAIL_OUT_MS).clamp(low, high)
-        } else if original_duration < MIN_READABLE_MS
-            && duration < MIN_READABLE_MS
-            && high > cue.end_ms
-        {
-            let next_speech = vad.segments.get(split).map_or(high, |seg| seg.start_ms);
-            let target = (cue.start_ms + MIN_READABLE_MS).min(next_speech).min(high);
-            if target < low.max(cue.end_ms) {
+        let target =
+            if let Some(seg) = last.filter(|seg| seg.end_ms > cue.end_ms.saturating_add(140)) {
+                // Continue toward ongoing speech even when the movement budget cannot cover it all.
+                (seg.end_ms + TRAIL_OUT_MS).clamp(low, high)
+            } else if original_duration < MIN_READABLE_MS
+                && duration < MIN_READABLE_MS
+                && high > cue.end_ms
+            {
+                let next_speech = vad.segments.get(split).map_or(high, |seg| seg.start_ms);
+                let target = (cue.start_ms + MIN_READABLE_MS).min(next_speech).min(high);
+                if target < low.max(cue.end_ms) {
+                    continue;
+                }
+                target
+            } else if let Some(seg) = last.filter(|seg| {
+                duration > 1500 && seg.end_ms > cue.start_ms && cue.end_ms > seg.end_ms + 600
+            }) {
+                if low > high.min(cue.end_ms) {
+                    continue;
+                }
+                (seg.end_ms + TRAIL_OUT_MS)
+                    .max(cue.start_ms + MIN_READABLE_MS)
+                    .clamp(low, high.min(cue.end_ms))
+            } else {
                 continue;
-            }
-            target
-        } else if let Some(seg) = last.filter(|seg| {
-            duration > 1500 && seg.end_ms > cue.start_ms && cue.end_ms > seg.end_ms + 600
-        }) {
-            if low > high.min(cue.end_ms) {
-                continue;
-            }
-            (seg.end_ms + TRAIL_OUT_MS)
-                .max(cue.start_ms + MIN_READABLE_MS)
-                .clamp(low, high.min(cue.end_ms))
-        } else {
-            continue;
-        };
+            };
         let end = target / plan.unit * plan.unit;
         if end != cue.end_ms {
             cues[i].end_ms = end;

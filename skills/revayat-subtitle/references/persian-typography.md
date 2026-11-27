@@ -24,10 +24,16 @@ This applies regardless of the opening script, digit, or dialogue dash. Keep
 ASS overrides, drawing data, and SRT tags outside the generated wrapper.
 Use actual Unicode characters and check the result in the target renderer.
 
-Conversion removes unbalanced directional controls from imported prose and
-keeps intentional balanced inner and cross-line scopes. Inside Persian words,
-it replaces stray `RLM` between letters with `ZWNJ` (`U+200C`). Reversed leading
-punctuation moves to the logical end only when it directly precedes a Persian
+Conversion removes only unmatched directional controls from imported prose,
+matching scopes across the whole cue before handling display lines. It keeps
+intentional balanced inner and cross-line scopes, including scopes across style
+tags, and leaves controls in tags and drawing data untouched. A `PDI` closes its
+matching isolate and any embeddings opened inside it; a stray terminator must
+not discard another balanced scope. Legacy embedding wrappers are removed only
+when their endpoints enclose one complete scope. At the supported nesting limit,
+boundary marks can anchor a line without adding another isolate. Inside Persian
+words, conversion replaces stray `RLM` between letters with `ZWNJ` (`U+200C`).
+Reversed leading punctuation moves to the logical end only when it directly precedes a Persian
 letter and the line has no terminal punctuation. Keep legitimate continuation
 ellipses and dialogue dashes.
 

@@ -300,11 +300,70 @@ fn balanced(text: &str, kind: &str) -> bool {
     stack.is_empty()
 }
 
+fn repair_unbalanced_scopes(mut text: String, kind: &str) -> Result<String, String> {
+    let mut stack = Vec::new();
+    let mut isolates = Vec::new();
+    let mut removed = HashSet::new();
+    let (mut offset, mut drawing) = (0, false);
+    for (prose, tag) in tokens::segments(&text, kind)? {
+        if !drawing {
+            for (at, c) in prose.char_indices() {
+                let at = offset + at;
+                match c {
+                    '\u{202a}' | '\u{202b}' | '\u{202d}' | '\u{202e}' => {
+                        stack.push((at, false));
+                    }
+                    '\u{2066}'..='\u{2068}' => {
+                        isolates.push(stack.len());
+                        stack.push((at, true));
+                    }
+                    PDF => {
+                        if stack.last().is_some_and(|&(_, isolate)| !isolate) {
+                            stack.pop();
+                        } else {
+                            removed.insert(at);
+                        }
+                    }
+                    PDI => {
+                        if let Some(open) = isolates.pop() {
+                            // A matching PDI also closes embeddings within its isolate.
+                            stack.truncate(open);
+                        } else {
+                            removed.insert(at);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        offset += prose.len() + tag.len();
+        if kind == "ass" {
+            drawing = drawing_mode(tag, drawing)?;
+        }
+    }
+    removed.extend(stack.into_iter().map(|(at, _)| at));
+    if !removed.is_empty() {
+        let mut at = 0;
+        text.retain(|c| {
+            let keep = !removed.contains(&at);
+            at += c.len_utf8();
+            keep
+        });
+    }
+    Ok(text)
+}
+
 pub(super) fn anchor(
     text: String,
     kind: &str,
     runtime_rtl_letters: Option<&HashSet<char>>,
 ) -> Result<String, String> {
+    // Repair the whole cue so scopes crossing lines or tags keep their matching controls.
+    let text = if balanced(&text, kind) {
+        text
+    } else {
+        repair_unbalanced_scopes(text, kind)?
+    };
     let (lines, breaks) = lines(&text, kind)?;
     let whole_balanced = balanced(&text, kind);
     let alpha = pattern!(Regex, r"\A\p{L}\z");
@@ -341,13 +400,6 @@ pub(super) fn anchor(
                     let last = indices.next_back().map_or(first, |(last, _)| last);
                     let mut parts: Vec<_> =
                         line.iter().map(|(part, _)| (*part).to_owned()).collect();
-                    if !line_balanced {
-                        for (part, (_, show)) in parts.iter_mut().zip(line) {
-                            if *show {
-                                part.retain(|c| !matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'));
-                            }
-                        }
-                    }
                     trim_edge_marks(&mut parts[first], true);
                     trim_edge_marks(&mut parts[last], false);
                     if line_balanced

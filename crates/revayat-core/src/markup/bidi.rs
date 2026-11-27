@@ -189,9 +189,22 @@ fn flush(
                 && line[last].1.ends_with(suffix)
                 && (first != last || line[first].1.len() >= prefix.len() + suffix.len())
             {
+                let original_first = line[first].1.clone();
+                let original_last = line[last].1.clone();
                 line[first].1.to_mut().drain(..prefix.len());
                 let end = line[last].1.len() - suffix.len();
                 line[last].1.to_mut().truncate(end);
+                // The endpoints may belong to sibling scopes, not one outer wrapper.
+                if suffix.ends_with(PDF)
+                    && validate(
+                        &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                        kind,
+                    )
+                    .is_err()
+                {
+                    line[first].1 = original_first;
+                    line[last].1 = original_last;
+                }
                 break;
             }
         }
@@ -203,16 +216,42 @@ fn flush(
                 kind,
             )
             .is_ok();
+            let mut isolated = false;
             if rtl && balanced {
+                let original_first = line[first].1.clone();
+                let original_last = line[last].1.clone();
                 line[first].1.to_mut().insert_str(0, RTL_ISOLATE);
                 line[last].1.to_mut().push(PDI);
-            } else {
+                isolated = validate(
+                    &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                    kind,
+                )
+                .is_ok();
+                if !isolated {
+                    // Boundary marks preserve input already at the supported nesting limit.
+                    line[first].1 = original_first;
+                    line[last].1 = original_last;
+                }
+            }
+            if !isolated {
                 let mark = if rtl { RLM } else { LRM };
                 line[first].1.to_mut().insert(0, mark);
                 line[last].1.to_mut().push(mark);
                 if !rtl && mixed && balanced {
+                    let original_first = line[first].1.clone();
+                    let original_last = line[last].1.clone();
                     line[first].1.to_mut().insert(0, LRE);
                     line[last].1.to_mut().push(PDF);
+                    if validate(
+                        &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),
+                        kind,
+                    )
+                    .is_err()
+                    {
+                        // LTR anchoring must preserve the same supported input depth as RTL.
+                        line[first].1 = original_first;
+                        line[last].1 = original_last;
+                    }
                 }
             }
         }

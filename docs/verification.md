@@ -38,6 +38,8 @@ For a failed `revayat-subtitle` command, inspect its UTF-8 operational log as de
 
 ## Audit evidence
 
+The [2026-11-27 Rust 3.0.3 recheck](audit-rust-303-2026-11-27.md) records endpoint replay, bounded continuing-speech extension, sibling embedding preservation, and whole-cue bidi repair. Its permanent regressions run in the existing workspace CI; the linked repair PR supplies the exact final revision and hosted results. Generation `18` and normalization `15` require new render evidence without changing earlier editions.
+
 The [2026-11-25 Rust audit](audit-rust-2026-11-25.md) records fresh v3 baseline tests, reproduced defects, implemented repairs, API/recipe migration, and the required review matrix. Its linked PR supplies the exact final revision and hosted CI receipt. Use that revision's results when evaluating the repairs.
 
 ### Earlier evidence
