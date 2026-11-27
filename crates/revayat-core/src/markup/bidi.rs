@@ -204,9 +204,8 @@ fn flush(
         .iter()
         .map(|(_, text)| text.as_ref())
         .collect::<String>();
-    project(&original, kind, context)?;
-    let has_rtl = |text: &str| has_rtl_with_classes(text, runtime_classes);
-    let has_ltr = |text: &str| has_ltr_with_classes(text, runtime_classes);
+    let prose = project(&original, kind, context)?;
+    let has_rtl = has_rtl_with_classes(&prose, runtime_classes);
     let indices = line
         .iter()
         .enumerate()
@@ -215,7 +214,7 @@ fn flush(
         })
         .collect::<Vec<_>>();
     if let (Some(&first), Some(&last)) = (indices.first(), indices.last())
-        && (force || indices.iter().any(|&i| has_rtl(&line[i].1)))
+        && (force || has_rtl)
     {
         if rtl
             && has_outer_rtl_isolate(
@@ -260,8 +259,9 @@ fn flush(
                 break;
             }
         }
-        if force || indices.iter().any(|&i| has_rtl(&line[i].1)) {
-            let mixed = indices.iter().any(|&i| has_ltr(&line[i].1));
+        let prose = readable(line, kind, line_context)?;
+        if force || has_rtl_with_classes(&prose, runtime_classes) {
+            let mixed = has_ltr_with_classes(&prose, runtime_classes);
             // Do not enclose half of an intentional scope that crosses a display break.
             let balanced = validate(
                 &line.iter().map(|(_, s)| s.as_ref()).collect::<String>(),

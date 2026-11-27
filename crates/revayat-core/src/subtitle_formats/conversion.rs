@@ -102,10 +102,15 @@ fn process(
         if options.direction == "rtl" && options.fix_zwnj {
             cue.text = text::normalize_persian_zwnj(cue.text)?;
         }
+        let context = document::ass_bidi_context(&result, &cue);
         if options.wrap_lines {
-            cue.text = text::wrap_subtitle_lines(cue.text, Some(options.max_chars), Some(2))?;
+            cue.text = text::wrap_subtitle_lines_with_ass_context(
+                cue.text,
+                options.max_chars,
+                2,
+                context,
+            )?;
         }
-        let context = document::ass_bidi_context(doc, &cue);
         cue.text =
             text::anchor_rtl_line_with_ass_context(cue.text, "ass", options.direction, context)?;
         result.cues.push(cue);

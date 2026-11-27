@@ -276,6 +276,15 @@ pub fn anchor_rtl_line_with_letters(
     }
 }
 
+pub(crate) fn wrap_subtitle_lines_with_ass_context(
+    text: String,
+    max_chars: i64,
+    max_lines: i64,
+    context: crate::markup::bidi_prose::AssContext,
+) -> Result<String, String> {
+    lines::wrap_with_context(text, max_chars, max_lines, "ass", context)
+}
+
 pub(crate) fn anchor_rtl_line_with_ass_context(
     text: String,
     kind: &str,

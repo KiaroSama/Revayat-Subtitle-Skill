@@ -118,6 +118,16 @@ fn convert_texts(source: &str) -> Result<Vec<String>> {
 }
 
 #[test]
+fn convert_anchors_each_ass_paragraph_without_rewriting_its_break() -> Result<()> {
+    for (mode, effect, tags) in [(2, "", ""), (0, "", r"{\q2}"), (0, "Banner;10", "")] {
+        let input = format!(r"{tags}سلام\nدنیا");
+        let expected = format!(r"{tags}{}\n{}", isolated("سلام"), isolated("دنیا"));
+        assert_eq!(convert_texts(&ass(&[input], mode, effect))?, [expected]);
+    }
+    Ok(())
+}
+
+#[test]
 fn convert_uses_visible_fsi_direction_for_ass_spaces() -> Result<()> {
     let texts: Vec<_> = [r"\hدنیا!", "\u{00a0}دنیا!", r"\nدنیا!", " دنیا!"]
         .into_iter()

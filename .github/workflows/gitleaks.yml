@@ -18,8 +18,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: gitleaks-${{ github.workflow }}-${{ github.ref }}-${{ inputs.scan_id || '' }}
-  cancel-in-progress: true
+  group: gitleaks-${{ github.workflow }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('push-{0}', github.sha) || github.ref }}-${{ inputs.scan_id || '' }}
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
   gitleaks:

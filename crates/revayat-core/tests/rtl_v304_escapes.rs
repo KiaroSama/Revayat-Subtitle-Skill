@@ -1,6 +1,10 @@
 //! Authored regressions for format-aware FSI level checks at the UAX #9 limit.
 
-use revayat_core::{markup, text_pipeline};
+use revayat_core::{
+    markup,
+    subtitle_formats::{conversion, document},
+    text_pipeline,
+};
 
 type Check = Result<(), String>;
 
@@ -190,6 +194,79 @@ fn ass_q2_soft_break_ends_fsi_before_the_later_persian_character() -> Check {
 fn ass_q0_restores_soft_space_semantics_after_q2() -> Check {
     let source = format!(r"{{\q2}}{{\q0}}{}", rtl_boundary(r"\nدنیا!", 60));
     let expected = format!(r"{{\q2}}{{\q0}}{}", isolate(&rtl_boundary(r"\nدنیا!", 60)));
+    assert_anchor(&source, &expected, "ass")
+}
+
+#[test]
+fn ass_spaces_do_not_trigger_a_mixed_ltr_embedding() -> Check {
+    let normalize = |text, kind: &str| markup::rtl(text, kind.into(), "ltr".into(), false);
+    for (tags, escape, space) in [
+        ("", r"\h", "\u{00a0}"),
+        (r"{\q0}", r"\n", " "),
+        (r"{\q1}", r"\n", " "),
+        (r"{\q3}", r"\n", " "),
+    ] {
+        let source = format!("{tags}سلام{escape}دنیا");
+        let actual = normalize(source, "ass")?;
+        assert_eq!(actual, format!("{tags}{LRM}سلام{escape}دنیا{LRM}"));
+        assert_eq!(
+            actual.replace(escape, space),
+            normalize(format!("{tags}سلام{space}دنیا"), "ass")?
+        );
+        assert_eq!(normalize(actual.clone(), "ass")?, actual);
+    }
+    for escape in [r"\h", r"\n"] {
+        assert_eq!(
+            normalize(format!("سلام{escape}دنیا"), "srt")?,
+            format!("{LRE}{LRM}سلام{escape}دنیا{LRM}{PDF}")
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn ass_conversion_splits_only_renderer_newlines_and_keeps_their_bytes() -> Check {
+    for (mode, effect, tags, escape, splits) in [
+        (2, "", "", r"\n", true),
+        (0, "", r"{\q2\rDefault}", r"\n", true),
+        (0, "Banner;10", "", r"\n", true),
+        (0, "banner;10", "", r"\n", false),
+        (2, "Banner;10", r"{\q0}", r"\n", false),
+        (1, "", "", r"\n", false),
+        (3, "", "", r"\n", false),
+        (0, "", "", r"\N", true),
+    ] {
+        let source = format!(
+            "[Script Info]\nScriptType: v4.00+\nWrapStyle: {mode}\n[V4+ Styles]\nFormat: Name\nStyle: Default\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,{effect},{tags}سلام{escape}دنیا\n"
+        );
+        let doc = document::parse(&source, "ass")?;
+        let options = conversion::Options {
+            max_chars: 5,
+            fix_zwnj: false,
+            strip_watermarks: false,
+            ..conversion::Options::default()
+        };
+        let (actual, _) = conversion::convert(&doc, &options)?;
+        let expected = if splits {
+            format!("{tags}{}{escape}{}", isolate("سلام"), isolate("دنیا"))
+        } else {
+            format!("{tags}{}", isolate(&format!("سلام{escape}دنیا")))
+        };
+        assert_eq!(
+            actual.cues[0].text, expected,
+            "mode={mode} effect={effect} tags={tags}"
+        );
+        let (again, _) = conversion::convert(&actual, &options)?;
+        assert_eq!(again.cues[0].text, expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn ass_q2_keeps_drawing_escapes_opaque_across_hard_breaks() -> Check {
+    let drawing = r"{\q2\p1}m 0 0 l 2 2\Nm 2 2\nm 3 3{\p0}";
+    let source = format!(r"{drawing}سلام\nدنیا");
+    let expected = format!(r"{drawing}{}\n{}", isolate("سلام"), isolate("دنیا"));
     assert_anchor(&source, &expected, "ass")
 }
 

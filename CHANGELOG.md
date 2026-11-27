@@ -7,6 +7,10 @@
 - Resolve FSI from rendered ASS whitespace while preserving raw escapes, markup and directional controls. Respect header and inline wrapping modes during conversion and reviewed builds.
 - Advance generation to `19` and normalization to `16`; preserve previous editions and require fresh render evidence. See the [Rust 3.0.4 recheck](docs/audit-rust-304-2026-11-27.md) and [issue #41](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/41).
 
+- Classify text direction from the visible ASS text so `\h` and soft `\n` no longer trigger an LTR wrapper on Persian-only lines.
+- In ASS conversion, treat `\n` as a line break when `WrapStyle: 2`, an inline `\q2`, or `Banner` makes it one.
+- Run Gitleaks in a separate concurrency group for each commit pushed to `main`, so a newer push does not cancel the earlier scan.
+
 ## [3.0.4] - 2026-11-27
 
 - Check worker-reported start snaps against the cue end before refinement. Reject changed starts at zero and forward moves of 20 ms or less, as the engine does. Keep invalid worker output unpublished so a corrected run can retry (R01, H03).

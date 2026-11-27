@@ -48,19 +48,26 @@ fn repair_leading_punctuation(parts: &mut [String], first: usize, last: usize) {
 type Token<'a> = (&'a str, bool);
 type Line<'a> = Vec<Token<'a>>;
 
-fn lines<'a>(text: &'a str, kind: &str) -> Result<(Vec<Line<'a>>, Vec<&'a str>), String> {
+fn lines<'a>(
+    text: &'a str,
+    kind: &str,
+    mut context: AssContext,
+) -> Result<(Vec<Line<'a>>, Vec<&'a str>), String> {
     let mut lines = Vec::new();
     let mut line = Vec::new();
     let mut breaks = Vec::new();
     let mut drawing = false;
     let newlines = if kind == "ass" {
-        pattern!(Regex, r"\\N|\r\n|\n|\r")
+        pattern!(Regex, r"\\[Nn]|\r\n|\n|\r")
     } else {
         pattern!(Regex, r"\r\n|\n|\r")
     };
     for (prose, tag) in tokens::segments(text, kind)? {
         let mut start = 0;
         for m in newlines.find_iter(prose) {
+            if m.as_str() == r"\n" && (drawing || !context.soft_break_is_newline()) {
+                continue;
+            }
             if m.start() > start {
                 line.push((&prose[start..m.start()], !drawing));
             }
@@ -75,6 +82,7 @@ fn lines<'a>(text: &'a str, kind: &str) -> Result<(Vec<Line<'a>>, Vec<&'a str>),
             continue;
         }
         if kind == "ass" && tag.starts_with('{') {
+            context.tag(tag)?;
             drawing = drawing_mode(tag, drawing)?;
         }
         if kind == "srt" && srt_break(tag) && srt_tag_fits(tag) {
@@ -209,6 +217,16 @@ fn wrap_group(lines: &[Line<'_>], width: usize, limit: usize, kind: &str) -> Str
 }
 
 pub(super) fn wrap(text: String, width: i64, limit: i64, kind: &str) -> Result<String, String> {
+    wrap_with_context(text, width, limit, kind, AssContext::default())
+}
+
+pub(super) fn wrap_with_context(
+    text: String,
+    width: i64,
+    limit: i64,
+    kind: &str,
+    context: AssContext,
+) -> Result<String, String> {
     if width < 1 || limit < 1 {
         return Err("ValueError: Line wrapping requires positive max_chars and max_lines".into());
     }
@@ -223,7 +241,7 @@ pub(super) fn wrap(text: String, width: i64, limit: i64, kind: &str) -> Result<S
             drawing = drawing_mode(tag, drawing)?;
         }
     }
-    let (lines, breaks) = lines(&text, kind)?;
+    let (lines, breaks) = lines(&text, kind, context)?;
     let visible: Vec<_> = lines
         .iter()
         .map(|line| visible(line, kind).trim_matches(py_space).to_owned())
@@ -234,7 +252,8 @@ pub(super) fn wrap(text: String, width: i64, limit: i64, kind: &str) -> Result<S
     }
     let starts: Vec<_> = std::iter::once(0)
         .chain(visible.iter().enumerate().skip(1).filter_map(|(i, line)| {
-            (line.starts_with("- ") || line.starts_with("– ")).then_some(i)
+            (breaks[i - 1] == r"\n" || line.starts_with("- ") || line.starts_with("– "))
+                .then_some(i)
         }))
         .chain(std::iter::once(lines.len()))
         .collect();
@@ -374,7 +393,7 @@ pub(super) fn anchor_with_context(
     } else {
         repair_unbalanced_scopes(text, kind)?
     };
-    let (lines, breaks) = lines(&text, kind)?;
+    let (lines, breaks) = lines(&text, kind, context)?;
     let whole_balanced = balanced(&text, kind);
     let alpha = pattern!(Regex, r"\A\p{L}\z");
     let mut output = String::with_capacity(text.len());
