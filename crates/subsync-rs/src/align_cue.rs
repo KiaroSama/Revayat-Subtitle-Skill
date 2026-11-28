@@ -328,12 +328,8 @@ fn snap_candidate_allowed(
             }
         }
     }
-    if candidate > cue.start_ms.saturating_add(100)
-        && signals.voiced_union.fraction(cue.start_ms, candidate) >= 0.50
-    {
-        return false;
-    }
-    true
+    !(candidate > cue.start_ms.saturating_add(100)
+        && signals.voiced_union.fraction(cue.start_ms, candidate) >= 0.50)
 }
 
 const TRAIL_OUT_MS: u64 = 250;
