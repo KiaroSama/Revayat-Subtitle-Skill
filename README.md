@@ -167,7 +167,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-CI builds both binaries for all four targets and runs workspace tests with FFmpeg/libass on Windows x64 and Linux x64. Check the [verification scope](docs/verification.md) for which checks run where. Rust checks and PNG tests cannot establish translation accuracy or confirm timing in your player; those require cue review and playback on the matching media.
+CI builds both binaries for all four targets and runs workspace tests with FFmpeg/libass on all four supported targets. Check the [verification scope](docs/verification.md) for which checks run where. Rust checks and PNG tests cannot establish translation accuracy or confirm timing in your player; those require cue review and playback on the matching media.
 
 ## Documentation
 

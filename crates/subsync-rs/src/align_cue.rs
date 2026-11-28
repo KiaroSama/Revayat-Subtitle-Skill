@@ -53,6 +53,11 @@ pub(super) fn refine_group_shifts(
         });
         let already_covered =
             open_voiced >= 0.35 && (base_bin >= 0.65 || (base_bin >= 0.45 && base_voiced >= 0.75));
+        let containing_segment = segments
+            .partition_point(|seg| seg.start_ms <= first_start)
+            .checked_sub(1)
+            .and_then(|index| segments.get(index))
+            .filter(|seg| first_start < seg.end_ms);
         let radius = limit.min(if base_bin >= 0.35 { 900 } else { 1500 });
         let low = (global_shift - limit)
             .max(base - radius)
@@ -63,11 +68,26 @@ pub(super) fn refine_group_shifts(
         let mut best = base;
         let mut best_score = baseline;
         if (low..=high).contains(&base) {
-            if !anchored && !already_covered {
+            if !anchored {
                 for step in -((base - low) / frame)..=(high - base) / frame {
                     check_cancelled()?;
                     let candidate = base + step * frame;
                     if candidate == base {
+                        continue;
+                    }
+                    // A late cue may cover most of its own phrase. Recover only that
+                    // phrase's onset; coverage alone must not permit a jump to another one.
+                    if already_covered
+                        && !(candidate < base
+                            && containing_segment.is_some_and(|seg| {
+                                first_cue
+                                    .start_ms
+                                    .saturating_add_signed(candidate)
+                                    .saturating_add(config.lead_in_ms)
+                                    .abs_diff(seg.start_ms)
+                                    <= signals.speech.frame_ms
+                            }))
+                    {
                         continue;
                     }
                     let (raw, cand_bin, cand_onset) = score(candidate);
@@ -260,14 +280,14 @@ pub(super) fn snap_start(
         .saturating_add(lead)
         .saturating_add(unit - 1)
         .saturating_add(MAX_ONSET_LOOKBACK_MS);
-    let allowed = |start, seg_start| {
+    let allowed = |start, seg_start, recovered_onset| {
         start >= low
             && start <= high
             && start >= min_start
             && start <= max_start
             && start <= cue.end_ms - 500
             && start > 0
-            && snap_candidate_allowed(*cue, seg_start, start, lead, signals)
+            && snap_candidate_allowed(*cue, seg_start, start, lead, recovered_onset, signals)
     };
     let candidate = vad.segments[first..]
         .iter()
@@ -282,11 +302,13 @@ pub(super) fn snap_start(
             let before_onset = |onset: u64| onset.saturating_sub(lead) / unit * unit;
             vad.onset_anchors_ms
                 .get(first + i)
-                .map(|&onset| before_onset(onset))
-                .filter(|&start| allowed(start, span.start_ms))
+                .and_then(|&onset| {
+                    let start = before_onset(onset);
+                    allowed(start, span.start_ms, onset < span.start_ms).then_some(start)
+                })
                 .or_else(|| {
                     let start = before_onset(span.start_ms);
-                    allowed(start, span.start_ms).then_some(start)
+                    allowed(start, span.start_ms, false).then_some(start)
                 })
         })
         .min_by_key(|&start| start.abs_diff(cue.start_ms))
@@ -304,9 +326,16 @@ fn snap_candidate_allowed(
     seg_start: u64,
     candidate: u64,
     lead: u64,
+    recovered_onset: bool,
     signals: &CueIntegrals<'_>,
 ) -> bool {
-    if candidate < cue.start_ms && cue.start_ms - candidate > 80 && cue.start_ms >= seg_start {
+    // The detector already corroborated a recovered attack, including unvoiced
+    // fricatives. Apply the hiss heuristic only to uncorroborated primary onsets.
+    if !recovered_onset
+        && candidate < cue.start_ms
+        && cue.start_ms - candidate > 80
+        && cue.start_ms >= seg_start
+    {
         let span_start = candidate.saturating_add(lead).min(cue.start_ms);
         if span_start < cue.start_ms {
             if signals.voiced_only.fraction(span_start, cue.start_ms) < 0.20 {
