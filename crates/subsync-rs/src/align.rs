@@ -462,11 +462,11 @@ pub fn validate_reported_timing(
     Ok(())
 }
 
-fn local_shifts(
+fn local_shifts<T: Copy + Into<f64>>(
     cues: &[SubtitleCue],
     order: &[usize],
     groups: &[Group],
-    speech: &Integral<'_, f32>,
+    speech: &Integral<'_, T>,
     global: &Global,
     penalty: f64,
 ) -> Result<Vec<i64>, SyncError> {
@@ -603,7 +603,7 @@ pub(crate) fn align(
         &plan.base,
         &plan.order,
         &plan.groups,
-        &speech,
+        &binary,
         &global,
         config.split_penalty,
     )?;

@@ -56,22 +56,26 @@ fn fixed_config() -> SyncConfig {
 
 #[test]
 fn anchored_cue_does_not_jump_across_silence_to_louder_neighbor() {
-    // Mirrors Birds of Prey #1072 / #632 / #757: cue sits squarely on its own speech onset
-    // [2020..2760], followed by a louder unrelated burst [3100..4480].
+    // Mirrors Birds of Prey #1072 / #632 / #757: surrounded by an anchored dialogue line so the
+    // DP stays on global offset 0, cue 2 sits squarely on its own speech onset [2020..2760],
+    // followed by a louder unrelated burst [3100..4480].
     let vad = build_vad(
         7000,
-        &[(2020, 2760, 0.50), (3100, 4480, 0.95)],
-        &[(2020, 2760), (3100, 4480)],
+        &[(300, 1400, 0.90), (2020, 2760, 0.50), (3100, 4480, 0.95)],
+        &[(300, 1400), (2020, 2760), (3100, 4480)],
     );
-    let mut doc =
-        SubtitleDocument::parse("1\n00:00:02,000 --> 00:00:03,300\nCome on.\n", None).unwrap();
+    let mut doc = SubtitleDocument::parse(
+        "1\n00:00:00,300 --> 00:00:01,400\nEarlier.\n\n2\n00:00:02,000 --> 00:00:03,300\nCome on.\n",
+        None,
+    )
+    .unwrap();
     let original = doc.cues.clone();
     let config = fixed_config();
     let report = sync_subtitles_with_vad(&mut doc, &vad, &config).unwrap();
     assert!(
-        doc.cues[0].start_ms.abs_diff(2000) <= 80,
+        doc.cues[1].start_ms.abs_diff(2000) <= 80,
         "anchored cue jumped to {:?}",
-        doc.cues[0]
+        doc.cues[1]
     );
     validate_reported_timing(&original, &doc.cues, SubtitleFormat::Srt, &report, &config).unwrap();
 }

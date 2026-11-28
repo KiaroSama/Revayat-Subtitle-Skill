@@ -46,14 +46,14 @@ pub(super) fn refine_group_shifts(
             0.0
         };
         let base_voiced = group_fraction(plan, signals.voiced_union, indices, base);
-        let anchored = open_voiced >= 0.60
-            || segments.iter().any(|seg| {
-                seg.start_ms.saturating_add(80) >= first_start
-                    && seg.start_ms <= first_start.saturating_add(150)
-                    && seg.end_ms > first_start
-            });
-        let already_covered = base_bin >= 0.65 || (base_bin >= 0.45 && base_voiced >= 0.75);
-        let radius = limit.min(if base_bin >= 0.35 { 800 } else { 1500 });
+        let anchored = segments.iter().any(|seg| {
+            seg.start_ms.saturating_add(80) >= first_start
+                && seg.start_ms <= first_start.saturating_add(150)
+                && seg.end_ms > first_start
+        });
+        let already_covered =
+            open_voiced >= 0.35 && (base_bin >= 0.65 || (base_bin >= 0.45 && base_voiced >= 0.75));
+        let radius = limit.min(if base_bin >= 0.35 { 900 } else { 1500 });
         let low = (global_shift - limit)
             .max(base - radius)
             .max(previous_end as i64 - groups[first].start_ms as i64);
@@ -77,11 +77,11 @@ pub(super) fn refine_group_shifts(
                     {
                         continue;
                     }
-                    if cand_bin < base_bin + 0.15 {
+                    if cand_bin < base_bin + 0.12 {
                         continue;
                     }
                     let value = raw - 0.00020 * candidate.abs_diff(base) as f64;
-                    if value > baseline + 0.10
+                    if value > baseline + 0.08
                         && (value > best_score + 1e-9
                             || ((value - best_score).abs() <= 1e-9
                                 && candidate.abs_diff(base) < best.abs_diff(base)))
