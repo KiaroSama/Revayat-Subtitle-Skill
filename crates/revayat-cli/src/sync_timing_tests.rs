@@ -297,6 +297,7 @@ fn real_engine_nonzero_snaps_obey_duration_without_a_new_onset_grid_restriction(
             duration_ms: 3000,
             probability: activity.iter().map(|&value| f32::from(value)).collect(),
             activity,
+            voiced_activity: Vec::new(),
             segments: vec![TimeSpan {
                 start_ms: onset,
                 end_ms: 2000,

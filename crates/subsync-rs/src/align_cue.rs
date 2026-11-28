@@ -1,15 +1,24 @@
 use super::{Integral, SyncConfig, SyncError, TimingPlan, check_cancelled};
+use crate::vad::{MAX_ONSET_LOOKBACK_MS, TimeSpan, VadResult};
+
+pub(super) struct CueIntegrals<'a> {
+    pub binary: &'a Integral<'a, u8>,
+    pub speech: &'a Integral<'a, f32>,
+    pub voiced_only: &'a Integral<'a, u8>,
+    pub voiced_union: &'a Integral<'a, u8>,
+}
 
 pub(super) fn refine_group_shifts(
     plan: &TimingPlan,
-    speech: &Integral<'_, f32>,
+    signals: &CueIntegrals<'_>,
+    segments: &[TimeSpan],
     global_shift: i64,
     config: &SyncConfig,
     offsets: &mut [i64],
 ) -> Result<(), SyncError> {
     let groups = &plan.groups;
     let limit = config.max_split_offset_ms;
-    let frame = speech.frame_ms as i64;
+    let frame = signals.speech.frame_ms as i64;
     let mut first = 0;
     let mut previous_end = 0;
     while first < groups.len() {
@@ -21,13 +30,30 @@ pub(super) fn refine_group_shifts(
             end += 1;
         }
         let base = offsets[first];
-        let next_start = groups.get(end).map_or(speech.duration_ms, |next| {
+        let next_start = groups.get(end).map_or(signals.speech.duration_ms, |next| {
             next.start_ms.saturating_add_signed(offsets[end])
         });
         let indices = &plan.order[groups[first].first..groups[end - 1].end];
-        let score = |shift| score_shift(plan, speech, config.lead_in_ms, indices, shift);
-        let baseline = score(base);
-        let radius = limit.min(if baseline >= 0.35 { 900 } else { 1500 });
+        let score = |shift| score_shift(plan, signals, config.lead_in_ms, indices, shift);
+        let (baseline, base_bin, _) = score(base);
+        let first_cue = plan.base[indices[0]];
+        let first_start = first_cue.start_ms.saturating_add_signed(base);
+        let first_end = first_cue.end_ms.saturating_add_signed(base);
+        let open_end = first_end.min(first_start.saturating_add(350));
+        let open_voiced = if first_start < open_end {
+            signals.voiced_union.fraction(first_start, open_end)
+        } else {
+            0.0
+        };
+        let base_voiced = group_fraction(plan, signals.voiced_union, indices, base);
+        let anchored = open_voiced >= 0.60
+            || segments.iter().any(|seg| {
+                seg.start_ms.saturating_add(80) >= first_start
+                    && seg.start_ms <= first_start.saturating_add(150)
+                    && seg.end_ms > first_start
+            });
+        let already_covered = base_bin >= 0.65 || (base_bin >= 0.45 && base_voiced >= 0.75);
+        let radius = limit.min(if base_bin >= 0.35 { 800 } else { 1500 });
         let low = (global_shift - limit)
             .max(base - radius)
             .max(previous_end as i64 - groups[first].start_ms as i64);
@@ -37,17 +63,32 @@ pub(super) fn refine_group_shifts(
         let mut best = base;
         let mut best_score = baseline;
         if (low..=high).contains(&base) {
-            for step in -((base - low) / frame)..=(high - base) / frame {
-                check_cancelled()?;
-                let candidate = base + step * frame;
-                let value = score(candidate) - 0.00010 * candidate.abs_diff(base) as f64;
-                if value > baseline + 0.05
-                    && (value > best_score + 1e-9
-                        || ((value - best_score).abs() <= 1e-9
-                            && candidate.abs_diff(base) < best.abs_diff(base)))
-                {
-                    best = candidate;
-                    best_score = value;
+            if !anchored && !already_covered {
+                for step in -((base - low) / frame)..=(high - base) / frame {
+                    check_cancelled()?;
+                    let candidate = base + step * frame;
+                    if candidate == base {
+                        continue;
+                    }
+                    let (raw, cand_bin, cand_onset) = score(candidate);
+                    if candidate.abs_diff(base) > 200
+                        && (base_bin >= 0.35 || open_voiced >= 0.40)
+                        && cand_onset < 0.25
+                    {
+                        continue;
+                    }
+                    if cand_bin < base_bin + 0.15 {
+                        continue;
+                    }
+                    let value = raw - 0.00020 * candidate.abs_diff(base) as f64;
+                    if value > baseline + 0.10
+                        && (value > best_score + 1e-9
+                            || ((value - best_score).abs() <= 1e-9
+                                && candidate.abs_diff(base) < best.abs_diff(base)))
+                    {
+                        best = candidate;
+                        best_score = value;
+                    }
                 }
             }
             offsets[first..end].fill(best);
@@ -81,13 +122,14 @@ pub(super) fn refine_group_shifts(
                     continue;
                 }
                 let indices = &plan.order[group.first..group.end];
-                let baseline = score_shift(plan, speech, config.lead_in_ms, indices, best);
+                let (baseline, _, _) = score_shift(plan, signals, config.lead_in_ms, indices, best);
                 let mut top = baseline + 0.05;
                 for step in -((best - lo) / frame)..=(hi - best) / frame {
                     check_cancelled()?;
                     let candidate = best + step * frame;
-                    let value = score_shift(plan, speech, config.lead_in_ms, indices, candidate)
-                        - 0.00004 * candidate.abs_diff(best) as f64;
+                    let (raw, _, _) =
+                        score_shift(plan, signals, config.lead_in_ms, indices, candidate);
+                    let value = raw - 0.00004 * candidate.abs_diff(best) as f64;
                     if value > top + 1e-9
                         || value > baseline + 0.05
                             && (value - top).abs() <= 1e-9
@@ -119,36 +161,179 @@ pub(super) fn joined_gap(previous_end: u64, next_start: u64) -> Option<u64> {
     (gap <= 150).then_some(gap)
 }
 
-fn score_shift(
+fn group_fraction(
     plan: &TimingPlan,
-    speech: &Integral<'_, f32>,
-    lead: u64,
+    integral: &Integral<'_, u8>,
     indices: &[usize],
     shift: i64,
 ) -> f64 {
-    let frame = speech.frame_ms;
     let duration = indices
         .iter()
         .map(|&i| plan.base[i].end_ms - plan.base[i].start_ms)
         .sum::<u64>() as f64;
-    let mut matched = 0.0;
+    if duration <= 0.0 {
+        return 0.0;
+    }
+    let matched: f64 = indices
+        .iter()
+        .map(|&i| {
+            let cue = plan.base[i];
+            let start = cue.start_ms.saturating_add_signed(shift);
+            let end = cue.end_ms.saturating_add_signed(shift);
+            integral.at(end) - integral.at(start)
+        })
+        .sum();
+    matched / duration
+}
+
+fn score_shift(
+    plan: &TimingPlan,
+    signals: &CueIntegrals<'_>,
+    lead: u64,
+    indices: &[usize],
+    shift: i64,
+) -> (f64, f64, f64) {
+    let frame = signals.speech.frame_ms;
+    let duration = indices
+        .iter()
+        .map(|&i| plan.base[i].end_ms - plan.base[i].start_ms)
+        .sum::<u64>() as f64;
+    let mut binary_matched = 0.0;
+    let mut speech_matched = 0.0;
     let mut onset = 0.0;
     for &i in indices {
         let cue = plan.base[i];
         let start = cue.start_ms.saturating_add_signed(shift);
         let end = cue.end_ms.saturating_add_signed(shift);
-        matched += speech.at(end) - speech.at(start);
+        binary_matched += signals.binary.at(end) - signals.binary.at(start);
+        speech_matched += signals.speech.at(end) - signals.speech.at(start);
         let target = start.saturating_add(lead);
         let before = target.saturating_sub(frame);
         let after = target.saturating_add(frame);
         let preceding = if before < target {
-            speech.fraction(before, target)
+            signals.binary.fraction(before, target)
         } else {
             0.0
         };
-        onset += (speech.fraction(target, after) - preceding).max(0.0);
+        onset += (signals.binary.fraction(target, after) - preceding).max(0.0);
     }
-    matched / duration + 0.06 * onset / indices.len() as f64
+    let bin_frac = binary_matched / duration;
+    let prob_frac = speech_matched / duration;
+    let onset_frac = onset / indices.len() as f64;
+    (
+        0.85 * bin_frac + 0.15 * prob_frac + 0.06 * onset_frac,
+        bin_frac,
+        onset_frac,
+    )
+}
+
+pub(super) fn snap_join_limit(plan: &TimingPlan, g: usize, previous_end: u64) -> u64 {
+    g.checked_sub(1)
+        .and_then(|prev| joined_gap(plan.groups[prev].end_ms, plan.groups[g].start_ms))
+        .map_or(u64::MAX, |gap| previous_end.saturating_add(gap + 80))
+}
+
+pub(super) fn snap_moves(before: u64, candidate: u64) -> bool {
+    candidate > 0 && (candidate < before || candidate > before.saturating_add(20))
+}
+
+pub(super) fn snap_start(
+    cue: &mut super::SubtitleCue,
+    min_start: u64,
+    vad: &VadResult,
+    signals: &CueIntegrals<'_>,
+    config: &SyncConfig,
+    max_start: u64,
+    unit: u64,
+) -> bool {
+    let distance = config.snap_ms;
+    if distance == 0 || cue.end_ms - cue.start_ms < 500 {
+        return false;
+    }
+    let low = cue.start_ms.saturating_sub(distance);
+    let high = cue.start_ms.saturating_add(distance);
+    let lead = config.lead_in_ms;
+    let baseline = signals.binary.fraction(cue.start_ms, cue.end_ms);
+    let first = vad.segments.partition_point(|span| span.start_ms < low);
+    // A formatted anchor can precede confirmation by the lookback and rounding allowance.
+    let search_high = high
+        .saturating_add(lead)
+        .saturating_add(unit - 1)
+        .saturating_add(MAX_ONSET_LOOKBACK_MS);
+    let allowed = |start, seg_start| {
+        start >= low
+            && start <= high
+            && start >= min_start
+            && start <= max_start
+            && start <= cue.end_ms - 500
+            && start > 0
+            && snap_candidate_allowed(*cue, seg_start, start, lead, signals)
+    };
+    let candidate = vad.segments[first..]
+        .iter()
+        .enumerate()
+        .take_while(|(_, span)| span.start_ms <= search_high)
+        // Score the confirmed onset, not silence in the lead-in or consonant closure.
+        .filter(|(_, span)| {
+            span.start_ms < cue.end_ms
+                && signals.binary.fraction(span.start_ms, cue.end_ms) + 1e-9 >= baseline
+        })
+        .filter_map(|(i, span)| {
+            let before_onset = |onset: u64| onset.saturating_sub(lead) / unit * unit;
+            vad.onset_anchors_ms
+                .get(first + i)
+                .map(|&onset| before_onset(onset))
+                .filter(|&start| allowed(start, span.start_ms))
+                .or_else(|| {
+                    let start = before_onset(span.start_ms);
+                    allowed(start, span.start_ms).then_some(start)
+                })
+        })
+        .min_by_key(|&start| start.abs_diff(cue.start_ms))
+        .filter(|&start| snap_moves(cue.start_ms, start));
+    if let Some(start) = candidate {
+        cue.start_ms = start;
+        true
+    } else {
+        false
+    }
+}
+
+fn snap_candidate_allowed(
+    cue: super::SubtitleCue,
+    seg_start: u64,
+    candidate: u64,
+    lead: u64,
+    signals: &CueIntegrals<'_>,
+) -> bool {
+    if candidate < cue.start_ms && cue.start_ms - candidate > 80 && cue.start_ms >= seg_start {
+        let span_start = candidate.saturating_add(lead).min(cue.start_ms);
+        if span_start < cue.start_ms {
+            if signals.voiced_only.fraction(span_start, cue.start_ms) < 0.20 {
+                return false;
+            }
+            let pre_p = signals.speech.fraction(span_start, cue.start_ms);
+            let in_p = signals
+                .speech
+                .fraction(
+                    cue.start_ms,
+                    cue.start_ms.saturating_add(120).min(cue.end_ms),
+                )
+                .max(signals.speech.fraction(
+                    cue.start_ms,
+                    cue.start_ms.saturating_add(300).min(cue.end_ms),
+                ));
+            if in_p >= 0.45 && pre_p + 0.15 < in_p {
+                return false;
+            }
+        }
+    }
+    if candidate > cue.start_ms.saturating_add(100)
+        && signals.voiced_union.fraction(cue.start_ms, candidate) >= 0.50
+    {
+        return false;
+    }
+    true
 }
 
 const TRAIL_OUT_MS: u64 = 250;
@@ -191,6 +376,7 @@ pub(super) fn refine_ends(
     plan: &TimingPlan,
     cues: &mut [super::SubtitleCue],
     vad: &super::VadResult,
+    voiced_union: &Integral<'_, u8>,
     limit: u64,
 ) -> Result<usize, SyncError> {
     let mut changed = 0;
@@ -245,7 +431,11 @@ pub(super) fn refine_ends(
             } else if let Some(seg) = last.filter(|seg| {
                 duration > 1500 && seg.end_ms > cue.start_ms && cue.end_ms > seg.end_ms + 600
             }) {
-                if low > high.min(cue.end_ms) {
+                let tail_ms = cue.end_ms - seg.end_ms;
+                if low > high.min(cue.end_ms)
+                    || voiced_union.fraction(seg.end_ms, cue.end_ms) >= 0.15
+                    || (tail_ms <= 750 && tail_ms.saturating_mul(4) <= duration)
+                {
                     continue;
                 }
                 (seg.end_ms + TRAIL_OUT_MS)
@@ -278,6 +468,7 @@ mod tests {
         let vad = VadResult {
             raw_segments: Vec::new(),
             onset_anchors_ms: Vec::new(),
+            voiced_activity: Vec::new(),
             frame_ms: 10,
             duration_ms: 4000,
             probability: Vec::new(),
@@ -287,11 +478,13 @@ mod tests {
                 end_ms: 3100,
             }],
         };
+        let voiced_union = super::Integral::new(&vad.activity, &vad);
         for format in [SubtitleFormat::Srt, SubtitleFormat::Ass] {
             let plan = TimingPlan::new(&authored, format, 1.0);
             for (next_start, expected) in [(2000, 2000), (2020, 2000), (2040, 2020)] {
                 let mut transformed = [authored[0], cue(next_start, next_start + 1400)];
-                let changed = refine_ends(&plan, &mut transformed, &vad, 600).unwrap();
+                let changed =
+                    refine_ends(&plan, &mut transformed, &vad, &voiced_union, 600).unwrap();
                 assert_eq!(
                     transformed[0].end_ms, expected,
                     "{format:?} next={next_start}"

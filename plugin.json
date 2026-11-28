@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "revayat-subtitle",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "license": "GPL-3.0-or-later",
   "description": "Translate and edit anime subtitles, check FFmpeg renders, and sync subtitles to video audio. Persian is the default; Persian, Russian and English voice guides are bundled.",
   "author": {

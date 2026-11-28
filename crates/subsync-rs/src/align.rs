@@ -1,7 +1,7 @@
 use crate::{
     SplitSegment, SyncConfig, SyncError, SyncReport, check_cancelled,
     formats::{SubtitleCue, SubtitleFormat},
-    vad::{MAX_ONSET_LOOKBACK_MS, VadResult},
+    vad::VadResult,
 };
 use rustfft::{FftPlanner, num_complex::Complex};
 
@@ -434,13 +434,13 @@ pub fn validate_reported_timing(
             if after.start_ms != before.start_ms {
                 if indices.len() != 1
                     || config.snap_ms == 0
-                    || !snap_moves(before.start_ms, after.start_ms)
+                    || !align_cue::snap_moves(before.start_ms, after.start_ms)
                     || before.end_ms - before.start_ms < 500
                     // Snapping precedes end refinement; a later extension cannot make it eligible.
                     || before.end_ms.saturating_sub(after.start_ms) < 500
                     || after.start_ms.abs_diff(before.start_ms) > config.snap_ms
                     || after.start_ms < previous_end
-                    || after.start_ms > snap_join_limit(&plan, g, previous_end)
+                    || after.start_ms > align_cue::snap_join_limit(&plan, g, previous_end)
                     || after.end_ms - after.start_ms < 500
                     || after.start_ms.saturating_add(config.lead_in_ms) >= report.audio_duration_ms
                     || !after.start_ms.is_multiple_of(plan.unit)
@@ -551,77 +551,6 @@ fn score<T: Copy + Into<f64>>(cues: &[SubtitleCue], speech: &Integral<'_, T>) ->
     (matched / total).clamp(0.0, 1.0)
 }
 
-fn snap_join_limit(plan: &TimingPlan, g: usize, previous_end: u64) -> u64 {
-    g.checked_sub(1)
-        .and_then(|prev| align_cue::joined_gap(plan.groups[prev].end_ms, plan.groups[g].start_ms))
-        .map_or(u64::MAX, |gap| previous_end.saturating_add(gap + 80))
-}
-
-fn snap_moves(before: u64, candidate: u64) -> bool {
-    candidate > 0 && (candidate < before || candidate > before.saturating_add(20))
-}
-
-fn snap_start(
-    cue: &mut SubtitleCue,
-    min_start: u64,
-    vad: &VadResult,
-    binary: &Integral<'_, u8>,
-    config: &SyncConfig,
-    max_start: u64,
-    unit: u64,
-) -> bool {
-    let distance = config.snap_ms;
-    if distance == 0 || cue.end_ms - cue.start_ms < 500 {
-        return false;
-    }
-    let low = cue.start_ms.saturating_sub(distance);
-    let high = cue.start_ms.saturating_add(distance);
-    let lead = config.lead_in_ms;
-    let baseline = binary.fraction(cue.start_ms, cue.end_ms);
-    let first = vad.segments.partition_point(|span| span.start_ms < low);
-    // A formatted anchor can precede confirmation by the lookback and rounding allowance.
-    let search_high = high
-        .saturating_add(lead)
-        .saturating_add(unit - 1)
-        .saturating_add(MAX_ONSET_LOOKBACK_MS);
-    let allowed = |start| {
-        start >= low
-            && start <= high
-            && start >= min_start
-            && start <= max_start
-            && start <= cue.end_ms - 500
-            && start > 0
-    };
-    let candidate = vad.segments[first..]
-        .iter()
-        .enumerate()
-        .take_while(|(_, span)| span.start_ms <= search_high)
-        // Score the confirmed onset, not silence in the lead-in or consonant closure.
-        .filter(|(_, span)| {
-            span.start_ms < cue.end_ms
-                && binary.fraction(span.start_ms, cue.end_ms) + 1e-9 >= baseline
-        })
-        .filter_map(|(i, span)| {
-            let before_onset = |onset: u64| onset.saturating_sub(lead) / unit * unit;
-            vad.onset_anchors_ms
-                .get(first + i)
-                .map(|&onset| before_onset(onset))
-                .filter(|&start| allowed(start))
-                .or_else(|| {
-                    let start = before_onset(span.start_ms);
-                    allowed(start).then_some(start)
-                })
-        })
-        .min_by_key(|&start| start.abs_diff(cue.start_ms))
-        .filter(|&start| snap_moves(cue.start_ms, start));
-    if let Some(start) = candidate {
-        cue.start_ms = start;
-        true
-    } else {
-        false
-    }
-}
-
 pub(crate) struct Alignment {
     pub cues: Vec<SubtitleCue>,
     pub fps_ratio: f64,
@@ -651,6 +580,25 @@ pub(crate) fn align(
     let plan = TimingPlan::new(cues, format, global.ratio);
     let speech = Integral::new(&weights, vad);
     let binary = Integral::new(&vad.activity, vad);
+    let voiced_only_slice = if vad.voiced_activity.is_empty() {
+        &vad.activity
+    } else {
+        &vad.voiced_activity
+    };
+    let voiced_union_buf: Vec<u8> = vad
+        .activity
+        .iter()
+        .zip(voiced_only_slice)
+        .map(|(&a, &v)| a.max(v))
+        .collect();
+    let voiced_only = Integral::new(voiced_only_slice, vad);
+    let voiced_union = Integral::new(&voiced_union_buf, vad);
+    let signals = align_cue::CueIntegrals {
+        binary: &binary,
+        speech: &speech,
+        voiced_only: &voiced_only,
+        voiced_union: &voiced_union,
+    };
     let mut offsets = local_shifts(
         &plan.base,
         &plan.order,
@@ -660,7 +608,14 @@ pub(crate) fn align(
         config.split_penalty,
     )?;
     if config.max_split_offset_ms > 0 {
-        align_cue::refine_group_shifts(&plan, &speech, global.shift, config, &mut offsets)?;
+        align_cue::refine_group_shifts(
+            &plan,
+            &signals,
+            &vad.segments,
+            global.shift,
+            config,
+            &mut offsets,
+        )?;
     }
     let mut aligned = plan.base.clone();
     let mut split_segments: Vec<SplitSegment> = Vec::new();
@@ -689,13 +644,13 @@ pub(crate) fn align(
         check_cancelled()?;
         let indices = &plan.order[group.first..group.end];
         if let [i] = indices {
-            cues_snapped += usize::from(snap_start(
+            cues_snapped += usize::from(align_cue::snap_start(
                 &mut aligned[*i],
                 previous_end,
                 vad,
-                &binary,
+                &signals,
                 config,
-                snap_join_limit(&plan, g, previous_end),
+                align_cue::snap_join_limit(&plan, g, previous_end),
                 plan.unit,
             ));
         }
@@ -706,7 +661,13 @@ pub(crate) fn align(
             .unwrap_or(previous_end);
     }
     let cues_end_adjusted = if config.end_adjust_ms > 0 {
-        align_cue::refine_ends(&plan, &mut aligned, vad, config.end_adjust_ms)?
+        align_cue::refine_ends(
+            &plan,
+            &mut aligned,
+            vad,
+            &voiced_union,
+            config.end_adjust_ms,
+        )?
     } else {
         0
     };

@@ -36,6 +36,7 @@ fn check(
     let vad = VadResult {
         raw_segments: Vec::new(),
         onset_anchors_ms: Vec::new(),
+        voiced_activity: Vec::new(),
         frame_ms: 10,
         duration_ms: duration,
         probability: activity.iter().map(|&value| f32::from(value)).collect(),

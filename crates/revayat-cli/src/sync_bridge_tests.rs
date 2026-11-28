@@ -315,6 +315,7 @@ fn accepts_real_engine_fps_quantization_and_negative_clamping_reports() {
         duration_ms: 45000,
         probability: activity.iter().map(|&value| f32::from(value)).collect(),
         activity,
+        voiced_activity: Vec::new(),
         segments: intervals
             .iter()
             .map(|&(start_ms, end_ms)| TimeSpan { start_ms, end_ms })

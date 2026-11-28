@@ -1,6 +1,6 @@
 # Verification scope
 
-## Automated checks for v3.0.4
+## Automated checks for v3.0.5
 
 Run these from the repository root with Rust `1.100.0`, `rustfmt`, and `clippy`:
 

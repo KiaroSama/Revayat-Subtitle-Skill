@@ -157,6 +157,7 @@ fn real_snap_then_end_adjustment_replays_at_the_presnap_duration_boundary() {
             let vad = VadResult {
                 raw_segments: Vec::new(),
                 onset_anchors_ms: Vec::new(),
+                voiced_activity: Vec::new(),
                 frame_ms: 10,
                 duration_ms: 4000,
                 probability: activity.iter().map(|&value| f32::from(value)).collect(),

@@ -748,7 +748,7 @@ fn version_prints_the_v3_release_without_a_log() -> Result<()> {
     assert_status(&output, 0);
     assert_eq!(
         String::from_utf8(output.stdout)?.trim(),
-        "revayat-subtitle 3.0.4"
+        "revayat-subtitle 3.0.5"
     );
     assert!(!scratch.path().join("logs").exists());
     Ok(())
@@ -770,7 +770,7 @@ fn supervise_can_forward_version_output_from_a_real_cli_child() -> Result<()> {
     assert_status(&output, 0);
     assert_eq!(
         String::from_utf8(output.stdout)?.trim(),
-        "revayat-subtitle 3.0.4"
+        "revayat-subtitle 3.0.5"
     );
     Ok(())
 }

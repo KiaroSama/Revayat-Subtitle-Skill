@@ -4,9 +4,9 @@ name: Release & Sign
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build, sign, and publish (e.g. v3.0.4)'
+        description: 'Release tag to build, sign, and publish (e.g. v3.0.5)'
         type: string
-        default: 'v3.0.4'
+        default: 'v3.0.5'
         required: true
 
 permissions: {}
@@ -67,7 +67,7 @@ jobs:
           export LC_ALL=C
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] ||
              ! git check-ref-format "refs/tags/$TAG"; then
-            printf '%s\n' 'Use a version tag such as v3.0.4 or v3.0.4-rc.1.' >&2
+            printf '%s\n' 'Use a version tag such as v3.0.5 or v3.0.5-rc.1.' >&2
             exit 1
           fi
 

@@ -16,6 +16,9 @@ pub struct VadResult {
     pub duration_ms: u64,
     pub probability: Vec<f32>,
     pub activity: Vec<u8>,
+    /// Scene-adaptive voiced speech frames (`120-3400 Hz`, local floor + 8 dB).
+    /// Empty means fall back to `activity` (for synthetic test fixtures).
+    pub voiced_activity: Vec<u8>,
     pub segments: Vec<TimeSpan>,
     /// Primary activity before gap bridging and tail padding.
     pub raw_segments: Vec<TimeSpan>,
@@ -48,6 +51,7 @@ fn extract_with_check(
         duration_ms: 0,
         probability: Vec::new(),
         activity: Vec::new(),
+        voiced_activity: Vec::new(),
         segments: Vec::new(),
         raw_segments: Vec::new(),
         onset_anchors_ms: Vec::new(),
@@ -193,18 +197,22 @@ fn extract_with_check(
             end_ms: (i as u64 * frame).min(result.duration_ms),
         });
     }
-    if !result.segments.is_empty() {
-        result.onset_anchors_ms = voiced_onsets(&features, &result.segments, frame_ms, checkpoint)?;
-    }
+    let (voiced_activity, onset_anchors_ms) =
+        voiced_signals(&features, &result.segments, frame_ms, checkpoint)?;
+    result.voiced_activity = voiced_activity;
+    result.onset_anchors_ms = onset_anchors_ms;
     Ok(result)
 }
 
-fn voiced_onsets(
+fn voiced_signals(
     features: &[(f32, f32, f32, f32)],
     segments: &[TimeSpan],
     frame_ms: u32,
     mut checkpoint: impl FnMut() -> Result<(), SyncError>,
-) -> Result<Vec<u64>, SyncError> {
+) -> Result<(Vec<u8>, Vec<u64>), SyncError> {
+    if features.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
     let step = (1000 / frame_ms) as usize;
     let radius = (12_500 / frame_ms) as usize;
     let mut floors = Vec::with_capacity(features.len().div_ceil(step));
@@ -221,12 +229,26 @@ fn voiced_onsets(
         let (_, floor, _) = levels.select_nth_unstable_by(percentile, f32::total_cmp);
         floors.push(floor.clamp(-56.0, -30.0));
     }
-    let qualifies = |i: usize| {
-        let (db, zcr, upper, broad) = features[i];
+    let local_floor = |i: usize| {
         let left = floors[i / step];
         let right = floors.get(i / step + 1).copied().unwrap_or(left);
-        let floor = left + (right - left) * ((i % step) as f32 / step as f32);
+        left + (right - left) * ((i % step) as f32 / step as f32)
+    };
+    let qualifies = |i: usize| {
+        let (db, zcr, upper, broad) = features[i];
+        let floor = local_floor(i);
         broad >= 0.65 && upper >= 0.06 && (350.0..=3800.0).contains(&zcr) && db >= floor + 8.0
+    };
+    let voiced_activity: Vec<u8> = (0..features.len())
+        .map(|i| u8::from(qualifies(i)))
+        .collect();
+    if segments.is_empty() {
+        checkpoint()?;
+        return Ok((voiced_activity, Vec::new()));
+    }
+    let qualifies_fricative = |i: usize| {
+        let (db, zcr, _, _) = features[i];
+        zcr >= 3800.0 && db >= (local_floor(i) + 8.0).max(-40.0)
     };
     let frame = u64::from(frame_ms);
     let persistence = 40_u32.div_ceil(frame_ms) as usize;
@@ -234,8 +256,12 @@ fn voiced_onsets(
     let closure = (180 / frame_ms) as usize;
     let crossing = 30_u32.div_ceil(frame_ms) as usize;
     let contrast = 150_u32.div_ceil(frame_ms) as usize;
+    let fricative_gap = (60 / frame_ms) as usize;
     let mean_db = |start: usize, end: usize| {
         features[start..end].iter().map(|f| f.0).sum::<f32>() / (end - start) as f32
+    };
+    let mean_floor = |start: usize, end: usize| {
+        (start..end).map(&local_floor).sum::<f32>() / (end - start) as f32
     };
     let mut previous_end = 0;
     let mut anchors = Vec::with_capacity(segments.len());
@@ -245,6 +271,12 @@ fn voiced_onsets(
         let lower = start.saturating_sub(lookback).max(previous_end);
         let upper = (start + crossing).min(features.len());
         previous_end = segment.end_ms.div_ceil(frame) as usize;
+        let confirmed_end = (start + (100 / frame_ms) as usize).min(features.len());
+        let confirmed_db = if start < confirmed_end {
+            mean_db(start, confirmed_end)
+        } else {
+            -60.0
+        };
         let mut candidate = None;
         let mut i = lower;
         while i < upper {
@@ -268,19 +300,58 @@ fn voiced_onsets(
             if run_end.saturating_sub(run_start) < persistence || start - run_end > closure {
                 continue;
             }
+            let run_db = mean_db(run_start, run_end);
+            // Ignore a faint separated pre-speech ambient bump near the local floor.
+            if start - run_end >= crossing
+                && run_db + 12.0 < confirmed_db
+                && run_db < mean_floor(run_start, run_end) + 12.0
+            {
+                continue;
+            }
             let before = run_start.saturating_sub(contrast);
             if before < run_start {
                 let background = mean_db(before, run_start);
-                if background > -30.0 && mean_db(run_start, run_end) - background < 4.0 {
+                if background > -30.0 && run_db - background < 4.0 {
                     continue;
                 }
             }
             candidate.get_or_insert(run_start);
         }
-        anchors.push(candidate.map_or(segment.start_ms, |i| i as u64 * frame));
+        let mut anchor = candidate.unwrap_or(start);
+        // Backtrack a crisp unvoiced fricative/sibilant attack (e.g. /s/) emerging from quiet silence.
+        let mut j = lower;
+        while j < anchor {
+            if !qualifies_fricative(j) {
+                j += 1;
+                continue;
+            }
+            let run_start = j;
+            while j < anchor && qualifies_fricative(j) {
+                j += 1;
+            }
+            if run_start == lower && lower > 0 && qualifies_fricative(lower - 1) {
+                continue;
+            }
+            if j - run_start < persistence || anchor - j > fricative_gap {
+                continue;
+            }
+            let before = run_start.saturating_sub(contrast);
+            if before < run_start {
+                let background = mean_db(before, run_start);
+                let floor_bg = mean_floor(before, run_start);
+                if background <= -40.0
+                    && background <= floor_bg + 5.0
+                    && mean_db(run_start, j) >= background + 6.0
+                {
+                    anchor = run_start;
+                    break;
+                }
+            }
+        }
+        anchors.push(anchor as u64 * frame);
     }
     checkpoint()?;
-    Ok(anchors)
+    Ok((voiced_activity, anchors))
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 
 ## Supported platforms
 
-Revayat Subtitle `3.0.4` builds from Rust `1.100.0`, edition `2024`. The [CI workflow](../.github/workflows/ci.yml) and [release workflow](../.github/workflows/release.yml) target these 64-bit platforms only:
+Revayat Subtitle `3.0.5` builds from Rust `1.100.0`, edition `2024`. The [CI workflow](../.github/workflows/ci.yml) and [release workflow](../.github/workflows/release.yml) target these 64-bit platforms only:
 
 | OS | Architecture | Rust target | Local binaries |
 | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ Before reverting runtime binaries or skill payloads, retain the compatible newer
 
 ## Plugin manifests
 
-The five manifest formats share the `3.0.4` skill tree and provide `revayat-subtitle` and `revayat-subtitle-sync`:
+The five manifest formats share the `3.0.5` skill tree and provide `revayat-subtitle` and `revayat-subtitle-sync`:
 
 - Claude Code: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (skills and four Markdown commands).
 - Cursor: `.cursor-plugin/plugin.json` and `.cursor-plugin/marketplace.json` (skills and four Markdown commands).

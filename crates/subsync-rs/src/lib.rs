@@ -173,6 +173,9 @@ fn validate_vad(vad: &VadResult) -> Result<(), SyncError> {
         || vad.duration_ms.div_ceil(u64::from(FRAME_MS)) != vad.activity.len() as u64
         || vad.probability.iter().any(|p| !(0.0..=1.0).contains(p))
         || vad.activity.iter().any(|&p| p > 1)
+        || (!vad.voiced_activity.is_empty()
+            && (vad.voiced_activity.len() != vad.activity.len()
+                || vad.voiced_activity.iter().any(|&p| p > 1)))
         || !ordered_spans(&vad.segments)
         || !ordered_spans(&vad.raw_segments)
         || (!vad.onset_anchors_ms.is_empty()

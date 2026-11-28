@@ -3,7 +3,7 @@ name: revayat-subtitle
 description: Use when translating or editing anime subtitles, reconciling ASS or SRT releases, or checking subtitle presentation. Persian is the default output. Use the requested target language for subtitle attachments, seasons, sequels and OVAs.
 license: GPL-3.0-or-later
 metadata:
-  version: "3.0.4"
+  version: "3.0.5"
   homepage: "https://github.com/KiaroSama/Revayat-Subtitle-Skill"
 ---
 

@@ -250,6 +250,7 @@ fn noisy_feature_length_timeline_keeps_unity_fps() {
     let vad = VadResult {
         raw_segments: Vec::new(),
         onset_anchors_ms: Vec::new(),
+        voiced_activity: Vec::new(),
         frame_ms: 10,
         duration_ms,
         activity: probability.iter().map(|&p| u8::from(p > 0.0)).collect(),
@@ -298,6 +299,7 @@ fn duplicated_ass_tail_does_not_change_fps_or_visible_cue_timing() {
     let vad = VadResult {
         raw_segments: Vec::new(),
         onset_anchors_ms: Vec::new(),
+        voiced_activity: Vec::new(),
         frame_ms: 10,
         duration_ms: 45_000,
         probability,
@@ -517,6 +519,7 @@ fn aligns_twelve_edited_sections_across_a_twelve_minute_timeline() {
     let vad = VadResult {
         raw_segments: Vec::new(),
         onset_anchors_ms: Vec::new(),
+        voiced_activity: Vec::new(),
         frame_ms: 10,
         duration_ms,
         probability: activity.iter().map(|&active| f32::from(active)).collect(),

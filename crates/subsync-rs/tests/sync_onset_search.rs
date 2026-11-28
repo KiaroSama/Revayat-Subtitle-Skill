@@ -16,6 +16,7 @@ fn activity(spans: &[(u64, u64)], anchors: &[u64]) -> VadResult {
         duration_ms: 6000,
         probability: activity.iter().map(|&value| f32::from(value)).collect(),
         activity,
+        voiced_activity: Vec::new(),
         segments: spans
             .iter()
             .map(|&(start_ms, end_ms)| TimeSpan { start_ms, end_ms })

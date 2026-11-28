@@ -1,16 +1,16 @@
 # Changelog
 
-## Unreleased
+## [3.0.5] - 2026-11-28
 
 - Consider recovered speech onsets and ASS centisecond rounding throughout the complete permitted snap window. Keep exact endpoint, neighbor, overlap and replay guards.
 - Reject onset candidates created by clipping a sustained background at the lookback or previous-segment boundary; retain real attacks at those boundaries.
 - Resolve FSI from rendered ASS whitespace while preserving raw escapes, markup and directional controls. Respect header and inline wrapping modes during conversion and reviewed builds.
-- Advance generation to `19` and normalization to `16`; preserve previous editions and require fresh render evidence. See the [Rust 3.0.4 recheck](docs/audit-rust-304-2026-11-27.md) and [issue #41](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/41).
-
 - Classify text direction from the visible ASS text so `\h` and soft `\n` no longer trigger an LTR wrapper on Persian-only lines.
 - In ASS conversion, treat `\n` as a line break when `WrapStyle: 2`, an inline `\q2`, or `Banner` makes it one.
 - Run Gitleaks in a separate concurrency group for each commit pushed to `main`, so a newer push does not cancel the earlier scan.
-- Advance generation to `20` and normalization to `17` for the visible-ASS direction change. Rebuild recipe `19/16` workspaces into a distinct edition instead of reporting an untouched previous build as modified; preserve old files and require fresh render approval. See the [2026-11-28 edition migration recheck](docs/audit-revayat-subtitle-2026-11-28.md).
+- Advance generation to `20` and normalization to `17` for the visible-ASS direction change. Rebuild recipe `19/16` workspaces into a distinct edition instead of reporting an untouched previous build as modified; preserve old files and require fresh render approval. See the [Rust 3.0.4 recheck](docs/audit-rust-304-2026-11-27.md), [issue #41](https://github.com/KiaroSama/Revayat-Subtitle-Skill/issues/41), and the [2026-11-28 edition migration recheck](docs/audit-revayat-subtitle-2026-11-28.md).
+- Stop per-cue group refinement from sliding already-anchored dialogue cues across silence or through continuous loud scenes onto louder sound effects or neighboring lines, by scoring binary speech presence with onset-anchor and opening-voiced locks.
+- Add scene-adaptive voiced activity (`120-3400 Hz`, 25 s local noise floor) and quiet-scene sibilant/fricative onset backtracking in `subsync-rs`; refuse backward snaps into unvoiced pre-speech hiss, refuse forward snaps over active voiced speech, and protect quiet or deep trailing voiced speech and short proportional reading tails from premature end trimming.
 
 ## [3.0.4] - 2026-11-27
 
