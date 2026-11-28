@@ -38,6 +38,8 @@ For a failed `revayat-subtitle` command, inspect its UTF-8 operational log as de
 
 ## Audit evidence
 
+The [2026-11-28 edition migration recheck](audit-revayat-subtitle-2026-11-28.md) records an actual source-build upgrade that changed ASS output without changing recipe `19/16`. Generation `20` and normalization `17` give the corrected output a separate edition identity. The permanent migration target checks historical output bytes, unchanged reviewed inputs, preservation, idempotent rebuilds and refusal of missing or stale render evidence. Whenever generation or normalization changes emitted bytes for the same reviewed input, advance the applicable recipe versions in that change and verify migration from the preceding implementation; a green fresh-workspace test does not cover an existing edition.
+
 The [2026-11-27 Rust 3.0.4 recheck](audit-rust-304-2026-11-27.md) records recovered-onset search bounds, clipped-background onset rejection, and format-aware FSI depth checks. Its new integration targets run in the existing four native CI lanes. Generation `19` and normalization `16` preserve earlier editions and require fresh render approval. The linked repair PR carries the final tested tree, head commit and hosted checks; earlier green checks do not validate a later commit.
 
 The [2026-11-27 Rust 3.0.3 recheck](audit-rust-303-2026-11-27.md) records endpoint replay, bounded continuing-speech extension, sibling embedding preservation, and whole-cue bidi repair. Its permanent regressions run in the existing workspace CI; the linked repair PR supplies the exact final revision and hosted results. Generation `18` and normalization `15` require new render evidence without changing earlier editions.

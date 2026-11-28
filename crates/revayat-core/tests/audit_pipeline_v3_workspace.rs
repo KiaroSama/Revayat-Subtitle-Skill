@@ -418,7 +418,7 @@ fn path_markers_and_inventory_refuse_lossy_filename_conversion() -> Check {
 
 #[test]
 fn recipe_upgrade_preserves_the_previous_generation_and_requires_fresh_evidence() -> Check {
-    for (generation, normalization) in [(13, 12), (17, 14), (18, 15)] {
+    for (generation, normalization) in [(13, 12), (17, 14), (18, 15), (19, 16)] {
         check_recipe_upgrade(json!({
             "version": generation,
             "normalization": normalization,
@@ -476,7 +476,7 @@ fn check_recipe_upgrade(old_recipe: serde_json::Value) -> Check {
     assert_eq!(built["input_identity"], edition.manifest["input_identity"]);
     assert_eq!(
         built["generation_recipe"],
-        json!({"version": 19, "normalization": 16, "timing": "floor-centisecond"})
+        json!({"version": 20, "normalization": 17, "timing": "floor-centisecond"})
     );
     assert!(
         !Path::new(built["build"].as_str().ok_or("build path")?)
