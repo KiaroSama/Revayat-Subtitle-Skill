@@ -39,7 +39,9 @@ Ctrl+C requests cooperative cancellation. The executables stop and reap owned FF
 
 The global search follows the [FFsubsync approach](https://github.com/smacke/ffsubsync#how-does-it-work). The split penalty follows the principle described by [ALASS](https://github.com/kaegi/alass). The engine implements both in Rust and does not run either external tool.
 
-A cue that already covers much of a speech segment can still be late. Covered-window protection permits a backward correction to that same segment's onset only when the existing onset, coverage-gain, score, distance and neighbor checks also pass. It does not authorize a jump to a different segment. Separately recovered quiet or unvoiced attacks retain their detector evidence when snapping; primary-onset hiss guards must not discard that evidence. Both kinds of candidate still obey the exact snap radius, format precision, minimum duration and neighboring-cue bounds.
+A cue that already covers much of a speech segment can still be late. Group refinement can move it back toward that same segment's onset if the onset, coverage gain, and score checks pass. The move must fit `--max-split-offset-ms`, the refinement search radius, format precision, and neighboring-cue bounds. It can still happen with `--snap-ms 0`.
+
+Start snapping uses separate limits. Both primary and recovered onsets obey the exact `--snap-ms` radius, format precision, a minimum reading duration of 500 ms, and neighboring-cue bounds. The primary-onset hiss check does not discard detector evidence for recovered quiet or unvoiced attacks.
 
 ## Options
 

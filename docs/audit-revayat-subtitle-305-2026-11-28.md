@@ -189,6 +189,25 @@ remain valid and final-head gates pass. Authored signals verify timing mechanics
 and integration, not speech semantics for every film. Playback review of actual
 supplied dialogue remains necessary.
 
+## Integration disposition (2026-11-28)
+
+GitHub published signed release `v3.0.5` from `8293a4f` at 11:46 UTC on
+2026-11-28 with 16 signed assets. PR #44 follows it under `Unreleased`.
+No new release tag or local build is planned unless requested.
+
+The owner chose to keep `95ad08b1027adb70bda775e95522ff7c62f8e518` and the
+published signed tags `v2.0.0..v3.0.5` without rewriting history. The commit
+uses a GitHub no-reply alias, not a private personal email. New commits use
+the repository's approved author and committer address.
+
+We removed the stale `crates/subsync-rs/Cargo.lock`. Candidate diagnostics
+and the consented speech benchmark are deferred. GPU acceleration is deferred
+until profiling shows where it would help.
+
+To address CodeRabbit finding `4727324372` on PR #44, the
+[audio-sync reference](../skills/revayat-subtitle/references/audio-sync.md)
+now documents group-refinement bounds separately from start-snapping bounds.
+
 ## Research references
 
 - [FFsubsync](https://github.com/smacke/ffsubsync#how-it-works): binary speech

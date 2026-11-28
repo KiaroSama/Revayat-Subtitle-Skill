@@ -5,6 +5,7 @@
 - Recover late cues and joined dialogue toward the onset of their own speech segment even when most of the authored window already contains speech. Keep the guards against unrelated onset jumps and continuous-wall drift.
 - Preserve separately recovered fricative and quiet/deep voiced onset evidence during backward snapping. Keep primary-onset hiss rejection, exact motion and neighbor limits, minimum reading time, format precision and worker replay checks.
 - Add real-waveform regressions for both repairs and correct the English README's description of the four native CI test targets. See the [3.0.5 source recheck](docs/audit-revayat-subtitle-305-2026-11-28.md).
+- Remove the stale `crates/subsync-rs/Cargo.lock` and clarify group-refinement and start-snapping limits in the [audio-sync reference](skills/revayat-subtitle/references/audio-sync.md).
 
 ## [3.0.5] - 2026-11-28
 
